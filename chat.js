@@ -1,7 +1,9 @@
 import OBR from "./obr.js";
 import { AVATAR, SPEECH, canSpeak, parseSpeech } from "./rules.js";
 
-import { openSessionChannel, savedAvatar, saveAvatar } from "./session.js";
+import { openSessionChannel, savedAvatar, saveAvatar, savedAppearance, saveAppearance } from "./session.js";
+
+import { drawBubble } from "./appearance.js";
 
 const transcript = document.querySelector("#transcript");
 const entries = document.querySelector("#entries");
@@ -126,7 +128,7 @@ form.addEventListener("submit", async (event) => {
       return;
     }
 
-    await OBR.broadcast.sendMessage(SPEECH, speech, { destination: "ALL" });
+    await OBR.broadcast.sendMessage(SPEECH, { ...speech, appearance: savedAppearance() }, { destination: "ALL" });
     if (input.value === draft) input.value = "";
     status.textContent = "";
   } catch (error) {
@@ -138,7 +140,44 @@ form.addEventListener("submit", async (event) => {
   }
 });
 
+function setupSettings() {
+  const chatTab = document.querySelector("#chat-tab");
+  const settingsTab = document.querySelector("#settings-tab");
+  const chatPanel = document.querySelector("#chat-panel");
+  const settingsPanel = document.querySelector("#settings-panel");
+  const fields = settingsPanel.querySelector("form");
+  const preview = settingsPanel.querySelector("#bubble-preview");
+
+  function drawPreview(style) {
+    const bubble = drawBubble("See you in the tavern!", style);
+    bubble.setAttribute("aria-label", "Speech bubble preview");
+    preview.replaceChildren(bubble);
+  }
+
+  const style = savedAppearance();
+  for (const [key, value] of Object.entries(style)) fields.elements.namedItem(key).value = value;
+  drawPreview(style);
+
+  function select(settings) {
+    chatTab.setAttribute("aria-pressed", String(!settings));
+    settingsTab.setAttribute("aria-pressed", String(settings));
+    chatPanel.hidden = settings;
+    settingsPanel.hidden = !settings;
+    if (!settings) scrollToLatest();
+  }
+
+  chatTab.addEventListener("click", () => select(false));
+  settingsTab.addEventListener("click", () => select(true));
+  fields.addEventListener("submit", (event) => event.preventDefault());
+  fields.addEventListener("input", () => {
+    const values = Object.fromEntries(new FormData(fields));
+    values.size = Number(values.size);
+    drawPreview(saveAppearance(values));
+  });
+}
+
 OBR.onReady(() => {
+  setupSettings();
   connectTranscript();
   OBR.player.onChange(({ metadata, role }) => {
     const state = JSON.stringify([metadata[AVATAR]?.tokenId, role]);

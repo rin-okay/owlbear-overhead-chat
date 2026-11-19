@@ -13,6 +13,11 @@
       <img src="./icon.svg" alt="" width="26" height="26">
       <h1>Overhead Chat</h1>
     </header>
+    <nav aria-label="Overhead Chat views">
+      <button type="button" id="chat-tab" aria-pressed="true" aria-controls="chat-panel">Chat</button>
+      <button type="button" id="settings-tab" aria-pressed="false" aria-controls="settings-panel">Settings</button>
+    </nav>
+    <div id="chat-panel">
     <section id="transcript" aria-label="Session chat" role="log" tabindex="0">
       <p id="empty">No messages yet.</p>
       <ol id="entries"></ol>
@@ -25,6 +30,29 @@
       </div>
       <p id="status" role="status">Open this panel in an Owlbear Rodeo room.</p>
     </form>
+    </div>
+    <section id="settings-panel" aria-label="Chat settings" hidden>
+      <form>
+        <label>Display name <input name="name" type="text" maxlength="32" placeholder="Use character name"></label>
+        <div class="colors">
+          <label>Bubble border <input name="border" type="color"></label>
+          <label>Bubble fill <input name="fill" type="color"></label>
+          <label>Text color <input name="color" type="color"></label>
+        </div>
+        <div class="font-controls">
+          <label>Font
+            <select name="font">
+              <option value="sans">Arial</option>
+              <option value="serif">Georgia</option>
+              <option value="mono">Courier New</option>
+              <option value="rounded">Trebuchet MS</option>
+            </select>
+          </label>
+          <label>Font size <input name="size" type="number" min="10" max="28" step="1" required></label>
+        </div>
+      </form>
+      <div id="bubble-preview" aria-label="Bubble preview"></div>
+    </section>
   </main>
 </body>
 </html>

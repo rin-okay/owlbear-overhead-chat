@@ -1,6 +1,7 @@
-import OBR, { buildLabel } from "./obr.js";
+import OBR, { buildBillboard, buildLabel } from "./obr.js";
 import { AVATAR, SPEECH, BUBBLE_MS, canSpeak, isPublicToken, parseSpeech } from "./rules.js";
 
+import { drawBubble, fonts, normalizeAppearance } from "./appearance.js";
 import { openSessionChannel, saveAvatar } from "./session.js";
 
 const transcript = [];
@@ -39,7 +40,8 @@ async function showSpeech(event, speech, version) {
   if (version !== sceneVersion || !canSpeak(sender, token, permissions)) return;
 
   const { tokenId, text } = speech;
-  const entry = { name: token.name || "Character", text, own: event.connectionId === connectionId };
+  const appearance = normalizeAppearance(event.data.appearance);
+  const entry = { name: appearance.name || token.name || "Character", text, own: event.connectionId === connectionId };
   transcript.push(entry);
   transcriptChannel?.postMessage({ type: "line", entry });
 
@@ -53,28 +55,31 @@ async function showSpeech(event, speech, version) {
   if (version !== sceneVersion) return;
 
   const gap = Math.min(16, Math.max(4, (bounds.max.y - bounds.min.y) * 0.07));
-  const label = buildLabel()
-    .plainText(text)
-    .position({ x: bounds.center.x, y: bounds.min.y - gap })
-    .attachedTo(tokenId)
-    .layer("TEXT")
-    .locked(true)
-    .fontSize(15)
-    .fontWeight(550)
-    .width(Math.min(230, Math.max(72, Array.from(text).length * 8 + 20)))
-    .padding(8)
-    .textAlign("CENTER")
-    .fillColor("#241d31")
-    .backgroundColor("#fbf6ff")
-    .cornerRadius(8)
-    .pointerWidth(12)
-    .pointerHeight(7)
-    .pointerDirection("DOWN")
-    .build();
+  const position = { x: bounds.center.x, y: bounds.min.y - gap };
+  const canvas = drawBubble(text, appearance);
+  const bubbleBuilder = buildBillboard({
+    url: canvas.toDataURL("image/png"), mime: "image/png", width: canvas.width, height: canvas.height,
+  }, { dpi: 300, offset: { x: canvas.width / 2, y: canvas.height } });
 
-  label.disableHit = true;
-  label.disableAttachmentBehavior = ["COPY", "ROTATION", "SCALE", "LOCKED"];
-  await OBR.scene.local.addItems([label]);
+  const attach = (builder) => {
+    const item = builder.position(position).attachedTo(tokenId).layer("TEXT").locked(true).build();
+    item.disableHit = true;
+    item.disableAttachmentBehavior = ["COPY", "ROTATION", "SCALE", "LOCKED"];
+    return item;
+  };
+
+  let label = attach(bubbleBuilder);
+  try {
+    await OBR.scene.local.addItems([label]);
+  } catch {
+    if (version !== sceneVersion) return;
+    label = attach(buildLabel()
+      .plainText(text).fontFamily(fonts[appearance.font]).fontSize(appearance.size)
+      .width(248).padding(8).textAlign("CENTER").fillColor(appearance.color)
+      .backgroundColor(appearance.fill).cornerRadius(8)
+      .pointerWidth(12).pointerHeight(7).pointerDirection("DOWN"));
+    await OBR.scene.local.addItems([label]);
+  }
   if (version !== sceneVersion) {
     if (await OBR.scene.isReady()) await OBR.scene.local.deleteItems([label.id]);
     return;
