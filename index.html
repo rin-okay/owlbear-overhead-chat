@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Overhead Chat</title>
+  <link rel="stylesheet" href="./chat.css">
+  <script type="module" src="./chat.js"></script>
+</head>
+<body>
+  <main>
+    <header>
+      <img src="./icon.svg" alt="" width="29" height="29">
+      <h1>Overhead Chat</h1>
+    </header>
+    <form>
+      <label for="message" id="speaker">Pick an avatar</label>
+      <div class="compose">
+        <input id="message" type="text" placeholder="Say something…" maxlength="180" required disabled autocomplete="off" aria-describedby="status">
+        <button type="submit" disabled>Send</button>
+      </div>
+      <p id="status" role="status">Open this panel in an Owlbear Rodeo room.</p>
+    </form>
+  </main>
+</body>
+</html>
