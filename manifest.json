@@ -1,6 +1,6 @@
 {
   "name": "Overhead Chat",
-  "version": "1.3.2",
+  "version": "1.3.3",
   "manifest_version": 1,
   "description": "Speak through a character token with temporary speech bubbles.",
   "icon": "/owlbear-overhead-chat/toolbar-chat.svg",

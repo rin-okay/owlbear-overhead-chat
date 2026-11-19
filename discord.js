@@ -27,8 +27,9 @@ export function saveDiscordSettings(settings) {
 const plainText = (value) => String(value).replace(/([\\*_~`|<>])/gu, "\\$1");
 
 export async function sendDiscord(url, entry, stillEnabled = () => true) {
+  const timestamp = Math.floor((entry.receivedAt ?? Date.now()) / 1000);
   const body = JSON.stringify({
-    content: `**${plainText(entry.name).replace(/\s+/gu, " ")}**\n${plainText(entry.text)}`,
+    content: `**${plainText(entry.name).replace(/\s+/gu, " ")}** <t:${timestamp}:t>\n${plainText(entry.text)}`,
     allowed_mentions: { parse: [] },
     flags: 4,
   });

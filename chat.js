@@ -1,5 +1,5 @@
 import OBR from "./obr.js";
-import { AVATAR, SPEECH, canSpeak, parseSpeech } from "./rules.js";
+import { ABOVE_FOG, AVATAR, SPEECH, canSpeak, parseSpeech } from "./rules.js";
 
 import { openSessionChannel, savedAvatar, saveAvatar, savedAppearance, saveAppearance } from "./session.js";
 
@@ -166,6 +166,52 @@ form.addEventListener("submit", async (event) => {
   }
 });
 
+function setupFogSetting() {
+  const setting = document.querySelector("#gm-fog-settings");
+  const checkbox = setting.querySelector("input");
+  const feedback = setting.querySelector("[role=status]");
+  let saved = false;
+  let revision = 0;
+
+  function sync(metadata) {
+    revision++;
+    saved = metadata[ABOVE_FOG] === true;
+    checkbox.checked = saved;
+    checkbox.disabled = false;
+    feedback.textContent = "";
+  }
+
+  function showForRole(role) {
+    setting.hidden = role !== "GM";
+  }
+
+  OBR.player.getRole().then(showForRole).catch(() => showForRole("PLAYER"));
+  OBR.player.onChange(({ role }) => showForRole(role));
+  OBR.room.onMetadataChange(sync);
+  const initialRevision = revision;
+  OBR.room.getMetadata().then((metadata) => {
+    if (revision === initialRevision) sync(metadata);
+  }).catch(() => {
+    if (revision === initialRevision) feedback.textContent = "Couldn’t load room settings.";
+  });
+
+  checkbox.addEventListener("change", async () => {
+    const requested = checkbox.checked;
+    checkbox.disabled = true;
+    try {
+      if (await OBR.player.getRole() !== "GM") return;
+      await OBR.room.setMetadata({ [ABOVE_FOG]: requested });
+      saved = requested;
+      feedback.textContent = "";
+    } catch {
+      feedback.textContent = "Couldn’t save the room setting.";
+    } finally {
+      checkbox.checked = saved;
+      checkbox.disabled = false;
+    }
+  });
+}
+
 function setupSettings() {
   const chatTab = document.querySelector("#chat-tab");
   const settingsTab = document.querySelector("#settings-tab");
@@ -217,6 +263,7 @@ function setupSettings() {
 
 OBR.onReady(() => {
   setupSettings();
+  setupFogSetting();
   connectTranscript();
   OBR.player.onChange(({ metadata, role }) => {
     const state = JSON.stringify([metadata[AVATAR]?.tokenId, role]);

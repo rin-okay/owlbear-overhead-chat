@@ -1,5 +1,5 @@
 import OBR, { buildBillboard, buildLabel } from "./obr.js";
-import { AVATAR, SPEECH, BUBBLE_MS, canSpeak, isPublicToken, parseSpeech } from "./rules.js";
+import { ABOVE_FOG, AVATAR, SPEECH, BUBBLE_MS, canSpeak, isPublicToken, parseSpeech } from "./rules.js";
 
 import { BUBBLE_LINE_HEIGHT, drawBubble, fonts, normalizeAppearance } from "./appearance.js";
 import { openSessionChannel, saveAvatar } from "./session.js";
@@ -52,7 +52,11 @@ async function showSpeech(event, speech, version, receivedAt) {
   transcriptChannel?.postMessage({ type: "line", entry });
   queueDiscord(entry, role, (message) => transcriptChannel?.postMessage({ type: "discord-status", message }));
 
-  const bounds = await OBR.scene.items.getItemBounds([tokenId]);
+  const [bounds, roomMetadata] = await Promise.all([
+    OBR.scene.items.getItemBounds([tokenId]),
+    OBR.room.getMetadata().catch(() => ({})),
+  ]);
+  const layer = roomMetadata[ABOVE_FOG] === true ? "CONTROL" : "TEXT";
   if (version !== sceneVersion || !Number.isFinite(bounds?.min?.y) ||
       !Number.isFinite(bounds?.max?.y) ||
       !Number.isFinite(bounds?.center?.x)) return;
@@ -69,7 +73,7 @@ async function showSpeech(event, speech, version, receivedAt) {
   }, { dpi: 300, offset: { x: canvas.width / 2, y: canvas.height } });
 
   const attach = (builder) => {
-    const item = builder.position(position).attachedTo(tokenId).layer("TEXT").locked(true).build();
+    const item = builder.position(position).attachedTo(tokenId).layer(layer).locked(true).build();
     item.disableHit = true;
     item.disableAttachmentBehavior = ["COPY", "ROTATION", "SCALE", "LOCKED"];
     return item;
