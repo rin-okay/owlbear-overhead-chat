@@ -10,9 +10,13 @@
 <body>
   <main>
     <header>
-      <img src="./icon.svg" alt="" width="29" height="29">
+      <img src="./icon.svg" alt="" width="26" height="26">
       <h1>Overhead Chat</h1>
     </header>
+    <section id="transcript" aria-label="Session chat" role="log" tabindex="0">
+      <p id="empty">No messages yet.</p>
+      <ol id="entries"></ol>
+    </section>
     <form>
       <label for="message" id="speaker">Pick an avatar</label>
       <div class="compose">

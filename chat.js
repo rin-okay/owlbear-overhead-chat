@@ -1,6 +1,11 @@
 import OBR from "./obr.js";
 import { AVATAR, SPEECH, canSpeak, parseSpeech } from "./rules.js";
 
+import { openSessionChannel, savedAvatar, saveAvatar } from "./session.js";
+
+const transcript = document.querySelector("#transcript");
+const entries = document.querySelector("#entries");
+const empty = document.querySelector("#empty");
 const form = document.querySelector("form");
 const speaker = document.querySelector("#speaker");
 const input = document.querySelector("#message");
@@ -13,6 +18,43 @@ let observedToken = null;
 let avatarState = "";
 let sending = false;
 let refreshVersion = 0;
+
+function appendLine(entry, target) {
+  const line = document.createElement("li");
+  const name = document.createElement("span");
+  name.className = "name";
+  name.textContent = `${entry.name}: `;
+  line.append(name, entry.text);
+  target.append(line);
+}
+
+function scrollToLatest() {
+  transcript.scrollTop = transcript.scrollHeight;
+}
+
+function connectTranscript() {
+  openSessionChannel().then((channel) => {
+    const requestHistory = () => channel.postMessage({ type: "request" });
+    channel.onmessage = ({ data }) => {
+      if (data?.type === "ready") requestHistory();
+      if (data?.type === "history") {
+        const fragment = document.createDocumentFragment();
+        data.entries.forEach((entry) => appendLine(entry, fragment));
+        entries.replaceChildren(fragment);
+        empty.hidden = data.entries.length > 0;
+        scrollToLatest();
+      }
+      if (data?.type === "line") {
+        const nearBottom = transcript.scrollHeight - transcript.clientHeight - transcript.scrollTop < 32;
+        empty.hidden = true;
+        appendLine(data.entry, entries);
+        if (nearBottom || data.entry.own) scrollToLatest();
+      }
+    };
+    window.addEventListener("pagehide", () => channel.close(), { once: true });
+    requestHistory();
+  }).catch((error) => console.error("Overhead Chat transcript unavailable", error));
+}
 
 function updateControls() {
   input.disabled = !avatar;
@@ -27,7 +69,9 @@ async function getAvatar() {
     OBR.player.getRole(),
     OBR.room.getPermissions(),
   ]);
-  const tokenId = metadata[AVATAR]?.tokenId;
+  const current = metadata[AVATAR]?.tokenId;
+  const tokenId = current ?? savedAvatar();
+  if (current) saveAvatar(current);
   const choose = "Select a character token and choose Set as avatar.";
 
   if (!tokenId) return { hint: choose };
@@ -36,7 +80,7 @@ async function getAvatar() {
     return { tokenId, observed: token, hint: choose };
   }
 
-  return { tokenId, observed: token, token, hint: "Public room speech · bubbles last six seconds." };
+  return { tokenId, observed: token, token, hint: "" };
 }
 
 async function refresh() {
@@ -84,7 +128,7 @@ form.addEventListener("submit", async (event) => {
 
     await OBR.broadcast.sendMessage(SPEECH, speech, { destination: "ALL" });
     if (input.value === draft) input.value = "";
-    status.textContent = "Public room speech · bubbles last six seconds.";
+    status.textContent = "";
   } catch (error) {
     console.error("Overhead Chat send failed", error);
     status.textContent = "Couldn’t send your message. Your draft is still here.";
@@ -95,6 +139,7 @@ form.addEventListener("submit", async (event) => {
 });
 
 OBR.onReady(() => {
+  connectTranscript();
   OBR.player.onChange(({ metadata, role }) => {
     const state = JSON.stringify([metadata[AVATAR]?.tokenId, role]);
     if (state === avatarState) return;

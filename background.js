@@ -1,8 +1,13 @@
 import OBR, { buildLabel } from "./obr.js";
 import { AVATAR, SPEECH, BUBBLE_MS, canSpeak, isPublicToken, parseSpeech } from "./rules.js";
 
+import { openSessionChannel, saveAvatar } from "./session.js";
+
+const transcript = [];
+let transcriptChannel;
+
 const active = new Map();
-const pending = new Map();
+let pending = Promise.resolve();
 let sceneVersion = 0;
 
 async function removeBubble(tokenId, bubble) {
@@ -30,9 +35,14 @@ async function showSpeech(event, speech, version) {
   const sender = event.connectionId === connectionId
     ? { id: OBR.player.id, role }
     : party.find((player) => player.connectionId === event.connectionId);
-  if (!canSpeak(sender, items[0], permissions)) return;
+  const [token] = items;
+  if (version !== sceneVersion || !canSpeak(sender, token, permissions)) return;
 
   const { tokenId, text } = speech;
+  const entry = { name: token.name || "Character", text, own: event.connectionId === connectionId };
+  transcript.push(entry);
+  transcriptChannel?.postMessage({ type: "line", entry });
+
   const bounds = await OBR.scene.items.getItemBounds([tokenId]);
   if (version !== sceneVersion || !Number.isFinite(bounds?.min?.y) ||
       !Number.isFinite(bounds?.max?.y) ||
@@ -82,23 +92,25 @@ function queueSpeech(event) {
   if (!speech) return;
   const version = sceneVersion;
 
-  // Keep SDK operations in arrival order when several lines target the same token.
-  const previous = pending.get(speech.tokenId) ?? Promise.resolve();
-  const work = previous.then(() => showSpeech(event, speech, version)).catch(report);
-  pending.set(speech.tokenId, work);
-  void work.then(() => {
-    if (pending.get(speech.tokenId) === work) pending.delete(speech.tokenId);
-  });
+  // Validate messages in receive order so the transcript reads in order.
+  pending = pending.then(() => showSpeech(event, speech, version)).catch(report);
 }
 
 OBR.onReady(() => {
   OBR.broadcast.onMessage(SPEECH, queueSpeech);
+  openSessionChannel().then((channel) => {
+    transcriptChannel = channel;
+    channel.onmessage = ({ data }) => {
+      if (data?.type === "request") channel.postMessage({ type: "history", entries: transcript });
+    };
+    channel.postMessage({ type: "ready" });
+  }).catch(report);
   OBR.scene.onReadyChange((ready) => {
     if (ready) return;
     ++sceneVersion;
     for (const bubble of active.values()) clearTimeout(bubble.timer);
     active.clear();
-    pending.clear();
+    pending = Promise.resolve();
   });
 
   OBR.scene.items.onChange((items) => {
@@ -112,7 +124,7 @@ OBR.onReady(() => {
   OBR.contextMenu.create({
     id: "chat.overhead.set-avatar.v1",
     icons: [{
-      icon: new URL("./icon.svg", import.meta.url).href,
+      icon: new URL("./toolbar-chat.svg", import.meta.url).href,
       label: "Set as avatar",
       filter: {
         min: 1,
@@ -137,6 +149,7 @@ OBR.onReady(() => {
           return;
         }
 
+        saveAvatar(token.id);
         await OBR.player.setMetadata({ [AVATAR]: { tokenId: token.id } });
         await OBR.action.open();
       } catch (error) {
