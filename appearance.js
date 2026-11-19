@@ -25,30 +25,55 @@ export function normalizeAppearance(value) {
   };
 }
 
-export function drawBubble(text, style) {
-  const canvas = document.createElement("canvas");
-  const ctx = canvas.getContext("2d");
-  const font = `${style.size}px ${fonts[style.font]}`;
-  ctx.font = font;
+function wrapParagraph(paragraph, measure) {
+  const limit = 240;
   const lines = [];
   let line = "";
-  for (const word of text.split(" ")) {
+  let continuedWord = false;
+  for (const word of paragraph.split(" ")) {
     const joined = line ? `${line} ${word}` : word;
-    if (ctx.measureText(joined).width <= 224) {
+    if (measure(joined) <= limit) {
       line = joined;
       continue;
     }
     if (line) lines.push(line);
     line = "";
+    continuedWord = false;
     for (const char of word) {
-      if (line && ctx.measureText(line + char).width > 224) {
+      if (line && measure(line + char) > limit) {
         lines.push(line);
         line = "";
+        continuedWord = true;
       }
       line += char;
     }
   }
+
+  if (lines.length && Array.from(line).length === 1) {
+    const previous = lines.at(-1);
+    const split = previous.lastIndexOf(" ");
+    if (split > 0 && measure(`${previous.slice(split + 1)} ${line}`) <= limit) {
+      lines[lines.length - 1] = previous.slice(0, split);
+      line = `${previous.slice(split + 1)} ${line}`;
+    } else if (continuedWord) {
+      const chars = Array.from(previous);
+      if (chars.length > 2 && measure(chars.at(-1) + line) <= limit) {
+        line = chars.pop() + line;
+        lines[lines.length - 1] = chars.join("");
+      }
+    }
+  }
   lines.push(line);
+  return lines;
+}
+
+export function drawBubble(text, style) {
+  const canvas = document.createElement("canvas");
+  const ctx = canvas.getContext("2d");
+  const font = `${style.size}px ${fonts[style.font]}`;
+  ctx.font = font;
+  const lines = text.split("\n").flatMap((paragraph) =>
+    wrapParagraph(paragraph, (line) => ctx.measureText(line).width));
 
   const width = Math.max(32, Math.ceil(Math.max(...lines.map((part) => ctx.measureText(part).width))) + 18);
   const lineHeight = Math.ceil(style.size * 1.3);
@@ -80,5 +105,5 @@ export function drawBubble(text, style) {
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   lines.forEach((part, index) => ctx.fillText(part, middle, 8 + (index + 0.5) * lineHeight));
-  return canvas;
+  return { canvas, lines };
 }

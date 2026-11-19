@@ -109,6 +109,12 @@ async function refresh() {
   }
 }
 
+input.addEventListener("keydown", (event) => {
+  if (event.key !== "Enter" || event.shiftKey || event.isComposing || event.keyCode === 229) return;
+  event.preventDefault();
+  form.requestSubmit();
+});
+
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
   if (sending || !avatar) return;
@@ -149,7 +155,7 @@ function setupSettings() {
   const preview = settingsPanel.querySelector("#bubble-preview");
 
   function drawPreview(style) {
-    const bubble = drawBubble("See you in the tavern!", style);
+    const { canvas: bubble } = drawBubble("See you in the tavern!", style);
     bubble.setAttribute("aria-label", "Speech bubble preview");
     preview.replaceChildren(bubble);
   }

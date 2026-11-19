@@ -22,6 +22,7 @@ export function parseSpeech(data) {
   const { tokenId, text } = data;
   if (typeof tokenId !== "string" || !tokenId || tokenId.length > 128 ||
       typeof text !== "string" || text.length > MAX_LENGTH) return null;
-  const line = text.trim().replace(/\s+/gu, " ");
+  const line = text.replace(/\r\n?/gu, "\n").trim().split("\n")
+    .map((part) => part.trim().replace(/[^\S\n]+/gu, " ")).join("\n");
   return line ? { tokenId, text: line } : null;
 }

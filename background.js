@@ -56,7 +56,7 @@ async function showSpeech(event, speech, version) {
 
   const gap = Math.min(16, Math.max(4, (bounds.max.y - bounds.min.y) * 0.07));
   const position = { x: bounds.center.x, y: bounds.min.y - gap };
-  const canvas = drawBubble(text, appearance);
+  const { canvas, lines } = drawBubble(text, appearance);
   const bubbleBuilder = buildBillboard({
     url: canvas.toDataURL("image/png"), mime: "image/png", width: canvas.width, height: canvas.height,
   }, { dpi: 300, offset: { x: canvas.width / 2, y: canvas.height } });
@@ -74,18 +74,17 @@ async function showSpeech(event, speech, version) {
   } catch {
     if (version !== sceneVersion) return;
 
-    const width = canvas.width / 2;
     const nativeLabel = () => buildLabel()
-      .plainText(text).fontFamily(fonts[appearance.font]).fontSize(appearance.size)
+      .plainText(lines.join("\n")).width("AUTO").fontFamily(fonts[appearance.font]).fontSize(appearance.size)
       .textAlign("CENTER").pointerDirection("DOWN");
     // Owlbear's native label has no border style. Stack two matching labels
     // with extra padding on the back layer to draw the rim. Both pointer
     // tips share an anchor. Extend the inner pointer to inset its body.
     labels = [
-      attach(nativeLabel().width(width + 4).padding(10).fillColor(appearance.border)
+      attach(nativeLabel().padding(10).fillColor(appearance.border)
         .backgroundColor(appearance.border).cornerRadius(10)
         .pointerWidth(16).pointerHeight(7)),
-      attach(nativeLabel().width(width).padding(8).fillColor(appearance.color)
+      attach(nativeLabel().padding(8).fillColor(appearance.color)
         .backgroundColor(appearance.fill).cornerRadius(8)
         .pointerWidth(12).pointerHeight(9)),
     ];

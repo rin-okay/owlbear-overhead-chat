@@ -68,3 +68,20 @@ select { font: inherit; background: #181321; color: inherit; border: 1px solid #
 
 #reset-appearance { margin-top: 8px; min-height: 32px; background: #312940; color: #e2d4f6; }
 #reset-appearance:hover { background: #c7b6f8; color: #271c3a; }
+
+#message {
+  font: 16px/1.35 system-ui, sans-serif;
+  width: 100%;
+  min-width: 0;
+  min-height: 42px;
+  resize: none;
+  background: #181321;
+  color: inherit;
+  border: 1px solid #645775;
+  border-radius: 7px;
+  padding: 7px 10px;
+}
+#message::placeholder { color: #ab9dbb; }
+#message:disabled { opacity: .56; }
+#entries li { white-space: pre-wrap; }
+#composer-hint { margin: 5px 0 0; color: #ab9dbb; font-size: 11px; }
