@@ -3,3 +3,6 @@
 
 /toolbar-chat.svg
   Access-Control-Allow-Origin: *
+
+/owlbear-overhead-chat/toolbar-chat.svg
+  Access-Control-Allow-Origin: *

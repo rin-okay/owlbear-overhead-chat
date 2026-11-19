@@ -1,14 +1,14 @@
 {
   "name": "Overhead Chat",
-  "version": "1.2.8",
+  "version": "1.2.9",
   "manifest_version": 1,
   "description": "Speak through a character token with temporary speech bubbles.",
-  "icon": "/toolbar-chat.svg",
-  "background_url": "/background.html",
+  "icon": "/owlbear-overhead-chat/toolbar-chat.svg",
+  "background_url": "/owlbear-overhead-chat/background.html",
   "action": {
     "title": "Overhead Chat",
-    "icon": "/toolbar-chat.svg",
-    "popover": "/index.html",
+    "icon": "/owlbear-overhead-chat/toolbar-chat.svg",
+    "popover": "/owlbear-overhead-chat/index.html",
     "width": 380,
     "height": 440
   }
