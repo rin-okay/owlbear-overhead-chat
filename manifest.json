@@ -1,13 +1,13 @@
 {
   "name": "Overhead Chat",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "manifest_version": 1,
   "description": "Speak through a character token with temporary speech bubbles.",
-  "icon": "/icon.svg",
+  "icon": "/toolbar-chat.svg",
   "background_url": "/background.html",
   "action": {
     "title": "Overhead Chat",
-    "icon": "/icon.svg",
+    "icon": "/toolbar-chat.svg",
     "popover": "/index.html",
     "width": 352,
     "height": 225

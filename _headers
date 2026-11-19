@@ -1,2 +1,5 @@
 /manifest.json
   Access-Control-Allow-Origin: *
+
+/toolbar-chat.svg
+  Access-Control-Allow-Origin: *
