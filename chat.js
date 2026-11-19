@@ -23,10 +23,28 @@ let refreshVersion = 0;
 
 function appendLine(entry, target) {
   const line = document.createElement("li");
-  const name = document.createElement("span");
+  const heading = document.createElement("div");
+  heading.className = "message-heading";
+
+  const name = document.createElement("strong");
   name.className = "name";
-  name.textContent = `${entry.name}: `;
-  line.append(name, entry.text);
+  name.textContent = entry.name;
+  heading.append(name);
+
+  if (Number.isFinite(entry.receivedAt)) {
+    const stamp = new Date(entry.receivedAt);
+    const hours = String(stamp.getHours()).padStart(2, "0");
+    const minutes = String(stamp.getMinutes()).padStart(2, "0");
+    const time = document.createElement("time");
+    time.dateTime = stamp.toISOString();
+    time.textContent = `${hours}:${minutes}`;
+    heading.append(time);
+  }
+
+  const message = document.createElement("div");
+  message.className = "message-text";
+  message.textContent = entry.text;
+  line.append(heading, message);
   target.append(line);
 }
 

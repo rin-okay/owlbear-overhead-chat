@@ -23,7 +23,7 @@ function report(error) {
   console.error("Overhead Chat background", error);
 }
 
-async function showSpeech(event, speech, version) {
+async function showSpeech(event, speech, version, receivedAt) {
   if (version !== sceneVersion || !await OBR.scene.isReady()) return;
 
   const [items, permissions, connectionId, role, party] = await Promise.all([
@@ -41,7 +41,12 @@ async function showSpeech(event, speech, version) {
 
   const { tokenId, text } = speech;
   const appearance = normalizeAppearance(event.data.appearance);
-  const entry = { name: appearance.name || token.name || "Character", text, own: event.connectionId === connectionId };
+  const entry = {
+    name: appearance.name || token.name || "Character",
+    text,
+    receivedAt,
+    own: event.connectionId === connectionId,
+  };
   transcript.push(entry);
   transcriptChannel?.postMessage({ type: "line", entry });
 
@@ -112,9 +117,10 @@ function queueSpeech(event) {
   const speech = parseSpeech(event.data);
   if (!speech) return;
   const version = sceneVersion;
+  const receivedAt = Date.now();
 
   // Validate messages in receive order so the transcript reads in order.
-  pending = pending.then(() => showSpeech(event, speech, version)).catch(report);
+  pending = pending.then(() => showSpeech(event, speech, version, receivedAt)).catch(report);
 }
 
 OBR.onReady(() => {

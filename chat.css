@@ -44,7 +44,7 @@ header { margin-bottom: 0; flex: none; }
 }
 #empty { margin: 0; color: #ab9dbb; }
 #entries { list-style: none; padding: 0; margin: 0; overflow-wrap: anywhere; }
-#entries li + li { margin-top: 5px; }
+#entries li + li { margin-top: 10px; }
 .name { color: #d9caf4; font-weight: 650; }
 form { flex: none; }
 #status { min-height: 0; margin-top: 7px; }
@@ -83,5 +83,8 @@ select { font: inherit; background: #181321; color: inherit; border: 1px solid #
 }
 #message::placeholder { color: #ab9dbb; }
 #message:disabled { opacity: .56; }
-#entries li { white-space: pre-wrap; }
+.message-heading { display: flex; align-items: baseline; gap: 8px; }
+.message-heading .name { min-width: 0; font-weight: 700; }
+.message-heading time { flex: none; font-size: 11px; color: #ab9dbb; font-variant-numeric: tabular-nums; }
+.message-text { white-space: pre-wrap; }
 #composer-hint { margin: 5px 0 0; color: #ab9dbb; font-size: 11px; }
