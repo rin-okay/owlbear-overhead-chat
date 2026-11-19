@@ -8,7 +8,6 @@
 body { margin: 0; }
 main { padding: 16px; }
 header { display: flex; align-items: center; gap: 9px; margin-bottom: 17px; }
-h1 { font-size: 17px; font-weight: 650; margin: 0; }
 label { display: block; color: #d9caf4; margin-bottom: 7px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .compose { display: flex; gap: 8px; }
 input, button { font: inherit; min-height: 42px; border-radius: 7px; }
