@@ -26,7 +26,7 @@ export function normalizeAppearance(value) {
 }
 
 function wrapParagraph(paragraph, measure) {
-  const limit = 240;
+  const limit = 192;
   const lines = [];
   let line = "";
   let continuedWord = false;
