@@ -1,7 +1,7 @@
 import OBR, { buildBillboard, buildLabel } from "./obr.js";
 import { AVATAR, SPEECH, BUBBLE_MS, canSpeak, isPublicToken, parseSpeech } from "./rules.js";
 
-import { drawBubble, fonts, normalizeAppearance } from "./appearance.js";
+import { BUBBLE_LINE_HEIGHT, drawBubble, fonts, normalizeAppearance } from "./appearance.js";
 import { openSessionChannel, saveAvatar } from "./session.js";
 
 const transcript = [];
@@ -81,7 +81,7 @@ async function showSpeech(event, speech, version, receivedAt) {
 
     const nativeLabel = () => buildLabel()
       .plainText(lines.join("\n")).width("AUTO").fontFamily(fonts[appearance.font]).fontSize(appearance.size)
-      .textAlign("CENTER").pointerDirection("DOWN");
+      .lineHeight(BUBBLE_LINE_HEIGHT).textAlign("CENTER").pointerDirection("DOWN");
     // Owlbear's native label has no border style. Stack two matching labels
     // with extra padding on the back layer to draw the rim. Both pointer
     // tips share an anchor. Extend the inner pointer to inset its body.

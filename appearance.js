@@ -1,3 +1,5 @@
+export const BUBBLE_LINE_HEIGHT = 1.15;
+
 export const fonts = {
   sans: "Arial, sans-serif",
   serif: "Georgia, serif",
@@ -76,7 +78,7 @@ export function drawBubble(text, style) {
     wrapParagraph(paragraph, (line) => ctx.measureText(line).width));
 
   const width = Math.max(32, Math.ceil(Math.max(...lines.map((part) => ctx.measureText(part).width))) + 18);
-  const lineHeight = Math.ceil(style.size * 1.3);
+  const lineHeight = Math.ceil(style.size * BUBBLE_LINE_HEIGHT);
   const body = 16 + lineHeight * lines.length;
   const height = body + 9;
   canvas.width = width * 2;
