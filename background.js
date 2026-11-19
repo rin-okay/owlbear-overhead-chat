@@ -79,14 +79,15 @@ async function showSpeech(event, speech, version) {
       .plainText(text).fontFamily(fonts[appearance.font]).fontSize(appearance.size)
       .textAlign("CENTER").pointerDirection("DOWN");
     // Owlbear's native label has no border style. Stack two matching labels
-    // with extra padding on the back layer to draw the rim.
+    // with extra padding on the back layer to draw the rim. Both pointer
+    // tips share an anchor. Extend the inner pointer to inset its body.
     labels = [
       attach(nativeLabel().width(width + 4).padding(10).fillColor(appearance.border)
         .backgroundColor(appearance.border).cornerRadius(10)
         .pointerWidth(16).pointerHeight(7)),
       attach(nativeLabel().width(width).padding(8).fillColor(appearance.color)
         .backgroundColor(appearance.fill).cornerRadius(8)
-        .pointerWidth(12).pointerHeight(5)),
+        .pointerWidth(12).pointerHeight(9)),
     ];
     labels.forEach((item, index) => {
       item.zIndex = index;
