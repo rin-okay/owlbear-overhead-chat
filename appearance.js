@@ -73,7 +73,7 @@ export function drawBubble(text, style) {
   ctx.closePath();
   ctx.fillStyle = style.fill;
   ctx.fill();
-  ctx.lineWidth = 1.5;
+  ctx.lineWidth = 2;
   ctx.strokeStyle = style.border;
   ctx.stroke();
   ctx.fillStyle = style.color;

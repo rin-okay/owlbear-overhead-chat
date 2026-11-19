@@ -16,7 +16,7 @@ async function removeBubble(tokenId, bubble) {
 
   clearTimeout(bubble.timer);
   active.delete(tokenId);
-  await OBR.scene.local.deleteItems([bubble.id]);
+  await OBR.scene.local.deleteItems(bubble.ids);
 }
 
 function report(error) {
@@ -68,24 +68,40 @@ async function showSpeech(event, speech, version) {
     return item;
   };
 
-  let label = attach(bubbleBuilder);
+  let labels = [attach(bubbleBuilder)];
   try {
-    await OBR.scene.local.addItems([label]);
+    await OBR.scene.local.addItems(labels);
   } catch {
     if (version !== sceneVersion) return;
-    label = attach(buildLabel()
+
+    const width = canvas.width / 2;
+    const nativeLabel = () => buildLabel()
       .plainText(text).fontFamily(fonts[appearance.font]).fontSize(appearance.size)
-      .width(canvas.width / 2).padding(8).textAlign("CENTER").fillColor(appearance.color)
-      .backgroundColor(appearance.fill).cornerRadius(8)
-      .pointerWidth(12).pointerHeight(7).pointerDirection("DOWN"));
-    await OBR.scene.local.addItems([label]);
+      .textAlign("CENTER").pointerDirection("DOWN");
+    // Owlbear's native label has no border style. Stack two matching labels
+    // with extra padding on the back layer to draw the rim.
+    labels = [
+      attach(nativeLabel().width(width + 4).padding(10).fillColor(appearance.border)
+        .backgroundColor(appearance.border).cornerRadius(10)
+        .pointerWidth(16).pointerHeight(7)),
+      attach(nativeLabel().width(width).padding(8).fillColor(appearance.color)
+        .backgroundColor(appearance.fill).cornerRadius(8)
+        .pointerWidth(12).pointerHeight(5)),
+    ];
+    labels.forEach((item, index) => {
+      item.zIndex = index;
+      item.disableAutoZIndex = true;
+    });
+    await OBR.scene.local.addItems(labels);
   }
+
+  const ids = labels.map((item) => item.id);
   if (version !== sceneVersion) {
-    if (await OBR.scene.isReady()) await OBR.scene.local.deleteItems([label.id]);
+    if (await OBR.scene.isReady()) await OBR.scene.local.deleteItems(ids);
     return;
   }
 
-  const bubble = { id: label.id, timer: null };
+  const bubble = { ids, timer: null };
   active.set(tokenId, bubble);
   bubble.timer = setTimeout(() => {
     removeBubble(tokenId, bubble).catch(report);
