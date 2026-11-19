@@ -82,7 +82,7 @@ async function showSpeech(event, speech, version, receivedAt) {
     if (version !== sceneVersion) return;
 
     const nativeLabel = () => buildLabel()
-      .plainText(lines.join("\n")).width("AUTO").fontFamily(fonts[appearance.font]).fontSize(appearance.size)
+      .plainText(lines.join("\n")).width("AUTO").fontFamily(fonts[appearance.font].face).fontSize(appearance.size)
       .lineHeight(BUBBLE_LINE_HEIGHT).textAlign("CENTER").pointerDirection("DOWN");
     // Owlbear's native label has no border style. Stack two matching labels
     // with extra padding on the back layer to draw the rim. Both pointer

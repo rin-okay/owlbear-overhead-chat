@@ -1,11 +1,11 @@
 export const BUBBLE_LINE_HEIGHT = 1.15;
 
 export const fonts = {
-  sans: "Arial, sans-serif",
-  serif: "Georgia, serif",
-  mono: '"Courier New", monospace',
-  comic: '"Comic Sans MS", "Comic Sans", cursive',
-  rounded: '"Trebuchet MS", sans-serif',
+  sans: { face: "Arial", fallback: "sans-serif" },
+  serif: { face: "Georgia", fallback: "serif" },
+  mono: { face: "Courier New", fallback: "monospace" },
+  comic: { face: "Comic Sans MS", fallback: '"Comic Sans", cursive' },
+  rounded: { face: "Trebuchet MS", fallback: "sans-serif" },
 };
 
 const defaults = {
@@ -73,7 +73,8 @@ function wrapParagraph(paragraph, measure) {
 export function drawBubble(text, style) {
   const canvas = document.createElement("canvas");
   const ctx = canvas.getContext("2d");
-  const font = `${style.size}px ${fonts[style.font]}`;
+  const { face, fallback } = fonts[style.font];
+  const font = `${style.size}px "${face}", ${fallback}`;
   ctx.font = font;
   const lines = text.split("\n").flatMap((paragraph) =>
     wrapParagraph(paragraph, (line) => ctx.measureText(line).width));
