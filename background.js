@@ -75,7 +75,7 @@ async function showSpeech(event, speech, version) {
     if (version !== sceneVersion) return;
     label = attach(buildLabel()
       .plainText(text).fontFamily(fonts[appearance.font]).fontSize(appearance.size)
-      .width(248).padding(8).textAlign("CENTER").fillColor(appearance.color)
+      .width(canvas.width / 2).padding(8).textAlign("CENTER").fillColor(appearance.color)
       .backgroundColor(appearance.fill).cornerRadius(8)
       .pointerWidth(12).pointerHeight(7).pointerDirection("DOWN"));
     await OBR.scene.local.addItems([label]);

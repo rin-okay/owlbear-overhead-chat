@@ -50,7 +50,7 @@ export function drawBubble(text, style) {
   }
   lines.push(line);
 
-  const width = Math.max(54, Math.ceil(Math.max(...lines.map((part) => ctx.measureText(part).width))) + 24);
+  const width = Math.max(32, Math.ceil(Math.max(...lines.map((part) => ctx.measureText(part).width))) + 18);
   const lineHeight = Math.ceil(style.size * 1.3);
   const body = 16 + lineHeight * lines.length;
   const height = body + 9;

@@ -65,3 +65,6 @@ nav button[aria-pressed="true"], nav button:hover { background: #c7b6f8; color: 
 select { font: inherit; background: #181321; color: inherit; border: 1px solid #645775; border-radius: 7px; padding: 0 8px; }
 #bubble-preview { margin-top: 12px; padding: 12px; display: grid; place-items: center; background: #181321; border-radius: 7px; }
 #bubble-preview canvas { max-width: 100%; object-fit: contain; }
+
+#reset-appearance { margin-top: 8px; min-height: 32px; background: #312940; color: #e2d4f6; }
+#reset-appearance:hover { background: #c7b6f8; color: #271c3a; }

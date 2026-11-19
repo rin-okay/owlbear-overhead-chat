@@ -154,9 +154,15 @@ function setupSettings() {
     preview.replaceChildren(bubble);
   }
 
-  const style = savedAppearance();
-  for (const [key, value] of Object.entries(style)) fields.elements.namedItem(key).value = value;
-  drawPreview(style);
+  function showAppearance(style) {
+    for (const [key, value] of Object.entries(style)) fields.elements.namedItem(key).value = value;
+    drawPreview(style);
+  }
+
+  showAppearance(savedAppearance());
+  settingsPanel.querySelector("#reset-appearance").addEventListener("click", () => {
+    showAppearance(saveAppearance());
+  });
 
   function select(settings) {
     chatTab.setAttribute("aria-pressed", String(!settings));
