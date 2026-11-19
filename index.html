@@ -14,6 +14,7 @@
       <nav aria-label="Overhead Chat views">
         <button type="button" id="chat-tab" aria-pressed="true" aria-controls="chat-panel">Chat</button>
         <button type="button" id="settings-tab" aria-pressed="false" aria-controls="settings-panel">Settings</button>
+        <button type="button" id="discord-tab" aria-pressed="false" aria-controls="discord-panel" hidden>Discord</button>
       </nav>
     </header>
     <div id="chat-panel">
@@ -52,6 +53,21 @@
       </form>
       <div id="bubble-preview" aria-label="Bubble preview"></div>
       <button id="reset-appearance" type="button">Reset to default</button>
+    </section>
+    <section id="discord-panel" aria-label="Discord settings" hidden>
+      <p>Mirror new Overhead Chat messages to a Discord text channel while this GM tab is open. Set up the relay on one GM browser per room.</p>
+      <form>
+        <label>Discord webhook URL
+          <input name="webhook" type="password" autocomplete="off" spellcheck="false" placeholder="Paste Discord webhook URL">
+        </label>
+        <label class="discord-enabled"><input name="enabled" type="checkbox"> Mirror new chat messages</label>
+        <div class="discord-actions">
+          <button type="submit">Save</button>
+          <button id="discord-test" type="button">Send test</button>
+          <button id="discord-remove" type="button">Remove webhook</button>
+        </div>
+      </form>
+      <p id="discord-status" role="status"></p>
     </section>
   </main>
 </body>

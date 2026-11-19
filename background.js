@@ -3,6 +3,7 @@ import { AVATAR, SPEECH, BUBBLE_MS, canSpeak, isPublicToken, parseSpeech } from 
 
 import { BUBBLE_LINE_HEIGHT, drawBubble, fonts, normalizeAppearance } from "./appearance.js";
 import { openSessionChannel, saveAvatar } from "./session.js";
+import { queueDiscord } from "./discord.js";
 
 const transcript = [];
 let transcriptChannel;
@@ -49,6 +50,7 @@ async function showSpeech(event, speech, version, receivedAt) {
   };
   transcript.push(entry);
   transcriptChannel?.postMessage({ type: "line", entry });
+  queueDiscord(entry, role, (message) => transcriptChannel?.postMessage({ type: "discord-status", message }));
 
   const bounds = await OBR.scene.items.getItemBounds([tokenId]);
   if (version !== sceneVersion || !Number.isFinite(bounds?.min?.y) ||

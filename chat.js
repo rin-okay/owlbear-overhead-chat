@@ -4,6 +4,7 @@ import { AVATAR, SPEECH, canSpeak, parseSpeech } from "./rules.js";
 import { openSessionChannel, savedAvatar, saveAvatar, savedAppearance, saveAppearance } from "./session.js";
 
 import { drawBubble } from "./appearance.js";
+import { setupDiscordPanel } from "./discord-panel.js";
 
 const transcript = document.querySelector("#transcript");
 const entries = document.querySelector("#entries");
@@ -57,6 +58,7 @@ function connectTranscript() {
     const requestHistory = () => channel.postMessage({ type: "request" });
     channel.onmessage = ({ data }) => {
       if (data?.type === "ready") requestHistory();
+      if (data?.type === "discord-status") document.querySelector("#discord-status").textContent = data.message;
       if (data?.type === "history") {
         const fragment = document.createDocumentFragment();
         data.entries.forEach((entry) => appendLine(entry, fragment));
@@ -188,16 +190,23 @@ function setupSettings() {
     showAppearance(saveAppearance());
   });
 
-  function select(settings) {
-    chatTab.setAttribute("aria-pressed", String(!settings));
-    settingsTab.setAttribute("aria-pressed", String(settings));
-    chatPanel.hidden = settings;
-    settingsPanel.hidden = !settings;
-    if (!settings) scrollToLatest();
+  const views = [
+    { tab: chatTab, panel: chatPanel },
+    { tab: settingsTab, panel: settingsPanel },
+    { tab: document.querySelector("#discord-tab"), panel: document.querySelector("#discord-panel") },
+  ];
+
+  function select(index) {
+    views.forEach(({ tab, panel }, view) => {
+      tab.setAttribute("aria-pressed", String(index === view));
+      panel.hidden = index !== view;
+    });
+    if (index === 0) scrollToLatest();
   }
 
-  chatTab.addEventListener("click", () => select(false));
-  settingsTab.addEventListener("click", () => select(true));
+  chatTab.addEventListener("click", () => select(0));
+  settingsTab.addEventListener("click", () => select(1));
+  setupDiscordPanel(() => select(0), () => select(2));
   fields.addEventListener("submit", (event) => event.preventDefault());
   fields.addEventListener("input", () => {
     const values = Object.fromEntries(new FormData(fields));

@@ -25,6 +25,12 @@ Add `http://localhost:5173/owlbear-overhead-chat/manifest.json` to your Owlbear 
 
 Try two messages in quick succession, then move the token and confirm the latest bubble stays attached and disappears. Repeat from a player account with Owner Only enabled to check the ownership filter.
 
-The extension sends public room speech. Use it for tokens the room is meant to see. Fog is not a privacy boundary for broadcasts. The transcript runs in memory for the current room tab. Closing the chat panel keeps the transcript, and reloading the room starts a new one. Avatar selection is remembered for this room in the same browser. This release has no Discord connection.
+The extension sends public room speech. Use it for tokens the room is meant to see. Fog is not a privacy boundary for broadcasts. The transcript runs in memory for the current room tab. Closing the chat panel keeps the transcript, and reloading the room starts a new one. Avatar selection is remembered for this room in the same browser.
 
 [Owlbear Rodeo's extension installation guide](https://docs.owlbear.rodeo/extensions/tutorial-hello-world/install-your-extension/) · [Owlbear Rodeo's player permissions guide](https://docs.owlbear.rodeo/docs/permissions/)
+
+## Discord relay
+
+In a Discord text channel, create an incoming webhook under **Edit Channel → Integrations** and copy its URL. As the Owlbear room GM, open the **Discord** tab, paste the webhook URL, and use **Send test**. To start sending new messages, turn on **Mirror new chat messages** and save.
+
+The relay runs while the configured GM has the Owlbear room tab open. It mirrors new public Overhead Chat messages; it does not replay history or bring Discord messages back into Owlbear. Use one configured GM browser per room. The webhook URL stays in that browser’s local storage for that GM and room.
