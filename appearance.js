@@ -4,6 +4,7 @@ export const fonts = {
   sans: "Arial, sans-serif",
   serif: "Georgia, serif",
   mono: '"Courier New", monospace',
+  comic: '"Comic Sans MS", "Comic Sans", cursive',
   rounded: '"Trebuchet MS", sans-serif',
 };
 
