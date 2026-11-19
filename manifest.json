@@ -1,6 +1,6 @@
 {
   "name": "Overhead Chat",
-  "version": "1.2.6",
+  "version": "1.2.7",
   "manifest_version": 1,
   "description": "Speak through a character token with temporary speech bubbles.",
   "icon": "/toolbar-chat.svg",
