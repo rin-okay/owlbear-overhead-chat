@@ -10,6 +10,21 @@ export function setupDiscordPanel(openChat, openGm) {
   const enabled = form.elements.namedItem("enabled");
   const status = discord.querySelector("#discord-status");
   const test = discord.querySelector("#discord-test");
+  const versionLabel = panel.querySelector("#extension-version");
+
+  async function showVersion() {
+    if (!versionLabel.hidden) return;
+    try {
+      const response = await fetch(new URL("./manifest.json", import.meta.url), { cache: "no-cache" });
+      if (!response.ok) return;
+      const { version } = await response.json();
+      if (typeof version !== "string" || !version.trim()) return;
+      versionLabel.textContent = `version ${version}`;
+      versionLabel.hidden = false;
+    } catch {
+      // A failed manifest request can be retried by reopening the tab.
+    }
+  }
 
   function load() {
     const saved = discordSettings();
@@ -40,6 +55,7 @@ export function setupDiscordPanel(openChat, openGm) {
     load();
     status.textContent = "";
     openGm();
+    void showVersion();
   });
 
   form.addEventListener("submit", async (event) => {

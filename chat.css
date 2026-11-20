@@ -91,6 +91,7 @@ select { font: inherit; background: #181321; color: inherit; border: 1px solid #
 
 #gm-panel { flex: 1; min-height: 0; overflow-y: auto; }
 #gm-panel label { white-space: normal; }
+#extension-version { margin-top: 12px; padding-top: 10px; border-top: 1px solid #544762; color: #ab9dbb; font-size: 11px; }
 #discord-settings h2 { margin: 0 0 6px; font-size: 1em; }
 #discord-settings p { margin: 0 0 12px; color: #c5b8d6; }
 #discord-settings input[type="password"] { margin-top: 4px; }
