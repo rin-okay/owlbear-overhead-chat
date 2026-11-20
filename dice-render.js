@@ -72,6 +72,8 @@ function nearestFace(references, normal) {
 }
 
 const light = new THREE.Vector3(5, 10, 7).normalize();
+const DICE_SCALE = 1.5;
+const defaultColors = { edge: "#8b75b5", fill: "#fbf6ff", ink: "#241d31" };
 
 function numberedMesh(sides) {
   const references = numberedFaces[sides].map(([value, x, y, z]) =>
@@ -105,10 +107,10 @@ function path(ctx, points) {
   ctx.closePath();
 }
 
-function printNumeral(ctx, project, glyph, rotation, position) {
-  const center = glyph.position.clone().applyQuaternion(rotation).add(position);
-  const right = glyph.right.clone().applyQuaternion(rotation).multiplyScalar(glyph.size);
-  const up = glyph.up.clone().applyQuaternion(rotation).multiplyScalar(glyph.size);
+function printNumeral(ctx, project, glyph, rotation, position, scale, ink) {
+  const center = glyph.position.clone().multiplyScalar(scale).applyQuaternion(rotation).add(position);
+  const right = glyph.right.clone().applyQuaternion(rotation).multiplyScalar(glyph.size * scale);
+  const up = glyph.up.clone().applyQuaternion(rotation).multiplyScalar(glyph.size * scale);
   const [x, y] = project(center);
   const [rx, ry] = project(center.clone().add(right));
   const [ux, uy] = project(center.clone().add(up));
@@ -117,13 +119,13 @@ function printNumeral(ctx, project, glyph, rotation, position) {
   ctx.font = "0.92px Helvetica, Arial, sans-serif";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.fillStyle = "#201b20";
+  ctx.fillStyle = ink;
   ctx.fillText(glyph.value, 0, 0.035);
   if (glyph.value === 6 || glyph.value === 9) ctx.fillRect(-0.19, 0.34, 0.38, 0.031);
   ctx.restore();
 }
 
-export function animateTray(canvas, dice, frames, duration) {
+export function animateTray(canvas, dice, frames, duration, colors = defaultColors) {
   const ctx = canvas.getContext("2d");
   if (!ctx) throw new Error("Dice canvas unavailable.");
   const models = new Map([...new Set(dice.map(({ sides }) => sides))]
@@ -149,6 +151,9 @@ export function animateTray(canvas, dice, frames, duration) {
       cameraHeight = Math.max(3.65, 6.15 * height / width) * 2.748;
     }
     if (!width || !height) return false;
+    const scale = DICE_SCALE;
+    const { edge, fill, ink } = colors;
+    const base = [1, 3, 5].map((index) => parseInt(fill.slice(index, index + 2), 16));
     const index = progress * (frames.length - 1);
     const first = frames[Math.floor(index)];
     const second = frames[Math.ceil(index)];
@@ -165,14 +170,14 @@ export function animateTray(canvas, dice, frames, duration) {
         .slerp(other.fromArray(second[die], 3).normalize(), fraction);
 
       for (const face of models.get(sides)) {
-        const world = face.points.map((point) => point.clone().applyQuaternion(rotation).add(position));
+        const world = face.points.map((point) => point.clone().multiplyScalar(scale).applyQuaternion(rotation).add(position));
         shadows.push(world.map(({ x, y, z }) => project({
           x: x - (y + 0.5) * light.x / light.y,
           y: -0.5,
           z: z - (y + 0.5) * light.z / light.y,
         })));
 
-        const center = face.center.clone().applyQuaternion(rotation).add(position);
+        const center = face.center.clone().multiplyScalar(scale).applyQuaternion(rotation).add(position);
         const normal = face.normal.clone().applyQuaternion(rotation);
         if (normal.dot(new THREE.Vector3(0, cameraHeight, 0).sub(center)) <= 0) continue;
         const brightness = Math.round((kept ? 181 : 113) + Math.max(0, normal.dot(light)) * (kept ? 67 : 65));
@@ -198,14 +203,16 @@ export function animateTray(canvas, dice, frames, duration) {
     visible.sort((a, b) => a.depth - b.depth);
     for (const { points, brightness, glyphs, rotation, position } of visible) {
       path(ctx, points);
-      ctx.fillStyle = `rgb(${brightness}, ${brightness - 3}, ${brightness - 2})`;
-      ctx.strokeStyle = ctx.fillStyle;
-      ctx.lineWidth = 0.45;
+      const shaded = base.map((channel) => Math.max(0, channel - (248 - brightness)));
+      ctx.fillStyle = `rgb(${shaded.join(",")})`;
+      ctx.strokeStyle = edge;
+      ctx.lineWidth = 4;
+      ctx.lineJoin = "round";
       ctx.fill();
       ctx.stroke();
       ctx.save();
       ctx.clip();
-      for (const glyph of glyphs) printNumeral(ctx, project, glyph, rotation, position);
+      for (const glyph of glyphs) printNumeral(ctx, project, glyph, rotation, position, scale, ink);
       ctx.restore();
     }
     return true;

@@ -1,3 +1,5 @@
+import { appendCalculation } from "./roll-display.js";
+
 const channel = new BroadcastChannel(`chat.overhead.dice-tray:${location.hash.slice(1)}`);
 const canvas = document.querySelector("canvas");
 const speaker = document.querySelector("#speaker");
@@ -5,7 +7,7 @@ const output = document.querySelector("output");
 const faces = document.querySelector("#faces");
 
 document.querySelector("button").addEventListener("click", () => channel.postMessage("close"));
-channel.onmessage = async ({ data: { name, rolls, dice, count, frames, duration } }) => {
+channel.onmessage = async ({ data: { name, rolls, dice, count, frames, duration, colors } }) => {
   channel.onmessage = null;
   speaker.textContent = `${name} is rolling…`;
 
@@ -14,7 +16,7 @@ channel.onmessage = async ({ data: { name, rolls, dice, count, frames, duration 
     try {
       const { animateTray } = await import("./dice-render.js");
       canvas.hidden = false;
-      await animateTray(canvas, dice.filter((die) => die.physical), frames, duration);
+      await animateTray(canvas, dice.filter((die) => die.physical), frames, duration, colors);
       animated = true;
     } catch (error) {
       console.warn("Overhead Chat dice rendering unavailable", error);
@@ -42,11 +44,12 @@ channel.onmessage = async ({ data: { name, rolls, dice, count, frames, duration 
     faces.hidden = false;
     if (animated) faces.dataset.overlay = "";
   }
-  for (const { notation, total } of rolls) {
+  for (const { notation, total, breakdown } of rolls) {
     const result = document.createElement("span");
     const value = document.createElement("strong");
     value.textContent = total;
-    result.append(`${notation} =`, value);
+    appendCalculation(result, breakdown, notation);
+    result.append(value);
     output.append(result);
   }
   channel.postMessage("settled");

@@ -87,7 +87,7 @@ async function showSpeech(event, speech, version, receivedAt) {
   if (entry.rolling || entry.rollError) return;
   if (phase === "resolved" && parts.some((part) => typeof part === "object")) {
     const tray = parseTray(event.data.tray);
-    if (tray) queueDicePopup(entry, tray);
+    if (tray) queueDicePopup(entry, tray, appearance);
     if (!previousRoll) rollingEntries.set(id, { tokenId, settled: true });
   }
   queueDiscord(entry, role, (message) => transcriptChannel?.postMessage({ type: "discord-status", message }));

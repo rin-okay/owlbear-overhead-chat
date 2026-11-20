@@ -1,16 +1,18 @@
 import OBR from "./obr.js";
+import { normalizeAppearance } from "./appearance.js";
 
 const POPOVER_ID = "chat.overhead.dice-tray";
 const queue = [];
 let active;
 
-export function queueDicePopup(entry, tray) {
+export function queueDicePopup(entry, tray, { border, fill, color, diceEdge } = normalizeAppearance()) {
   if (queue.length >= 8) queue.shift();
   queue.push({
     ...tray,
     name: entry.name,
+    colors: { edge: diceEdge ?? border, fill, ink: color },
     rolls: entry.parts.filter((part) => typeof part === "object")
-      .map(({ notation, total }) => ({ notation, total })),
+      .map(({ notation, total, breakdown }) => ({ notation, total, breakdown })),
   });
   openNext();
 }

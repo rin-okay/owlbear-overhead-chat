@@ -9,7 +9,7 @@ export const fonts = {
 };
 
 const defaults = {
-  name: "", border: "#8b75b5", fill: "#fbf6ff", color: "#241d31", font: "sans", size: 15,
+  name: "", border: "#8b75b5", fill: "#fbf6ff", color: "#241d31", diceEdge: null, font: "sans", size: 15,
 };
 
 export function normalizeAppearance(value) {
@@ -23,6 +23,7 @@ export function normalizeAppearance(value) {
     border: color("border"),
     fill: color("fill"),
     color: color("color"),
+    diceEdge: color("diceEdge"),
     font: typeof value?.font === "string" && Object.hasOwn(fonts, value.font) ? value.font : defaults.font,
     size: Number.isInteger(size) ? Math.max(10, Math.min(28, size)) : defaults.size,
   };

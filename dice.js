@@ -34,12 +34,19 @@ export function chatParts(text, results) {
   for (const [index, { start, end, notation }] of spans.entries()) {
     if (!notation || notation.length > MAX_NOTATION) return [text];
     if (start > cursor) parts.push(text.slice(cursor, start));
-    const { total, detail } = results[index];
-    parts.push({ total, detail, notation });
+    const { total, detail, breakdown } = results[index];
+    parts.push({ total, detail, notation, breakdown: validBreakdown(breakdown, total) ? breakdown : undefined });
     cursor = end;
   }
   if (cursor < text.length) parts.push(text.slice(cursor));
   return parts;
+}
+
+function validBreakdown(breakdown, total) {
+  return Array.isArray(breakdown) && breakdown.length > 0 && breakdown.length <= 140 &&
+    breakdown.every((value) => Number.isSafeInteger(value) ? Math.abs(value) <= 99999999 :
+      typeof value === "string" && /^~-?[1-9]\d{0,3}$/.test(value)) &&
+    breakdown.reduce((sum, value) => typeof value === "number" ? sum + value : sum, 0) === total;
 }
 
 export function randomFace(sides) {
@@ -86,9 +93,11 @@ export function parseDice(notation) {
 export function scoreDice(terms, face = randomFace) {
   let total = 0;
   const details = [];
+  const breakdown = [];
   for (const { text, constant, factor, count, sides, filter, filterCount } of terms) {
     if (constant !== undefined) {
       total += constant;
+      breakdown.push(constant);
       details.push(text);
       continue;
     }
@@ -100,10 +109,12 @@ export function scoreDice(terms, face = randomFace) {
     const kept = (index) => !filter || (filter.startsWith("k") === chosen.has(index));
     values.forEach((value, index) => {
       const keep = kept(index);
-      if (keep) total += factor * value;
+      const signedValue = factor * value;
+      if (keep) total += signedValue;
+      breakdown.push(keep ? signedValue : `~${signedValue}`);
       if (typeof dice[index] === "object") dice[index].kept = keep;
     });
     details.push(`${text} → [${values.map((value, index) => kept(index) ? value : `${value} dropped`).join(", ")}]`);
   }
-  return { total, detail: details.join("\n").slice(0, 1200) };
+  return { total, detail: details.join("\n").slice(0, 1200), breakdown };
 }
