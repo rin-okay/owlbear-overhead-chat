@@ -1,32 +1,26 @@
 import { percentileTerms } from "./percentile.js";
 
-const MAX_ROLLS = 4;
 const MAX_NOTATION = 80;
 
-const ROLL_COMMAND = /^(?:(?:\.\/|\/)?r|\/roll)(?:\s+|$)(.*)$/is;
+const ROLL_COMMAND = /^\/r(?:\s+|$)(.*)$/is;
 export const isRollCommand = (text) => ROLL_COMMAND.test(text);
 
 export function rollSpans(text) {
   const command = ROLL_COMMAND.exec(text);
   if (command) return [{ start: 0, end: text.length, notation: command[1].trim() }];
-  return [...text.matchAll(/\br\[([^\[\]\n]*)\]/gi)].map((match) => ({
-    start: match.index,
-    end: match.index + match[0].length,
-    notation: match[1].trim(),
-  }));
+  return [];
 }
 
 export function validateRollSpans(spans) {
-  if (spans.length > MAX_ROLLS) throw new Error("Use up to four rolls per message.");
   for (const { notation } of spans) {
     if (!notation || notation.length > MAX_NOTATION || !/d(?:\d|f|%)/i.test(notation.replace(/\s/g, ""))) {
-      throw new Error("Enter dice notation like /r 1d20+7 or r[2d20kh1].");
+      throw new Error("Enter dice notation like /r 1d20+7 or /r 2d20kh1.");
     }
   }
 }
 
 export function chatParts(text, results) {
-  if (!Array.isArray(results) || !results.length || results.length > MAX_ROLLS) return [text];
+  if (!Array.isArray(results) || results.length !== 1) return [text];
   const spans = rollSpans(text);
   if (results.length !== spans.length || !results.every((roll) =>
     Number.isFinite(roll?.total) && typeof roll.detail === "string" && roll.detail.length <= 1200)) return [text];

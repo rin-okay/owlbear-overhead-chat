@@ -43,7 +43,7 @@ The relay runs while the configured GM has the Owlbear room tab open. It mirrors
 
 ## Rolling dice
 
-Send `/r 1d20+7` for a standalone roll, or include `r[2d20kh1]` inside a message. Hover over a result in the chat log to see the expression and dice breakdown.
+Start a message with `/r` followed by the dice expression, such as `/r 1d20+7` or `/r 2d20kh1`. Hover over a result in the chat log to see the expression and dice breakdown.
 
 With Rumble! off, everyone in the Owlbear room running Overhead Chat, including the roller, sees the same 3D toss in a temporary popup. The popup animates up to eight standard dice (d4, d6, d8, d10, d12, d20) and shows the roll totals. Custom dice and dice beyond the preview limit still count in the chat result.
 
