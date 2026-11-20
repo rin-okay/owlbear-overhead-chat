@@ -27,7 +27,7 @@ Try two messages in quick succession, then move the token and confirm the latest
 
 The extension sends public room speech. Use it for tokens the room is meant to see. Fog is not a privacy boundary for broadcasts. The transcript runs in memory for the current room tab. Closing the chat panel keeps the transcript, and reloading the room starts a new one. Avatar selection is remembered for this room in the same browser.
 
-Click **move**, or press F2 with the message box focused, to control your unlocked chat avatar. The arrow keys move it by one grid interval. Click **move** again, press F2 or Escape, or click away to return to chat.
+Click **move**, press Tab then Space from the message box, or use F2 to control your unlocked chat avatar. The arrow keys and WASD move it by one grid interval. Q or comma rotates left, and E or period rotates right, 15 degrees per press. Space, Enter, F2, or Escape returns to typing. Clicking away also exits move mode.
 
 [Owlbear Rodeo's extension installation guide](https://docs.owlbear.rodeo/extensions/tutorial-hello-world/install-your-extension/) · [Owlbear Rodeo's player permissions guide](https://docs.owlbear.rodeo/docs/permissions/)
 

@@ -18,6 +18,7 @@ const speaker = document.querySelector("#speaker");
 const input = document.querySelector("#message");
 const send = form.querySelector("[type=submit]");
 const moveButton = form.querySelector("#move-avatar");
+const moveModeLabel = form.querySelector("#move-mode-label");
 const status = document.querySelector("#status");
 
 let avatar = null;
@@ -29,11 +30,16 @@ let rollInProgress = false;
 let refreshVersion = 0;
 let tokenControl;
 let movingAvatar = false;
+let modeExitKey;
 
 const movementKeys = {
-  ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1],
+  arrowleft: [-1, 0], a: [-1, 0],
+  arrowright: [1, 0], d: [1, 0],
+  arrowup: [0, -1], w: [0, -1],
+  arrowdown: [0, 1], s: [0, 1],
+  q: [0, 0, -15], ",": [0, 0, -15],
+  e: [0, 0, 15], ".": [0, 0, 15],
 };
-const controlHint = "Token control mode. Use arrow keys to move. Press F2 or Esc to return to chat.";
 
 function appendLine(entry, target) {
   const line = document.createElement("li");
@@ -168,7 +174,7 @@ async function refresh() {
     selectedAvatarId = tokenId ?? null;
     observedToken = observed ?? null;
     speaker.textContent = token ? `Speaking as ${token.name || "Character"}` : "Pick an avatar";
-    status.textContent = tokenControl ? controlHint : hint;
+    status.textContent = hint;
     updateControls();
     if (shouldFocus) input.focus();
   } catch (error) {
@@ -186,8 +192,9 @@ function stopTokenControl() {
   if (!tokenControl) return;
   tokenControl = undefined;
   input.readOnly = false;
+  input.setAttribute("aria-describedby", "status");
+  moveModeLabel.hidden = true;
   moveButton.setAttribute("aria-pressed", "false");
-  if (status.textContent === controlHint) status.textContent = "";
 }
 
 function toggleTokenControl() {
@@ -195,10 +202,11 @@ function toggleTokenControl() {
     stopTokenControl();
   } else {
     if (moveButton.disabled) return;
-    tokenControl = { tokenId: avatar.id, moves: [] };
+    tokenControl = { tokenId: avatar.id, actions: [] };
     input.readOnly = true;
+    input.setAttribute("aria-describedby", "move-mode-label status");
+    moveModeLabel.hidden = false;
     moveButton.setAttribute("aria-pressed", "true");
-    status.textContent = controlHint;
   }
   input.focus();
 }
@@ -206,21 +214,25 @@ function toggleTokenControl() {
 async function moveAvatar(mode) {
   movingAvatar = true;
   try {
-    while (mode === tokenControl && mode.moves.length) {
-      const [x, y] = mode.moves.shift();
-      const [{ token }, step] = await Promise.all([getAvatar(), OBR.scene.grid.getDpi()]);
+    while (mode === tokenControl && mode.actions.length) {
+      const [x, y, rotation = 0] = mode.actions.shift();
+      const [{ token }, step] = await Promise.all([getAvatar(), rotation ? 0 : OBR.scene.grid.getDpi()]);
       if (mode !== tokenControl) return;
       if (token?.id !== mode.tokenId || token.locked) {
         stopTokenControl();
         await refresh();
         return;
       }
-      if (!Number.isFinite(step) || step <= 0) throw new Error("Scene grid size unavailable.");
+      if (!rotation && (!Number.isFinite(step) || step <= 0)) throw new Error("Scene grid size unavailable.");
 
       await OBR.scene.items.updateItems([mode.tokenId], ([item]) => {
         if (mode !== tokenControl || !isPublicToken(item) || item.locked) return;
-        item.position.x += x * step;
-        item.position.y += y * step;
+        if (rotation) {
+          item.rotation = ((item.rotation + rotation) % 360 + 360) % 360;
+        } else {
+          item.position.x += x * step;
+          item.position.y += y * step;
+        }
       });
     }
   } catch (error) {
@@ -230,7 +242,7 @@ async function moveAvatar(mode) {
     status.textContent = "Couldn’t move your avatar.";
   } finally {
     movingAvatar = false;
-    if (tokenControl?.moves.length) void moveAvatar(tokenControl);
+    if (tokenControl?.actions.length) void moveAvatar(tokenControl);
   }
 }
 
@@ -243,21 +255,37 @@ moveButton.addEventListener("mousedown", (event) => {
   if (tokenControl) event.preventDefault();
 });
 moveButton.addEventListener("click", toggleTokenControl);
+input.addEventListener("keyup", (event) => {
+  if (event.key === modeExitKey) modeExitKey = undefined;
+});
 
 input.addEventListener("keydown", (event) => {
   if (event.isComposing || event.keyCode === 229) return;
+  if (event.key === modeExitKey) {
+    if (event.repeat) {
+      event.preventDefault();
+      return;
+    }
+    modeExitKey = undefined;
+  }
   if (event.key === "F2" && !event.ctrlKey && !event.altKey && !event.metaKey) {
     event.preventDefault();
     if (!event.repeat) toggleTokenControl();
     return;
   }
   if (tokenControl) {
-    if (event.key === "Escape") {
+    const key = event.key.toLowerCase();
+    if (key === "escape" || key === " " || key === "enter") {
       event.preventDefault();
+      if (event.repeat) return;
+      modeExitKey = event.key;
       stopTokenControl();
-    } else if (Object.hasOwn(movementKeys, event.key) && !event.ctrlKey && !event.altKey && !event.metaKey) {
+      input.focus();
+    } else if (Object.hasOwn(movementKeys, key) && !event.ctrlKey && !event.altKey && !event.metaKey) {
       event.preventDefault();
-      if (tokenControl.moves.length < 4) tokenControl.moves.push(movementKeys[event.key]);
+      const action = movementKeys[key];
+      if (event.repeat && (action[2] || tokenControl.actions.length >= 4)) return;
+      tokenControl.actions.push(action);
       if (!movingAvatar) void moveAvatar(tokenControl);
     }
     return;

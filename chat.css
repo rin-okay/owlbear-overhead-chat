@@ -11,6 +11,7 @@ main { padding: 16px; }
 header { display: flex; align-items: center; gap: 9px; margin-bottom: 17px; }
 label { display: block; color: #d9caf4; margin-bottom: 7px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .compose { display: flex; gap: 8px; }
+.message-field { position: relative; display: flex; flex: 1; min-width: 0; }
 input, button { font: inherit; min-height: 42px; border-radius: 7px; }
 input {
   width: 100%;
@@ -86,7 +87,10 @@ select { font: inherit; background: #181321; color: inherit; border: 1px solid #
 #message::placeholder { color: #ab9dbb; font-size: 12px; }
 #message, #entries { text-transform: none; }
 #message:disabled { opacity: .56; }
-#message[readonly] { border-color: #c7b6f8; }
+#message[readonly] { background: #312b3c; color: transparent; caret-color: transparent; }
+#message[readonly]::placeholder, #message[readonly]::selection { color: transparent; }
+#message[readonly]::selection { background: transparent; }
+#move-mode-label { position: absolute; top: 8px; left: 11px; color: #ab9dbb; font-size: 12px; pointer-events: none; }
 #move-avatar { background: #312940; color: #e2d4f6; padding-inline: 10px; }
 #move-avatar:enabled:hover, #move-avatar[aria-pressed="true"] { background: #c7b6f8; color: #271c3a; }
 .message-heading { display: flex; align-items: baseline; gap: 8px; }
