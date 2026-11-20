@@ -25,7 +25,7 @@ Add `http://localhost:5173/owlbear-overhead-chat/manifest.json` to your Owlbear 
 
 Try two messages in quick succession, then move the token and confirm the latest bubble stays attached and disappears. Repeat from a player account with Owner Only enabled to check the ownership filter.
 
-The extension sends public room speech. Use it for tokens the room is meant to see. Fog is not a privacy boundary for broadcasts. The transcript runs in memory for the current room tab. Closing the chat panel keeps the transcript, and reloading the room starts a new one. Avatar selection is remembered for this room in the same browser.
+The extension sends public room speech. Use it for tokens the room is meant to see. Fog is not a privacy boundary for broadcasts. The transcript keeps the latest 1,000 messages in memory for the current room tab. Chat opens on the latest 100 messages, and **load older messages** shows earlier messages in batches. Closing the chat panel keeps the transcript, and reloading the room starts a new one. Avatar selection is remembered for this room in the same browser.
 
 Click **move**, press Tab then Space from the message box, or use F2 to control your unlocked chat avatar. The arrow keys and WASD move it by one grid interval. Hold Shift with any movement key to move half a grid interval. Q or comma rotates left, and E or period rotates right, 15 degrees at a time. Hold a rotation key to keep turning. Press R to mirror the avatar horizontally. Space, Enter, F2, or Escape returns to typing. Clicking away also exits move mode.
 

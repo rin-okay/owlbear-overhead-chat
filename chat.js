@@ -51,11 +51,12 @@ const movementKeys = {
 function appendLine(entry, target) {
   const line = document.createElement("li");
   if (entry.id) line.dataset.entryId = entry.id;
+  line.dataset.sequence = entry.sequence;
   if (entry.rolling || entry.rollError) {
     line.className = "roll-status";
     line.textContent = entry.rolling ? `${entry.name} is rolling…` : `${entry.name} couldn’t roll: ${entry.rollError}`;
     target.append(line);
-    return;
+    return line;
   }
 
   const heading = document.createElement("div");
@@ -101,6 +102,7 @@ function appendLine(entry, target) {
     line.append(heading, message);
   }
   target.append(line);
+  return line;
 }
 
 function scrollToLatest() {
@@ -109,31 +111,62 @@ function scrollToLatest() {
 
 function connectTranscript() {
   openSessionChannel().then((channel) => {
-    const requestHistory = () => channel.postMessage({ type: "request" });
+    const older = document.querySelector("#older-messages");
+    const rows = new Map();
+    let request;
+    const sendRequest = () => channel.postMessage({ type: "request", ...request });
+
+    function requestHistory(before) {
+      request = { requestId: crypto.randomUUID(), before };
+      older.disabled = true;
+      sendRequest();
+    }
+
+    older.addEventListener("click", () => {
+      const first = entries.firstElementChild;
+      if (!request && first) requestHistory(Number(first.dataset.sequence));
+    });
+
     channel.onmessage = ({ data }) => {
-      if (data?.type === "ready") requestHistory();
+      if (data?.type === "ready" && request) sendRequest();
       if (data?.type === "discord-status") document.querySelector("#discord-status").textContent = data.message;
-      if (data?.type === "history") {
+      if (data?.type === "history" && request && data.requestId === request.requestId) {
+        const initial = request.before === undefined;
+        request = undefined;
+        const oldHeight = transcript.scrollHeight;
+        const oldTop = transcript.scrollTop;
         const fragment = document.createDocumentFragment();
-        data.entries.forEach((entry) => appendLine(entry, fragment));
-        entries.replaceChildren(fragment);
-        empty.hidden = data.entries.length > 0;
-        scrollToLatest();
+        if (initial) rows.clear();
+        for (const entry of data.entries) {
+          if (!rows.has(entry.id)) rows.set(entry.id, appendLine(entry, fragment));
+        }
+        if (initial) entries.replaceChildren(fragment);
+        else entries.prepend(fragment);
+        empty.hidden = rows.size > 0;
+        older.hidden = !data.hasOlder;
+        older.disabled = false;
+        if (initial) scrollToLatest();
+        else transcript.scrollTop = oldTop + transcript.scrollHeight - oldHeight;
       }
       if (data?.type === "line" || data?.type === "replace") {
         const nearBottom = transcript.scrollHeight - transcript.clientHeight - transcript.scrollTop < 32;
-        empty.hidden = true;
-        const previous = data.type === "replace"
-          ? Array.from(entries.children).find((line) => line.dataset.entryId === data.entry.id)
-          : null;
+        const { entry, oldestSequence } = data;
+        const previous = rows.get(entry.id);
         if (previous) {
           const fragment = document.createDocumentFragment();
-          appendLine(data.entry, fragment);
+          rows.set(entry.id, appendLine(entry, fragment));
           previous.replaceWith(fragment);
-        } else {
-          appendLine(data.entry, entries);
+        } else if (data.type === "line") {
+          rows.set(entry.id, appendLine(entry, entries));
         }
-        if (nearBottom || (data.entry.own && data.type === "line")) scrollToLatest();
+        while (Number(entries.firstElementChild?.dataset.sequence) < oldestSequence) {
+          const first = entries.firstElementChild;
+          rows.delete(first.dataset.entryId);
+          first.remove();
+        }
+        if (Number(entries.firstElementChild?.dataset.sequence) === oldestSequence) older.hidden = true;
+        empty.hidden = rows.size > 0;
+        if (nearBottom || (entry.own && data.type === "line")) scrollToLatest();
       }
     };
     window.addEventListener("pagehide", () => channel.close(), { once: true });

@@ -9,15 +9,30 @@ import { queueDiscord } from "./discord.js";
 import { parseTray } from "./dice-replay.js";
 import { queueDicePopup, resetDicePopups } from "./dice-popup.js";
 
-const transcript = [];
+const HISTORY_LIMIT = 1000;
+const HISTORY_PAGE_SIZE = 100;
+const ROLL_TIMEOUT_MS = 70_000;
+const transcript = new Map();
 const rollingEntries = new Map();
+const settledRolls = new Map();
+let sequence = 0;
 let transcriptChannel;
 
 const active = new Map();
+const queuedBubbles = new Map();
 let floating = [];
 let floatingTimer;
-let pending = Promise.resolve();
+let pendingBubbles = Promise.resolve();
+let pendingSpeech = Promise.resolve();
 let sceneVersion = 0;
+let sceneReady;
+let sceneItems;
+let permissions;
+let role;
+let party;
+let roomMetadata;
+let connectionId;
+let initialState;
 
 async function removeBubble(tokenId, bubble) {
   if (active.get(tokenId) !== bubble) return;
@@ -33,7 +48,7 @@ function report(error) {
 
 function queueScene(task) {
   const version = sceneVersion;
-  pending = pending.then(() => {
+  pendingBubbles = pendingBubbles.then(() => {
     if (version === sceneVersion) return task(version);
   }).catch(report);
 }
@@ -66,9 +81,9 @@ async function updateFloating(next, version) {
   if (version === sceneVersion) floating = next;
 }
 
-async function showFloating(text, accent, tokenId, position, layer, version) {
+async function showFloating(text, accent, tokenId, position, layer, version, current) {
   const dpi = await OBR.scene.grid.getDpi();
-  if (version !== sceneVersion || !Number.isFinite(dpi) || dpi <= 0) return;
+  if (!current() || !Number.isFinite(dpi) || dpi <= 0) return;
   const { canvas, width, height } = drawFloatingBubble(text, accent);
   const item = buildImage({
     url: canvas.toDataURL("image/png"), mime: "image/png", width: canvas.width, height: canvas.height,
@@ -78,9 +93,9 @@ async function showFloating(text, accent, tokenId, position, layer, version) {
   const bubble = { id: item.id, tokenId, width, height, x: position.x, y: position.y, originY: position.y };
   const placed = placeFloatingBubbles([bubble, ...floating]);
   await updateFloating(placed.slice(1), version);
-  if (version !== sceneVersion) return;
+  if (!current()) return;
   await OBR.scene.local.addItems([item]);
-  if (version !== sceneVersion) {
+  if (!current()) {
     if (await OBR.scene.isReady()) await OBR.scene.local.deleteItems([item.id]);
     return;
   }
@@ -88,30 +103,55 @@ async function showFloating(text, accent, tokenId, position, layer, version) {
   scheduleFloatingStep();
 }
 
-async function showSpeech(event, speech, version, receivedAt) {
-  if (version !== sceneVersion || !await OBR.scene.isReady()) return;
+function storeEntry(entry, type) {
+  transcript.set(entry.id, entry);
+  if (transcript.size > HISTORY_LIMIT) {
+    const oldest = transcript.keys().next().value;
+    clearTimeout(rollingEntries.get(oldest));
+    rollingEntries.delete(oldest);
+    transcript.delete(oldest);
+  }
+  transcriptChannel?.postMessage({
+    type, entry, oldestSequence: transcript.values().next().value.sequence,
+  });
+}
 
-  const [items, permissions, connectionId, role, party] = await Promise.all([
-    OBR.scene.items.getItems([speech.tokenId]),
-    OBR.room.getPermissions(),
-    OBR.player.getConnectionId(),
-    OBR.player.getRole(),
-    OBR.party.getPlayers(),
-  ]);
+function publishHistory({ requestId, before = Infinity }) {
+  const entries = [];
+  for (const entry of transcript.values()) {
+    if (entry.sequence >= before) break;
+    entries.push(entry);
+  }
+  transcriptChannel.postMessage({
+    type: "history", requestId, entries: entries.slice(-HISTORY_PAGE_SIZE),
+    hasOlder: entries.length > HISTORY_PAGE_SIZE,
+  });
+}
+
+async function acceptSpeech(event, speech, version, receivedAt) {
+  await initialState;
+  if (version !== sceneVersion || !sceneReady) return;
+
+  const itemsBeforeLookup = sceneItems;
+  const [fetchedToken] = await OBR.scene.items.getItems([speech.tokenId]);
+  const token = sceneItems === itemsBeforeLookup ? fetchedToken : sceneItems?.find((item) => item.id === speech.tokenId);
   const sender = event.connectionId === connectionId
     ? { id: OBR.player.id, role }
-    : party.find((player) => player.connectionId === event.connectionId);
-  const [token] = items;
-  if (version !== sceneVersion || !canSpeak(sender, token, permissions)) return;
+    : party?.get(event.connectionId);
+  if (version !== sceneVersion || !canSpeak(sender, token, permissions ?? [])) return;
 
   const { tokenId } = speech;
   const phase = event.data.rollPhase;
   const rollId = event.data.rollId;
   if (phase && (typeof rollId !== "string" || !/^[a-f0-9-]{36}$/i.test(rollId) ||
       !["pending", "resolved", "failed"].includes(phase) || !rollSpans(speech.text).length)) return;
-  const id = phase ? `${event.connectionId}:${rollId}` : undefined;
-  const previousRoll = rollingEntries.get(id);
-  if ((previousRoll && (phase === "pending" || previousRoll.settled)) || (previousRoll && previousRoll.tokenId !== tokenId)) return;
+  const id = phase ? `${event.connectionId}:${rollId}` : `message:${sequence + 1}`;
+  const previousRoll = phase ? transcript.get(id) : undefined;
+  while (settledRolls.size && settledRolls.values().next().value <= receivedAt) {
+    settledRolls.delete(settledRolls.keys().next().value);
+  }
+  if (settledRolls.has(id) || (previousRoll &&
+      (phase === "pending" || previousRoll.rollPhase !== "pending" || previousRoll.tokenId !== tokenId))) return;
   const parts = chatParts(speech.text, event.data.rolls);
   const text = parts.map((part) => typeof part === "string" ? part : `${part.notation}: ${part.total}`).join("");
   const appearance = normalizeAppearance(event.data.appearance);
@@ -120,58 +160,78 @@ async function showSpeech(event, speech, version, receivedAt) {
     text,
     parts,
     id,
+    tokenId,
+    rollPhase: phase,
+    sequence: previousRoll?.sequence ?? ++sequence,
     rolling: phase === "pending",
     rollError: phase === "failed" ? String(event.data.rollError || "Roll failed.").slice(0, 200) : undefined,
     standaloneRoll: isRollCommand(speech.text) && typeof parts[0] === "object",
-    receivedAt: previousRoll ? transcript[previousRoll.index].receivedAt : receivedAt,
+    receivedAt: previousRoll?.receivedAt ?? receivedAt,
     own: event.connectionId === connectionId,
   };
-  if (previousRoll) {
-    clearTimeout(previousRoll.timer);
-    previousRoll.settled = true;
-    transcript[previousRoll.index] = entry;
-    transcriptChannel?.postMessage({ type: "replace", entry });
-  } else {
-    transcript.push(entry);
-    transcriptChannel?.postMessage({ type: "line", entry });
-  }
+  clearTimeout(rollingEntries.get(id));
+  rollingEntries.delete(id);
+  storeEntry(entry, previousRoll ? "replace" : "line");
   if (entry.rolling) {
-    const index = transcript.length - 1;
     const timer = setTimeout(() => {
+      rollingEntries.delete(id);
+      if (transcript.get(id) !== entry) return;
       const expired = { ...entry, rolling: false, rollError: "The roll timed out." };
-      transcript[index] = expired;
-      transcriptChannel?.postMessage({ type: "replace", entry: expired });
-    }, 70000);
-    rollingEntries.set(id, { tokenId, index, timer });
+      storeEntry(expired, "replace");
+    }, ROLL_TIMEOUT_MS);
+    rollingEntries.set(id, timer);
+  } else if (phase) {
+    settledRolls.set(id, receivedAt + ROLL_TIMEOUT_MS);
+    if (settledRolls.size > HISTORY_LIMIT) settledRolls.delete(settledRolls.keys().next().value);
   }
   if (entry.rolling || entry.rollError) return;
   if (phase === "resolved" && parts.some((part) => typeof part === "object")) {
     const tray = parseTray(event.data.tray);
     if (tray) queueDicePopup(entry, tray, appearance);
-    if (!previousRoll) rollingEntries.set(id, { tokenId, settled: true });
   }
   queueDiscord(entry, role, (message) => transcriptChannel?.postMessage({ type: "discord-status", message }));
+  queueBubble({ tokenId, text, appearance, itemsAtValidation: sceneItems });
+}
 
-  const [bounds, roomMetadata] = await Promise.all([
-    OBR.scene.items.getItemBounds([tokenId]),
-    OBR.room.getMetadata().catch(() => ({})),
-  ]);
-  const layer = roomMetadata[ABOVE_FOG] === true ? "CONTROL" : "TEXT";
-  if (version !== sceneVersion || !Number.isFinite(bounds?.min?.y) ||
+function queueBubble(message) {
+  if (roomMetadata?.[HABBO_MODE] === true) {
+    queueScene((version) => showBubble(message, version, true));
+    return;
+  }
+  const { tokenId } = message;
+  const alreadyQueued = queuedBubbles.has(tokenId);
+  queuedBubbles.set(tokenId, message);
+  if (alreadyQueued) return;
+  queueScene((version) => {
+    const latest = queuedBubbles.get(tokenId);
+    queuedBubbles.delete(tokenId);
+    return showBubble(latest, version, false);
+  });
+}
+
+async function showBubble({ tokenId, text, appearance, itemsAtValidation }, version, floatingMode) {
+  const current = () => version === sceneVersion &&
+    floatingMode === (roomMetadata?.[HABBO_MODE] === true) &&
+    (floatingMode || !queuedBubbles.has(tokenId)) &&
+    (sceneItems === itemsAtValidation || sceneItems?.some((item) => item.id === tokenId && isPublicToken(item)));
+  if (!current()) return;
+  const bounds = await OBR.scene.items.getItemBounds([tokenId]);
+  const layer = roomMetadata?.[ABOVE_FOG] === true ? "CONTROL" : "TEXT";
+  if (!current() || !Number.isFinite(bounds?.min?.y) ||
       !Number.isFinite(bounds?.max?.y) ||
       !Number.isFinite(bounds?.center?.x)) return;
 
   const gap = Math.min(16, Math.max(4, (bounds.max.y - bounds.min.y) * 0.07));
   const position = { x: bounds.center.x, y: bounds.min.y - gap };
-  if (roomMetadata[HABBO_MODE] === true) {
+  if (floatingMode) {
     if (active.size) await Promise.all([...active].map(([id, bubble]) => removeBubble(id, bubble)));
-    if (version === sceneVersion) await showFloating(text, appearance.border, tokenId, position, layer, version);
+    if (current()) await showFloating(text, appearance.border, tokenId, position, layer, version, current);
     return;
   }
   if (floating.length) await updateFloating([], version);
   const previous = active.get(tokenId);
   if (previous) await removeBubble(tokenId, previous);
-  if (version !== sceneVersion) return;
+  if (!current()) return;
 
   const { canvas, lines } = drawBubble(text, appearance);
   const bubbleBuilder = buildBillboard({
@@ -189,7 +249,7 @@ async function showSpeech(event, speech, version, receivedAt) {
   try {
     await OBR.scene.local.addItems(labels);
   } catch {
-    if (version !== sceneVersion) return;
+    if (!current()) return;
 
     const nativeLabel = () => buildLabel()
       .plainText(lines.join("\n")).width("AUTO").fontFamily(fonts[appearance.font].face).fontSize(appearance.size)
@@ -213,7 +273,7 @@ async function showSpeech(event, speech, version, receivedAt) {
   }
 
   const ids = labels.map((item) => item.id);
-  if (version !== sceneVersion) {
+  if (!current()) {
     if (await OBR.scene.isReady()) await OBR.scene.local.deleteItems(ids);
     return;
   }
@@ -229,21 +289,22 @@ function queueSpeech(event) {
   const speech = parseSpeech(event.data);
   if (!speech) return;
   const receivedAt = Date.now();
+  const version = sceneVersion;
 
   // Validate messages in receive order so the transcript reads in order.
-  queueScene((version) => showSpeech(event, speech, version, receivedAt));
+  pendingSpeech = pendingSpeech.then(() => acceptSpeech(event, speech, version, receivedAt)).catch(report);
 }
 
 OBR.onReady(() => {
-  OBR.broadcast.onMessage(SPEECH, queueSpeech);
   openSessionChannel().then((channel) => {
     transcriptChannel = channel;
     channel.onmessage = ({ data }) => {
-      if (data?.type === "request") channel.postMessage({ type: "history", entries: transcript });
+      if (data?.type === "request" && typeof data.requestId === "string") publishHistory(data);
     };
     channel.postMessage({ type: "ready" });
   }).catch(report);
   OBR.scene.onReadyChange((ready) => {
+    sceneReady = ready;
     if (ready) return;
     ++sceneVersion;
     resetDicePopups();
@@ -252,10 +313,15 @@ OBR.onReady(() => {
     clearTimeout(floatingTimer);
     floatingTimer = undefined;
     floating = [];
-    pending = Promise.resolve();
+    sceneItems = undefined;
+    queuedBubbles.clear();
+    pendingSpeech = Promise.resolve();
+    pendingBubbles = Promise.resolve();
   });
 
   OBR.scene.items.onChange((items) => {
+    if (!sceneReady) return;
+    sceneItems = items;
     if (!active.size && !floating.length) return;
     const publicTokens = new Set(items.filter(isPublicToken).map((item) => item.id));
     for (const [tokenId, bubble] of active) {
@@ -266,15 +332,37 @@ OBR.onReady(() => {
     }
   });
 
+  OBR.player.onChange((player) => { role = player.role; });
+  OBR.party.onChange((players) => {
+    party = new Map(players.map((player) => [player.connectionId, player]));
+  });
+  OBR.room.onPermissionsChange((value) => { permissions = value; });
   OBR.room.onMetadataChange((metadata) => {
+    const wasFloating = roomMetadata?.[HABBO_MODE] === true;
+    roomMetadata = metadata;
+    const floatingMode = metadata[HABBO_MODE] === true;
+    if (wasFloating === floatingMode) return;
     queueScene(async (version) => {
-      if (metadata[HABBO_MODE] === true) {
+      if (floatingMode) {
         await Promise.all([...active].map(([id, bubble]) => removeBubble(id, bubble)));
       } else if (floating.length) {
         await updateFloating([], version);
       }
     });
   });
+  initialState = Promise.allSettled([
+    OBR.scene.isReady().then((ready) => { sceneReady ??= ready; }),
+    OBR.player.getConnectionId().then((value) => { connectionId = value; }),
+    OBR.player.getRole().then((value) => { role ??= value; }),
+    OBR.party.getPlayers().then((players) => {
+      party ??= new Map(players.map((player) => [player.connectionId, player]));
+    }),
+    OBR.room.getPermissions().then((value) => { permissions ??= value; }),
+    OBR.room.getMetadata().then((value) => { roomMetadata ??= value; }),
+  ]).then((results) => {
+    for (const result of results) if (result.status === "rejected") report(result.reason);
+  });
+  OBR.broadcast.onMessage(SPEECH, queueSpeech);
 
   OBR.contextMenu.create({
     id: "chat.overhead.set-avatar.v1",
