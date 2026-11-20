@@ -84,6 +84,7 @@ select { font: inherit; background: #181321; color: inherit; border: 1px solid #
 }
 #speaker { font-size: 11px; }
 #message::placeholder { color: #ab9dbb; font-size: 12px; }
+#message, #entries { text-transform: none; }
 #message:disabled { opacity: .56; }
 #message[readonly] { border-color: #c7b6f8; }
 #move-avatar { background: #312940; color: #e2d4f6; padding-inline: 10px; }
