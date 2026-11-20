@@ -31,8 +31,8 @@ function openNext() {
       return OBR.popover.open({
         id: POPOVER_ID,
         url: url.href,
-        width: Math.min(412, Math.max(180, width - 24)),
-        height: Math.min(254, Math.max(150, height - 24)),
+        width: Math.min(480, Math.max(180, width - 24)),
+        height: Math.min(310, Math.max(150, height - 24)),
         anchorReference: "POSITION",
         anchorPosition: { top: height - 12, left: width / 2 },
         anchorOrigin: { vertical: "BOTTOM", horizontal: "CENTER" },

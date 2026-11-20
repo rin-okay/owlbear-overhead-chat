@@ -41,6 +41,6 @@ Send `/r 1d20+7` for a standalone roll, or include `r[2d20kh1]` inside a message
 
 With Rumble! off, everyone in the Owlbear room running Overhead Chat, including the roller, sees the same 3D toss in a temporary popup. The popup animates up to eight standard dice (d4, d6, d8, d10, d12, d20) and shows the roll totals. Custom dice and dice beyond the preview limit still count in the chat result.
 
-The shared replay uses the [Dicesuki](https://github.com/donovan-yohan/dicesuki) solo WebAssembly physics engine by Donovan Yohan (MIT), pinned to commit `8fae459b1b31a112d918ec3897e66c5f67b5e409`. Its Rapier simulation produces the faces and motion for the 3D dice.
+The shared replay uses the [Dicesuki](https://github.com/donovan-yohan/dicesuki) solo WebAssembly physics engine by Donovan Yohan (MIT), pinned to commit `8fae459b1b31a112d918ec3897e66c5f67b5e409`. Its Rapier simulation produces the faces and motion for the 3D dice. The popup uses Dicesuki's basic white dice styling and [face numbering](./DICESUKI-LICENSE.md).
 
 The GM can enable **Use Rumble! for dice rolls** in **Settings** to use Rumble’s notation and dice animations. Open Rumble! in the room before rolling in Overhead Chat.

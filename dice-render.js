@@ -1,15 +1,13 @@
 import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.162.0/build/three.module.js";
 
-const colors = ["#9564e3", "#4faec5", "#c55a98", "#6d91df", "#a375d0", "#52ae9a", "#ce8459", "#7973d4"];
-const view = new THREE.Vector3(0, 0.958, 0.287);
-const light = new THREE.Vector3(-0.6, 1, -0.35).normalize();
+import { numberedFaces } from "./dice-faces.js";
 
 function trapezohedron() {
   // The 10-sided solid uses Dicesuki's d10 geometry contract.
   const vertices = [[0, 1, 0], [0, -1, 0]];
   for (let index = 0; index < 10; index++) {
     const angle = index * Math.PI / 5;
-    vertices.push([Math.cos(angle), (index % 2 ? 1 : -1) * 0.105572809, Math.sin(angle)]);
+    vertices.push([-Math.cos(angle), (index % 2 ? 1 : -1) * 0.105572809, -Math.sin(angle)]);
   }
   const triangles = [];
   for (let index = 0; index < 10; index++) {
@@ -53,6 +51,7 @@ function meshFaces(sides) {
       faces.push({ normal, points });
     }
   }
+  geometry.dispose();
   return faces.map(({ normal, points }) => {
     const center = new THREE.Vector3();
     points.forEach((point) => center.add(point));
@@ -67,100 +66,181 @@ function meshFaces(sides) {
   });
 }
 
-export function animateTray(canvas, dice, frames, duration) {
-  const ctx = canvas.getContext("2d");
-  if (!ctx) throw new Error("Canvas unavailable.");
-  const width = canvas.clientWidth;
-  const height = canvas.clientHeight;
-  const pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
-  canvas.width = width * pixelRatio;
-  canvas.height = height * pixelRatio;
-  ctx.scale(pixelRatio, pixelRatio);
-  ctx.lineJoin = "round";
-  const unit = Math.min(width / 11.7, height / 8.25);
-  const project = ({ x, y, z }) => [width / 2 + x * unit, height * 0.56 + (z * view.y - y * view.z) * unit];
-  const meshes = new Map(dice.map(({ sides }) => [sides, meshFaces(sides)]));
-  const bases = dice.map((die, index) => new THREE.Color(die.kept ? colors[index] : "#746981"));
-  const other = new THREE.Quaternion();
+function nearestFace(references, normal) {
+  return references.reduce((best, candidate) =>
+    candidate.normal.dot(normal) > best.normal.dot(normal) ? candidate : best);
+}
 
-  function draw(progress) {
-    const index = progress * (frames.length - 1);
-    const first = frames[Math.floor(index)];
-    const second = frames[Math.ceil(index)];
-    const fraction = index % 1;
-    const settled = progress === 1;
-    const surfaces = [];
-    const labels = [];
-    ctx.clearRect(0, 0, width, height);
-    for (const [i, { sides, value, kept }] of dice.entries()) {
-      const [x, y, z] = first[i].slice(0, 3).map((position, axis) =>
-        position + (second[i][axis] - position) * fraction);
-      const position = new THREE.Vector3(x, y, z);
-      const rotation = new THREE.Quaternion().fromArray(first[i], 3).normalize()
-        .slerp(other.fromArray(second[i], 3).normalize(), fraction);
-      const shadow = project({ x, y: -0.4, z });
-      ctx.fillStyle = `rgba(5,2,10,${0.4 / (1 + Math.max(0, y) * 0.18)})`;
-      ctx.beginPath();
-      ctx.ellipse(...shadow, unit * 0.85, unit * 0.60, 0, 0, 2 * Math.PI);
-      ctx.fill();
-      const faces = meshes.get(sides);
-      let top;
-      for (const face of faces) {
-        const normal = face.normal.clone().applyQuaternion(rotation);
-        if (normal.dot(view) <= 0.005) continue;
-        const center = face.center.clone().applyQuaternion(rotation).add(position);
-        surfaces.push({
-          points: face.points.map((point) => project(point.clone().applyQuaternion(rotation).add(position))),
-          depth: center.dot(view),
-          color: bases[i].clone().multiplyScalar(0.40 + 0.67 * Math.max(0, normal.dot(light))).getStyle(),
-        });
-        if (!top || normal.y > top.y) top = { point: center, y: normal.y };
+function numeralMaterial(value, materials) {
+  if (materials.has(value)) return materials.get(value);
+  const image = document.createElement("canvas");
+  image.width = image.height = 128;
+  const ink = image.getContext("2d");
+  ink.font = "102px Helvetica, Arial, sans-serif";
+  ink.fillStyle = "#161316";
+  ink.textAlign = "center";
+  ink.textBaseline = "middle";
+  ink.fillText(value, 64, 66);
+  if (value === 6 || value === 9) ink.fillRect(48, 108, 32, 4);
+
+  const map = new THREE.CanvasTexture(image);
+  map.colorSpace = THREE.SRGBColorSpace;
+  map.anisotropy = 4;
+  const material = new THREE.MeshBasicMaterial({ map, transparent: true, depthWrite: false, alphaTest: 0.05 });
+  materials.set(value, material);
+  return material;
+}
+
+function addNumeral(group, plane, materials, value, position, normal, up, width, height = width) {
+  const numeral = new THREE.Mesh(plane, numeralMaterial(value, materials));
+  const right = up.clone().cross(normal).normalize();
+  const vertical = normal.clone().cross(right);
+  numeral.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(right, vertical, normal));
+  numeral.position.copy(position).addScaledVector(normal, 0.003);
+  numeral.scale.set(width, height, 1);
+  numeral.renderOrder = 1;
+  group.add(numeral);
+}
+
+function createDie(sides, kept, plane, materials, bodyMaterials) {
+  const group = new THREE.Group();
+  const hull = [];
+  const references = numberedFaces[sides].map(([value, x, y, z]) =>
+    ({ value, normal: new THREE.Vector3(x, y, z).normalize() }));
+
+  for (const { normal, center, points } of meshFaces(sides)) {
+    for (let index = 1; index < points.length - 1; index++) {
+      hull.push(...points[0], ...points[index], ...points[index + 1]);
+    }
+
+    if (sides === 4) {
+      for (const tip of points) {
+        const vertexValue = nearestFace(references, tip.clone().normalize().negate()).value;
+        addNumeral(group, plane, materials, vertexValue, center.clone().lerp(tip, 0.45),
+          normal, tip.clone().sub(center), 0.31);
       }
-      if (settled) labels.push({ point: project(sides === 4 || !top
-        ? position.clone().add(new THREE.Vector3(0, 0.42, -0.05)) : top.point), value, kept });
+      continue;
     }
-    surfaces.sort((a, b) => a.depth - b.depth);
-    for (const { points, color } of surfaces) {
-      ctx.fillStyle = color;
-      ctx.strokeStyle = "#2b1c3e";
-      ctx.lineWidth = 0.9;
-      ctx.beginPath();
-      ctx.moveTo(...points[0]);
-      for (const point of points.slice(1)) ctx.lineTo(...point);
-      ctx.closePath();
-      ctx.fill();
-      ctx.stroke();
-    }
-    for (const { point: [x, y], value, kept } of labels) {
-      ctx.font = `bold ${Math.max(11, unit * 0.66)}px system-ui`;
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.lineWidth = 2.8;
-      ctx.strokeStyle = "#21142c";
-      ctx.fillStyle = kept ? "#fff" : "#dbd0e4";
-      ctx.strokeText(value, x, y);
-      ctx.fillText(value, x, y);
-      if (!kept) ctx.fillRect(x - 7, y - 1, 14, 1);
-    }
+
+    const { value } = nearestFace(references, normal);
+    const up = points[0].clone().sub(center);
+    const size = sides === 6 ? 0.69 : sides === 20 ? 0.49 : 0.59;
+    addNumeral(group, plane, materials, value, center, normal, up, size * (value >= 10 ? 1.22 : 1), size);
   }
 
-  if (matchMedia("(prefers-reduced-motion: reduce)").matches) {
-    draw(1);
-    return Promise.resolve();
-  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(hull, 3));
+  geometry.computeVertexNormals();
+  const body = new THREE.Mesh(geometry, bodyMaterials[kept ? 0 : 1]);
+  body.castShadow = true;
+  body.receiveShadow = true;
+  group.add(body);
+  return group;
+}
 
-  return new Promise((resolve, reject) => {
-    const start = performance.now();
-    function frame(now) {
-      const progress = Math.min(1, (now - start) / duration);
-      try {
-        draw(progress);
-        if (progress < 1) requestAnimationFrame(frame);
-        else resolve();
-      } catch (error) {
-        reject(error);
-      }
+export async function animateTray(canvas, dice, frames, duration) {
+  const { clientWidth: width, clientHeight: height } = canvas;
+  if (!width || !height) throw new Error("Dice tray is not visible.");
+
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+  const scene = new THREE.Scene();
+  const materials = new Map();
+  const dispose = () => {
+    const geometries = new Set();
+    const sceneMaterials = new Set();
+    scene.traverse((object) => {
+      if (object.geometry) geometries.add(object.geometry);
+      if (object.material) sceneMaterials.add(object.material);
+    });
+    geometries.forEach((geometry) => geometry.dispose());
+    sceneMaterials.forEach((material) => {
+      material.map?.dispose();
+      material.dispose();
+    });
+    scene.children.find((object) => object.isDirectionalLight)?.shadow.dispose();
+    renderer.dispose();
+  };
+  window.addEventListener("pagehide", dispose, { once: true });
+
+  try {
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    renderer.setSize(width, height, false);
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    scene.background = new THREE.Color("#17131b");
+
+    const camera = new THREE.PerspectiveCamera(40, width / height, 0.1, 60);
+    const halfFov = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
+    const cameraHeight = Math.max(3.7, 6.15 / camera.aspect) / halfFov;
+    camera.up.set(0, 0, -1);
+    camera.position.set(0, cameraHeight, 0);
+    camera.lookAt(0, 0, 0);
+    scene.add(new THREE.HemisphereLight("#f7edf2", "#736981", 1.45));
+    const key = new THREE.DirectionalLight("#fff4eb", 2.25);
+    key.position.set(5, 10, 7);
+    key.castShadow = true;
+    key.shadow.mapSize.set(1024, 1024);
+    Object.assign(key.shadow.camera, { left: -9, right: 9, top: 9, bottom: -9, near: 0.5, far: 27 });
+    key.shadow.camera.updateProjectionMatrix();
+    key.shadow.normalBias = 0.017;
+    scene.add(key);
+
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(36, 36),
+      new THREE.MeshStandardMaterial({ color: "#211b24", roughness: 1 }));
+    floor.rotation.x = -Math.PI / 2;
+    floor.position.y = -0.5;
+    floor.receiveShadow = true;
+    scene.add(floor);
+
+    const plane = new THREE.PlaneGeometry(1, 1);
+    const bodyMaterials = ["#ffffff", "#9a909f"].map((color) =>
+      new THREE.MeshStandardMaterial({ color, roughness: 0.62 }));
+    const models = dice.map(({ sides, kept }) => {
+      const model = createDie(sides, kept, plane, materials, bodyMaterials);
+      scene.add(model);
+      return model;
+    });
+    const other = new THREE.Quaternion();
+
+    function draw(progress) {
+      const index = progress * (frames.length - 1);
+      const first = frames[Math.floor(index)];
+      const second = frames[Math.ceil(index)];
+      const fraction = index % 1;
+      models.forEach((model, die) => {
+        model.position.fromArray(first[die]);
+        const [x, y, z] = second[die];
+        model.position.x += (x - model.position.x) * fraction;
+        model.position.y += (y - model.position.y) * fraction;
+        model.position.z += (z - model.position.z) * fraction;
+        model.quaternion.fromArray(first[die], 3).normalize()
+          .slerp(other.fromArray(second[die], 3).normalize(), fraction);
+      });
+      renderer.render(scene, camera);
     }
-    requestAnimationFrame(frame);
-  });
+
+    if (matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      draw(1);
+      return;
+    }
+
+    await new Promise((resolve, reject) => {
+      const start = performance.now();
+      function frame(now) {
+        try {
+          const progress = THREE.MathUtils.clamp((now - start) / duration, 0, 1);
+          draw(progress);
+          if (progress < 1) requestAnimationFrame(frame);
+          else resolve();
+        } catch (error) {
+          reject(error);
+        }
+      }
+      requestAnimationFrame(frame);
+    });
+  } catch (error) {
+    window.removeEventListener("pagehide", dispose);
+    dispose();
+    throw error;
+  }
 }

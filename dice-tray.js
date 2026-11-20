@@ -44,7 +44,9 @@ channel.onmessage = async ({ data: { name, rolls, dice, count, frames, duration 
   }
   for (const { notation, total } of rolls) {
     const result = document.createElement("span");
-    result.textContent = `${notation} = ${total}`;
+    const value = document.createElement("strong");
+    value.textContent = total;
+    result.append(`${notation} =`, value);
     output.append(result);
   }
   channel.postMessage("settled");
