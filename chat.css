@@ -51,6 +51,8 @@ header { margin-bottom: 0; flex: none; }
 form { flex: none; }
 #status { min-height: 0; margin-top: 7px; }
 #status:empty { display: none; }
+#move-warning { margin: 7px 0 0; font-size: 12px; color: #c8bbd5; }
+#move-warning:empty { display: none; }
 
 [hidden] { display: none !important; }
 nav { display: flex; gap: 6px; }

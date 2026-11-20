@@ -26,6 +26,7 @@ const input = document.querySelector("#message");
 const send = form.querySelector("[type=submit]");
 const moveButton = form.querySelector("#move-avatar");
 const moveModeLabel = form.querySelector("#move-mode-label");
+const moveWarning = form.querySelector("#move-warning");
 const status = document.querySelector("#status");
 
 let avatar = null;
@@ -39,6 +40,8 @@ let tokenControl;
 let movingAvatar = false;
 let modeExitKey;
 let refreshAvatarPanel;
+let moveWarningTimer;
+let moveWarningFade;
 const SLOT_DOUBLE_TAP_MS = 500;
 
 const movementKeys = {
@@ -190,7 +193,7 @@ function connectTranscript() {
 function updateControls() {
   input.disabled = !avatar;
   send.disabled = !avatar || sending;
-  moveButton.disabled = !avatar || avatar.locked || sending;
+  moveButton.disabled = !tokenControl && (!avatar || avatar.locked || sending);
 }
 
 async function getAvatar() {
@@ -222,7 +225,7 @@ async function refresh() {
     if (version !== refreshVersion) return;
 
     const shouldFocus = token && token.id !== avatar?.id;
-    if (tokenControl && !tokenControl.switching && (token?.id !== tokenControl.tokenId || token.locked)) stopTokenControl();
+    if (tokenControl && !tokenControl.switching && tokenId && tokenId !== tokenControl.tokenId) stopTokenControl();
     avatar = token ?? null;
     selectedAvatarId = tokenId ?? null;
     observedToken = observed ?? null;
@@ -233,7 +236,10 @@ async function refresh() {
   } catch (error) {
     if (version !== refreshVersion) return;
     console.error("Overhead Chat could not read the avatar", error);
-    stopTokenControl();
+    if (tokenControl) {
+      warnMoveFailed();
+      return;
+    }
     avatar = null;
     speaker.textContent = "Pick an avatar";
     status.textContent = "Couldn’t read your avatar. Close and reopen chat to retry.";
@@ -249,6 +255,7 @@ function stopTokenControl() {
   input.setAttribute("aria-describedby", "status");
   moveModeLabel.hidden = true;
   moveButton.setAttribute("aria-pressed", "false");
+  updateControls();
 }
 
 function toggleTokenControl() {
@@ -291,6 +298,20 @@ function holdRotation(mode, key, action) {
   held.timer = setTimeout(repeat, 240);
 }
 
+function warnMoveFailed() {
+  clearTimeout(moveWarningTimer);
+  moveWarningFade?.cancel();
+  moveWarning.textContent = "Couldn’t update your avatar.";
+  if (!matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    moveWarningFade = moveWarning.animate([
+      { opacity: 1, offset: 0 },
+      { opacity: 1, offset: 0.85 },
+      { opacity: 0 },
+    ], 3200);
+  }
+  moveWarningTimer = setTimeout(() => { moveWarning.textContent = ""; }, 3200);
+}
+
 async function moveAvatar(mode) {
   movingAvatar = true;
   try {
@@ -299,11 +320,7 @@ async function moveAvatar(mode) {
       const { offset, rotation, mirror, artwork, onApplied } = mode.actions.shift();
       const [{ token }, step] = await Promise.all([getAvatar(), offset ? OBR.scene.grid.getDpi() : 0]);
       if (mode !== tokenControl || mode.switching || tokenId !== mode.tokenId) return;
-      if (token?.id !== tokenId || token.locked) {
-        stopTokenControl();
-        await refresh();
-        return;
-      }
+      if (token?.id !== tokenId || token.locked) throw new Error("Avatar is unavailable or locked.");
       if (offset && (!Number.isFinite(step) || step <= 0)) throw new Error("Scene grid size unavailable.");
 
       let applied = false;
@@ -312,7 +329,6 @@ async function moveAvatar(mode) {
         if (artwork) {
           item.image = artwork.image;
           item.grid = artwork.grid;
-          applied = true;
         } else if (offset) {
           const [x, y] = offset;
           item.position.x += x * step;
@@ -322,14 +338,18 @@ async function moveAvatar(mode) {
         } else {
           item.rotation = ((item.rotation + rotation) % 360 + 360) % 360;
         }
+        applied = true;
       });
-      if (applied) onApplied();
+      if (mode !== tokenControl || mode.switching || tokenId !== mode.tokenId) return;
+      if (!applied) throw new Error("Avatar changed before the update.");
+      onApplied?.();
     }
   } catch (error) {
     if (mode !== tokenControl) return;
     console.error("Overhead Chat token movement failed", error);
-    stopTokenControl();
-    status.textContent = "Couldn’t update your avatar.";
+    mode.actions.length = 0;
+    stopRotation(mode);
+    warnMoveFailed();
   } finally {
     movingAvatar = false;
     if (tokenControl?.actions.length && !tokenControl.switching) void moveAvatar(tokenControl);
