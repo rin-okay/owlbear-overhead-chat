@@ -42,12 +42,13 @@ export function decodeReplay(replay, diceCount) {
 export function parseTray(tray) {
   const { dice, replay, duration, count } = tray ?? {};
   if (!Array.isArray(dice) || !dice.length || dice.length > MAX_DICE_SHOWN ||
-      !Number.isInteger(count) || count < dice.length || count > 400 ||
+      !Number.isInteger(count) || count < dice.length || count > 800 ||
       !dice.every((die) => {
-        const { sides, value, kept, physical } = die ?? {};
+        const { sides, value, kept, physical, percentile } = die ?? {};
         return Number.isInteger(sides) && sides >= 2 && sides <= 1000 &&
           Number.isInteger(value) && value > 0 && value <= sides &&
-          typeof kept === "boolean" && typeof physical === "boolean";
+          typeof kept === "boolean" && typeof physical === "boolean" &&
+          (percentile === undefined || (sides === 10 && (percentile === "tens" || percentile === "ones")));
       })) return;
   const physicalCount = dice.filter((die) => die.physical).length;
   const frames = decodeReplay(replay, physicalCount);

@@ -1,6 +1,7 @@
 import * as THREE from "./vendor/three/three.module.min.js";
 
 import { numberedFaces } from "./dice-faces.js";
+import { percentileLabel } from "./percentile.js";
 
 function trapezohedron() {
   // The 10-sided solid uses Dicesuki's d10 geometry contract.
@@ -75,7 +76,7 @@ const light = new THREE.Vector3(5, 10, 7).normalize();
 const DICE_SCALE = 1.5;
 const defaultColors = { edge: "#8b75b5", fill: "#fbf6ff", ink: "#241d31" };
 
-function numberedMesh(sides) {
+function numberedMesh(sides, percentile) {
   const references = numberedFaces[sides].map(([value, x, y, z]) =>
     ({ value, normal: new THREE.Vector3(x, y, z).normalize() }));
   return meshFaces(sides).map((face) => {
@@ -95,7 +96,10 @@ function numberedMesh(sides) {
         }];
     return {
       ...face,
-      glyphs: glyphs.map(({ up, ...glyph }) => ({ ...glyph, up, right: up.clone().cross(normal) })),
+      glyphs: glyphs.map(({ up, ...glyph }) => ({
+        ...glyph, up, right: up.clone().cross(normal),
+        label: percentile ? percentileLabel(glyph.value, percentile) : String(glyph.value),
+      })),
     };
   });
 }
@@ -120,16 +124,19 @@ function printNumeral(ctx, project, glyph, rotation, position, scale, ink) {
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   ctx.fillStyle = ink;
-  ctx.fillText(glyph.value, 0, 0.035);
-  if (glyph.value === 6 || glyph.value === 9) ctx.fillRect(-0.19, 0.34, 0.38, 0.031);
+  ctx.fillText(glyph.label, 0, 0.035);
+  if (glyph.label === "6" || glyph.label === "9") ctx.fillRect(-0.19, 0.34, 0.38, 0.031);
   ctx.restore();
 }
 
 export function animateTray(canvas, dice, frames, duration, colors = defaultColors) {
   const ctx = canvas.getContext("2d");
   if (!ctx) throw new Error("Dice canvas unavailable.");
-  const models = new Map([...new Set(dice.map(({ sides }) => sides))]
-    .map((sides) => [sides, numberedMesh(sides)]));
+  const models = new Map();
+  for (const { sides, percentile } of dice) {
+    const shape = percentile ?? sides;
+    if (!models.has(shape)) models.set(shape, numberedMesh(sides, percentile));
+  }
   const pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
   const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
   const other = new THREE.Quaternion();
@@ -163,13 +170,13 @@ export function animateTray(canvas, dice, frames, duration, colors = defaultColo
     ctx.fillStyle = "#211b24";
     ctx.fillRect(0, 0, width, height);
 
-    for (const [die, { sides, kept }] of dice.entries()) {
+    for (const [die, { sides, kept, percentile }] of dice.entries()) {
       const position = new THREE.Vector3().fromArray(first[die])
         .lerp(new THREE.Vector3().fromArray(second[die]), fraction);
       const rotation = new THREE.Quaternion().fromArray(first[die], 3).normalize()
         .slerp(other.fromArray(second[die], 3).normalize(), fraction);
 
-      for (const face of models.get(sides)) {
+      for (const face of models.get(percentile ?? sides)) {
         const world = face.points.map((point) => point.clone().multiplyScalar(scale).applyQuaternion(rotation).add(position));
         shadows.push(world.map(({ x, y, z }) => project({
           x: x - (y + 0.5) * light.x / light.y,

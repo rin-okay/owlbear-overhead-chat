@@ -1,3 +1,5 @@
+import { percentileTerms } from "./percentile.js";
+
 const MAX_ROLLS = 4;
 const MAX_NOTATION = 80;
 
@@ -45,8 +47,11 @@ export function chatParts(text, results) {
 function validBreakdown(breakdown, total) {
   return Array.isArray(breakdown) && breakdown.length > 0 && breakdown.length <= 140 &&
     breakdown.every((value) => Number.isSafeInteger(value) ? Math.abs(value) <= 99999999 :
-      typeof value === "string" && /^~-?[1-9]\d{0,3}$/.test(value)) &&
-    breakdown.reduce((sum, value) => typeof value === "number" ? sum + value : sum, 0) === total;
+      typeof value === "string" && /^(?:~-?[1-9]\d{0,3}|~?p-?(?:[1-9]\d?|100))$/.test(value)) &&
+    breakdown.reduce((sum, value) => {
+      if (typeof value === "number") return sum + value;
+      return value.startsWith("p") ? sum + Number(value.slice(1)) : sum;
+    }, 0) === total;
 }
 
 export function randomFace(sides) {
@@ -111,10 +116,15 @@ export function scoreDice(terms, face = randomFace) {
       const keep = kept(index);
       const signedValue = factor * value;
       if (keep) total += signedValue;
-      breakdown.push(keep ? signedValue : `~${signedValue}`);
+      if (sides === 100) breakdown.push(`${keep ? "" : "~"}p${signedValue}`);
+      else breakdown.push(keep ? signedValue : `~${signedValue}`);
       if (typeof dice[index] === "object") dice[index].kept = keep;
     });
-    details.push(`${text} → [${values.map((value, index) => kept(index) ? value : `${value} dropped`).join(", ")}]`);
+    const faces = values.map((value, index) => {
+      const label = sides === 100 ? `${percentileTerms(value)}${value === 100 ? " → 100" : ""}` : value;
+      return kept(index) ? label : `${label} dropped`;
+    });
+    details.push(`${text} → [${faces.join(", ")}]`);
   }
   return { total, detail: details.join("\n").slice(0, 1200), breakdown };
 }

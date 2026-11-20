@@ -34,10 +34,12 @@ export async function simulate(sides) {
       const values = new Array(sides.length);
       for (const { diceId, faceValue } of result.results) {
         const index = Number(diceId);
-        values[index] = sides[index] === 10 && faceValue === 0 ? 10 : faceValue;
+        const size = sides[index];
+        const face = size === "10tens" ? faceValue / 10 : faceValue;
+        values[index] = (size === 10 || size === "10tens") && face === 0 ? 10 : face;
       }
       if (Array.from(values).some((value, index) =>
-        !Number.isInteger(value) || value < 1 || value > sides[index])) break;
+        !Number.isInteger(value) || value < 1 || value > (sides[index] === "10tens" ? 10 : sides[index]))) break;
       return { values, replay: encodeReplay(frames, sides.length), duration: tick * TICK_MS };
     }
     throw new Error("The dice did not settle.");

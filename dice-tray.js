@@ -1,4 +1,5 @@
 import { appendCalculation } from "./roll-display.js";
+import { percentileLabel } from "./percentile.js";
 
 const channel = new BroadcastChannel(`chat.overhead.dice-tray:${location.hash.slice(1)}`);
 const canvas = document.querySelector("canvas");
@@ -26,9 +27,9 @@ channel.onmessage = async ({ data: { name, rolls, dice, count, frames, duration,
 
   speaker.textContent = `${name} rolled`;
   const chips = animated ? dice.filter((die) => !die.physical) : dice;
-  for (const { sides, value, kept } of chips) {
+  for (const { sides, value, kept, percentile } of chips) {
     const chip = document.createElement("span");
-    chip.textContent = `d${sides} · ${value}`;
+    chip.textContent = percentile ? `d10 ${percentile} · ${percentileLabel(value, percentile)}` : `d${sides} · ${value}`;
     if (!kept) {
       chip.className = "dropped";
       chip.title = "Dropped";
@@ -55,3 +56,4 @@ channel.onmessage = async ({ data: { name, rolls, dice, count, frames, duration,
   channel.postMessage("settled");
 };
 channel.postMessage("ready");
+

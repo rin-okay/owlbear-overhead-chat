@@ -25,20 +25,28 @@ function simulateDice(sides) {
 export async function rollWithNativeDice(spans) {
   const expressions = spans.map(({ notation }) => parseDice(notation));
   const dice = [];
+  const shown = [];
   let count = 0;
   for (const { sides, count: amount } of expressions.flat()) {
     if (!amount) continue;
-    for (let index = 0; index < amount && dice.length < MAX_DICE_SHOWN; index++) {
-      dice.push({ sides, physical: physicalSides.has(sides) });
+    const slots = sides === 100 ? 2 : 1;
+    if (count === dice.length) {
+      for (let index = 0; index < amount && dice.length + slots <= MAX_DICE_SHOWN; index++) {
+        const faces = slots === 2
+          ? ["tens", "ones"].map((percentile) => ({ sides: 10, percentile, physical: true }))
+          : [{ sides, physical: physicalSides.has(sides) }];
+        dice.push(...faces);
+        shown.push(faces);
+      }
     }
-    count += amount;
+    count += amount * slots;
   }
 
   const physical = dice.filter((die) => die.physical);
   let simulation;
   if (physical.length) {
     try {
-      const sizes = physical.map((die) => die.sides);
+      const sizes = physical.map((die) => die.percentile === "tens" ? "10tens" : die.sides);
       try {
         simulation = await simulateDice(sizes);
       } catch {
@@ -54,10 +62,15 @@ export async function rollWithNativeDice(spans) {
 
   let index = 0;
   const rolls = expressions.map((terms) => scoreDice(terms, (sides) => {
-    const die = dice[index++];
-    if (!die) return randomFace(sides);
-    die.value ??= randomFace(sides);
-    return die;
+    const faces = shown[index++];
+    if (!faces) return randomFace(sides);
+    for (const die of faces) die.value ??= randomFace(die.sides);
+    if (faces.length === 1) return faces[0];
+    const [tens, ones] = faces;
+    return {
+      value: (tens.value % 10 * 10 + ones.value % 10) || 100,
+      set kept(keep) { tens.kept = ones.kept = keep; },
+    };
   }));
   return { rolls, tray: { dice, count, replay: simulation?.replay, duration: simulation?.duration } };
 }
