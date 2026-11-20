@@ -191,6 +191,7 @@ async function refresh() {
 
 function stopTokenControl() {
   if (!tokenControl) return;
+  stopRotation(tokenControl);
   tokenControl = undefined;
   input.readOnly = false;
   input.setAttribute("aria-describedby", "status");
@@ -201,6 +202,7 @@ function stopTokenControl() {
 function toggleTokenControl() {
   if (tokenControl) {
     stopTokenControl();
+    input.focus();
   } else {
     if (moveButton.disabled) return;
     tokenControl = { tokenId: avatar.id, actions: [] };
@@ -208,8 +210,33 @@ function toggleTokenControl() {
     input.setAttribute("aria-describedby", "move-mode-label status");
     moveModeLabel.hidden = false;
     moveButton.setAttribute("aria-pressed", "true");
+    moveButton.focus();
   }
-  input.focus();
+}
+
+function queueAvatarAction(mode, action) {
+  mode.actions.push(action);
+  if (!movingAvatar) void moveAvatar(mode);
+}
+
+function stopRotation(mode) {
+  if (!mode?.heldRotation) return;
+  clearTimeout(mode.heldRotation.timer);
+  mode.heldRotation = undefined;
+}
+
+function holdRotation(mode, key, action) {
+  stopRotation(mode);
+  const held = { key };
+  mode.heldRotation = held;
+
+  function repeat() {
+    if (mode !== tokenControl || mode.heldRotation !== held) return;
+    if (!movingAvatar) queueAvatarAction(mode, action);
+    held.timer = setTimeout(repeat, 120);
+  }
+
+  held.timer = setTimeout(repeat, 240);
 }
 
 async function moveAvatar(mode) {
@@ -250,20 +277,27 @@ async function moveAvatar(mode) {
   }
 }
 
-input.addEventListener("blur", stopTokenControl);
+moveButton.addEventListener("blur", stopTokenControl);
 window.addEventListener("blur", stopTokenControl);
 document.addEventListener("pointerdown", (event) => {
   if (event.target !== input && !moveButton.contains(event.target)) stopTokenControl();
 });
-moveButton.addEventListener("mousedown", (event) => {
-  if (tokenControl) event.preventDefault();
-});
 moveButton.addEventListener("click", toggleTokenControl);
-input.addEventListener("keyup", (event) => {
-  if (event.key === modeExitKey) modeExitKey = undefined;
+form.addEventListener("keyup", (event) => {
+  if (event.key === modeExitKey) {
+    modeExitKey = undefined;
+    event.preventDefault();
+  }
+  if (tokenControl?.heldRotation?.key === (event.code || event.key.toLowerCase())) stopRotation(tokenControl);
 });
 
-input.addEventListener("keydown", (event) => {
+form.addEventListener("keydown", (event) => {
+  if (event.target !== input && (event.target !== moveButton || !tokenControl)) return;
+  const physicalKey = event.code || event.key.toLowerCase();
+  if (event.repeat && tokenControl?.heldRotation?.key === physicalKey) {
+    event.preventDefault();
+    return;
+  }
   if (event.isComposing || event.keyCode === 229) return;
   if (event.key === modeExitKey) {
     if (event.repeat) {
@@ -288,9 +322,9 @@ input.addEventListener("keydown", (event) => {
     } else if (Object.hasOwn(movementKeys, key) && !event.ctrlKey && !event.altKey && !event.metaKey) {
       event.preventDefault();
       const action = movementKeys[key];
-      if (event.repeat && (action.mirror || tokenControl.actions.length >= 4)) return;
-      tokenControl.actions.push(action);
-      if (!movingAvatar) void moveAvatar(tokenControl);
+      if (event.repeat && (action.rotation || action.mirror || tokenControl.actions.length >= 4)) return;
+      queueAvatarAction(tokenControl, action);
+      if (action.rotation) holdRotation(tokenControl, physicalKey, action);
     }
     return;
   }
