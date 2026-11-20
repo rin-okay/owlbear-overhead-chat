@@ -39,4 +39,4 @@ The relay runs while the configured GM has the Owlbear room tab open. It mirrors
 
 Send `/r 1d20+7` for a standalone roll, or include `r[2d20kh1]` inside a message. Hover over a result in the chat log to see the expression and dice breakdown.
 
-The GM can enable **Use Rumble! for dice rolls** in **Settings** to use Rumble’s notation and dice animations. Open Rumble! in the room and choose **Everyone** as the recipient before rolling in Overhead Chat.
+The GM can enable **Use Rumble! for dice rolls** in **Settings** to use Rumble’s notation and dice animations. Open Rumble! in the room before rolling in Overhead Chat.

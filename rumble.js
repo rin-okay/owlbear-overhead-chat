@@ -1,9 +1,45 @@
 import OBR from "./obr.js";
 
-const REQUEST = "com.battle-system.friends/metadata_diceroll";
 const ACTIVE = "com.battle-system.rumble/rumble_active";
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 let lastCompleted = 0;
+
+const DICE_WINDOW = "com.battle-system.dicewindow";
+let graphicTimer;
+
+async function showOwnDice(roll) {
+  const dice = [];
+  const values = [];
+  for (const set of roll.sets ?? []) {
+    if (!/^d(?:\d+|f)$/i.test(set.type)) continue;
+    for (const die of set.rolls ?? []) {
+      if (!Number.isFinite(die.value)) continue;
+      dice.push(set.type);
+      values.push(die.value);
+    }
+  }
+  if (!dice.length) return;
+
+  const url = new URL("https://rumble.battle-system.com/dicewindow.html");
+  url.search = new URLSearchParams({
+    preroll: `${dice.join("_")}@${values.join(",")}`,
+    player: roll.dPlayer || "Overhead Chat",
+    playercolor: (roll.dPColor || "#c7b6f8").replace("#", ""),
+    color: (roll.dColor || "#8b75b5").replace("#", ""),
+    numbercolor: (roll.dNumber || "#ffffff").replace("#", ""),
+    texture: roll.dTexture || "none",
+  }).toString();
+  const [width, height] = await Promise.all([OBR.viewport.getWidth(), OBR.viewport.getHeight()]);
+  await OBR.popover.open({
+    id: DICE_WINDOW, url: url.href, width: 300, height: 300,
+    anchorPosition: { top: height - 20, left: width - 20 }, anchorReference: "POSITION",
+    anchorOrigin: { vertical: "BOTTOM", horizontal: "RIGHT" },
+    transformOrigin: { vertical: "BOTTOM", horizontal: "RIGHT" },
+    disableClickAway: true, hidePaper: true,
+  });
+  clearTimeout(graphicTimer);
+  graphicTimer = setTimeout(() => OBR.popover.close(DICE_WINDOW).catch(() => {}), 6500);
+}
 
 export async function rollWithRumble(notation) {
   const [metadata, connectionId] = await Promise.all([OBR.player.getMetadata(), OBR.player.getConnectionId()]);
@@ -31,14 +67,17 @@ export async function rollWithRumble(notation) {
       const match = detail.match(/\bfor\s+(-?\d+(?:\.\d+)?)(?:!| successes?!?)?\s*$/i);
       const total = match ? Number(match[1]) : /\bno success/i.test(detail) ? 0 : NaN;
       if (!Number.isFinite(total)) finish(new Error("Rumble! returned a roll without a numeric total. Check its log."));
-      else finish(null, { total, detail: detail.slice(0, 1200) });
+      else {
+        showOwnDice(data.rollResult).catch((error) => console.warn("Rumble! dice window couldn’t open", error));
+        finish(null, { total, detail: detail.slice(0, 1200) });
+      }
     });
     const timeout = setTimeout(() => {
-      finish(new Error("Rumble! didn’t return a roll. Keep it open, select Everyone, and check the notation."));
+      finish(new Error("Rumble! didn’t return a roll. Keep it open and check the notation."));
     }, 12000);
 
     // Rumble uses its own parser and animation on the sender's connection.
-    OBR.player.setMetadata({ [REQUEST]: { notation, sender, created: new Date().toISOString() } })
+    OBR.broadcast.sendMessage("FORGE_LISTENER", { notation, sender, targetId: "0000" }, { destination: "LOCAL" })
       .catch(() => finish(new Error("Couldn’t send the roll to Rumble!")));
   });
 }

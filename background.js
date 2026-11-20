@@ -3,10 +3,11 @@ import { ABOVE_FOG, AVATAR, SPEECH, BUBBLE_MS, canSpeak, isPublicToken, parseSpe
 
 import { BUBBLE_LINE_HEIGHT, drawBubble, fonts, normalizeAppearance } from "./appearance.js";
 import { openSessionChannel, saveAvatar } from "./session.js";
-import { chatParts } from "./dice.js";
+import { chatParts, isRollCommand, rollSpans } from "./dice.js";
 import { queueDiscord } from "./discord.js";
 
 const transcript = [];
+const rollingEntries = new Map();
 let transcriptChannel;
 
 const active = new Map();
@@ -42,18 +43,46 @@ async function showSpeech(event, speech, version, receivedAt) {
   if (version !== sceneVersion || !canSpeak(sender, token, permissions)) return;
 
   const { tokenId } = speech;
+  const phase = event.data.rollPhase;
+  const rollId = event.data.rollId;
+  if (phase && (typeof rollId !== "string" || !/^[a-f0-9-]{36}$/i.test(rollId) ||
+      !["pending", "resolved", "failed"].includes(phase) || !rollSpans(speech.text).length)) return;
+  const id = phase ? `${event.connectionId}:${rollId}` : undefined;
+  const previousRoll = rollingEntries.get(id);
+  if ((previousRoll && (phase === "pending" || previousRoll.settled)) || (previousRoll && previousRoll.tokenId !== tokenId)) return;
   const parts = chatParts(speech.text, event.data.rolls);
-  const text = parts.map((part) => typeof part === "string" ? part : String(part.total)).join("");
+  const text = parts.map((part) => typeof part === "string" ? part : `${part.notation}: ${part.total}`).join("");
   const appearance = normalizeAppearance(event.data.appearance);
   const entry = {
     name: appearance.name || token.name || "Character",
     text,
     parts,
-    receivedAt,
+    id,
+    rolling: phase === "pending",
+    rollError: phase === "failed" ? String(event.data.rollError || "Roll failed.").slice(0, 200) : undefined,
+    standaloneRoll: isRollCommand(speech.text) && typeof parts[0] === "object",
+    receivedAt: previousRoll ? transcript[previousRoll.index].receivedAt : receivedAt,
     own: event.connectionId === connectionId,
   };
-  transcript.push(entry);
-  transcriptChannel?.postMessage({ type: "line", entry });
+  if (previousRoll) {
+    clearTimeout(previousRoll.timer);
+    previousRoll.settled = true;
+    transcript[previousRoll.index] = entry;
+    transcriptChannel?.postMessage({ type: "replace", entry });
+  } else {
+    transcript.push(entry);
+    transcriptChannel?.postMessage({ type: "line", entry });
+  }
+  if (entry.rolling) {
+    const index = transcript.length - 1;
+    const timer = setTimeout(() => {
+      const expired = { ...entry, rolling: false, rollError: "The roll timed out." };
+      transcript[index] = expired;
+      transcriptChannel?.postMessage({ type: "replace", entry: expired });
+    }, 70000);
+    rollingEntries.set(id, { tokenId, index, timer });
+  }
+  if (entry.rolling || entry.rollError) return;
   queueDiscord(entry, role, (message) => transcriptChannel?.postMessage({ type: "discord-status", message }));
 
   const [bounds, roomMetadata] = await Promise.all([

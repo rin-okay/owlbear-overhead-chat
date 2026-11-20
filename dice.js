@@ -1,8 +1,11 @@
 const MAX_ROLLS = 4;
 const MAX_NOTATION = 80;
 
+const ROLL_COMMAND = /^(?:(?:\.\/|\/)?r|\/roll)(?:\s+|$)(.*)$/is;
+export const isRollCommand = (text) => ROLL_COMMAND.test(text);
+
 export function rollSpans(text) {
-  const command = /^(?:(?:\.\/|\/)?r|\/roll)(?:\s+|$)(.*)$/is.exec(text);
+  const command = ROLL_COMMAND.exec(text);
   if (command) return [{ start: 0, end: text.length, notation: command[1].trim() }];
   return [...text.matchAll(/\br\[([^\[\]\n]*)\]/gi)].map((match) => ({
     start: match.index,

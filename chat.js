@@ -23,10 +23,19 @@ let selectedAvatarId = null;
 let observedToken = null;
 let avatarState = "";
 let sending = false;
+let rollInProgress = false;
 let refreshVersion = 0;
 
 function appendLine(entry, target) {
   const line = document.createElement("li");
+  if (entry.id) line.dataset.entryId = entry.id;
+  if (entry.rolling || entry.rollError) {
+    line.className = "roll-status";
+    line.textContent = entry.rolling ? `${entry.name} is rolling…` : `${entry.name} couldn’t roll: ${entry.rollError}`;
+    target.append(line);
+    return;
+  }
+
   const heading = document.createElement("div");
   heading.className = "message-heading";
 
@@ -35,7 +44,7 @@ function appendLine(entry, target) {
   name.textContent = entry.name;
   heading.append(name);
 
-  if (Number.isFinite(entry.receivedAt)) {
+  if (!entry.standaloneRoll && Number.isFinite(entry.receivedAt)) {
     const stamp = new Date(entry.receivedAt);
     const hours = String(stamp.getHours()).padStart(2, "0");
     const minutes = String(stamp.getMinutes()).padStart(2, "0");
@@ -45,7 +54,7 @@ function appendLine(entry, target) {
     heading.append(time);
   }
 
-  const message = document.createElement("div");
+  const message = document.createElement(entry.standaloneRoll ? "span" : "div");
   message.className = "message-text";
   for (const part of entry.parts ?? [entry.text]) {
     if (typeof part === "string") {
@@ -58,10 +67,17 @@ function appendLine(entry, target) {
     result.tabIndex = 0;
     result.title = `${part.notation}\n${part.detail}\nTotal: ${part.total}`;
     result.setAttribute("aria-label", result.title);
-    result.textContent = String(part.total);
+    result.textContent = entry.standaloneRoll ? String(part.total) : `${part.notation}: ${part.total}`;
     message.append(result);
   }
-  line.append(heading, message);
+  if (entry.standaloneRoll) {
+    line.className = "roll-message";
+    heading.className = "roll-heading";
+    heading.append(` rolled ${entry.parts[0].notation}: `, message);
+    line.append(heading);
+  } else {
+    line.append(heading, message);
+  }
   target.append(line);
 }
 
@@ -82,11 +98,20 @@ function connectTranscript() {
         empty.hidden = data.entries.length > 0;
         scrollToLatest();
       }
-      if (data?.type === "line") {
+      if (data?.type === "line" || data?.type === "replace") {
         const nearBottom = transcript.scrollHeight - transcript.clientHeight - transcript.scrollTop < 32;
         empty.hidden = true;
-        appendLine(data.entry, entries);
-        if (nearBottom || data.entry.own) scrollToLatest();
+        const previous = data.type === "replace"
+          ? Array.from(entries.children).find((line) => line.dataset.entryId === data.entry.id)
+          : null;
+        if (previous) {
+          const fragment = document.createDocumentFragment();
+          appendLine(data.entry, fragment);
+          previous.replaceWith(fragment);
+        } else {
+          appendLine(data.entry, entries);
+        }
+        if (nearBottom || (data.entry.own && data.type === "line")) scrollToLatest();
       }
     };
     window.addEventListener("pagehide", () => channel.close(), { once: true });
@@ -162,7 +187,6 @@ form.addEventListener("submit", async (event) => {
 
   sending = true;
   updateControls();
-  let resolvingRoll = false;
   try {
     const { token } = await getAvatar();
     if (token?.id !== intendedToken) {
@@ -171,30 +195,57 @@ form.addEventListener("submit", async (event) => {
       return;
     }
 
-    const rolls = [];
     const spans = rollSpans(speech.text);
-    if (spans.length) {
-      resolvingRoll = true;
+    try {
       validateRollSpans(spans);
-      const useRumble = (await OBR.room.getMetadata())[RUMBLE_DICE] === true;
-      status.textContent = useRumble ? "Waiting for Rumble!…" : "Rolling…";
-      for (const { notation } of spans) {
-        rolls.push(useRumble ? await rollWithRumble(notation) : rollInChat(notation));
-      }
-      resolvingRoll = false;
+      if (spans.length && rollInProgress) throw new Error("Your previous roll is still resolving.");
+    } catch (error) {
+      status.textContent = error.message;
+      return;
     }
 
-    await OBR.broadcast.sendMessage(SPEECH, { ...speech, rolls, appearance: savedAppearance() }, { destination: "ALL" });
+    const message = { ...speech, appearance: savedAppearance() };
+    if (spans.length) {
+      message.rollId = crypto.randomUUID();
+      await OBR.broadcast.sendMessage(SPEECH, { ...message, rollPhase: "pending" }, { destination: "ALL" });
+      rollInProgress = true;
+      void finishRoll(message, spans);
+    } else {
+      await OBR.broadcast.sendMessage(SPEECH, message, { destination: "ALL" });
+    }
     if (input.value === draft) input.value = "";
     status.textContent = "";
   } catch (error) {
     console.error("Overhead Chat send failed", error);
-    status.textContent = resolvingRoll ? error.message : "Couldn’t send your message. Your draft is still here.";
+    status.textContent = "Couldn’t send your message. Your draft is still here.";
   } finally {
     sending = false;
     updateControls();
   }
 });
+
+async function finishRoll(message, spans) {
+  let resolution;
+  try {
+    const useRumble = (await OBR.room.getMetadata())[RUMBLE_DICE] === true;
+    const rolls = [];
+    for (const { notation } of spans) {
+      rolls.push(useRumble ? await rollWithRumble(notation) : rollInChat(notation));
+    }
+    resolution = { rolls, rollPhase: "resolved" };
+  } catch (error) {
+    resolution = { rollPhase: "failed", rollError: String(error.message || "Roll failed.").slice(0, 200) };
+  }
+
+  try {
+    await OBR.broadcast.sendMessage(SPEECH, { ...message, ...resolution }, { destination: "ALL" });
+  } catch (error) {
+    console.error("Overhead Chat roll update failed", error);
+    status.textContent = "Couldn’t share the completed roll.";
+  } finally {
+    rollInProgress = false;
+  }
+}
 
 function setupRoomToggle(id, key) {
   const setting = document.getElementById(id);

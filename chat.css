@@ -103,3 +103,6 @@ select { font: inherit; background: #181321; color: inherit; border: 1px solid #
 :is(#gm-fog-settings, #gm-rumble-settings) p:empty { display: none; }
 
 .chat-roll { padding: 0 4px; border-radius: 4px; background: #4c3a67; color: #fff; font-weight: 700; cursor: help; }
+
+.roll-status { color: #ab9dbb; font-style: italic; }
+.roll-heading .message-text { display: inline; }
