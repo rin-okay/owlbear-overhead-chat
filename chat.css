@@ -66,8 +66,9 @@ select { font: inherit; background: #181321; color: inherit; border: 1px solid #
 #bubble-preview { margin-top: 12px; padding: 12px; display: grid; place-items: center; background: #181321; border-radius: 7px; }
 #bubble-preview canvas { max-width: 100%; object-fit: contain; }
 
-#reset-appearance { margin-top: 8px; min-height: 32px; background: #312940; color: #e2d4f6; }
-#reset-appearance:hover { background: #c7b6f8; color: #271c3a; }
+.appearance-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.appearance-actions button { min-height: 32px; background: #312940; color: #e2d4f6; }
+.appearance-actions button:hover { background: #c7b6f8; color: #271c3a; }
 
 #message {
   font: 16px/1.35 system-ui, sans-serif;

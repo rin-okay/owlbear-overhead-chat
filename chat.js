@@ -319,6 +319,18 @@ function setupSettings() {
   settingsPanel.querySelector("#reset-appearance").addEventListener("click", () => {
     showAppearance(saveAppearance());
   });
+  settingsPanel.querySelector("#export-appearance").addEventListener("click", () => {
+    const { border, fill, color, font, size } = savedAppearance();
+    const json = JSON.stringify({ border, fill, color, font, size }, null, 2) + "\n";
+    const url = URL.createObjectURL(new Blob([json], { type: "application/json" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "overhead-chat-colors.json";
+    settingsPanel.append(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  });
 
   const views = [
     { tab: chatTab, panel: chatPanel },
