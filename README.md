@@ -29,7 +29,7 @@ The extension sends public room speech. Use it for tokens the room is meant to s
 
 Click **move**, press Tab then Space from the message box, or use F2 to control your unlocked chat avatar. The arrow keys and WASD move it by one grid interval. Q or comma rotates left, and E or period rotates right, 15 degrees at a time. Hold a rotation key to keep turning. Press R to mirror the avatar horizontally. Space, Enter, F2, or Escape returns to typing. Clicking away also exits move mode.
 
-The **avatar** tab has two sets of nine slots, saved for this room in your browser. In **talk as**, assign visible, unlocked character tokens you can control. In **change to**, choose artwork from Owlbear’s Characters assets. In move mode, press **1–9** to switch the active token or change its artwork, depending on which mode is selected.
+The **avatar** tab has two sets of nine slots, saved for this room in your browser. In **talk as**, assign visible, unlocked character tokens you can control. In **change to**, choose artwork from Owlbear’s Characters assets. In move mode, press **1–9** to switch the active token or change its artwork, depending on which mode is selected. Tap the same number twice quickly to apply the slot and return to typing.
 
 The GM can turn on **habbo hotel mode** in the **gm** tab for pixel-style bubbles. They rise from the spot where each message was spoken, stack above newer bubbles, and disappear after roughly six lines of travel.
 

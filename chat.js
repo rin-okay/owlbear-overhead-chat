@@ -36,6 +36,7 @@ let tokenControl;
 let movingAvatar = false;
 let modeExitKey;
 let refreshAvatarPanel;
+const SLOT_DOUBLE_TAP_MS = 500;
 
 const movementKeys = {
   arrowleft: { offset: [-1, 0] }, a: { offset: [-1, 0] },
@@ -249,7 +250,7 @@ async function moveAvatar(mode) {
   try {
     while (mode === tokenControl && !mode.switching && mode.actions.length) {
       const tokenId = mode.tokenId;
-      const { offset, rotation, mirror, artwork } = mode.actions.shift();
+      const { offset, rotation, mirror, artwork, onApplied } = mode.actions.shift();
       const [{ token }, step] = await Promise.all([getAvatar(), offset ? OBR.scene.grid.getDpi() : 0]);
       if (mode !== tokenControl || mode.switching || tokenId !== mode.tokenId) return;
       if (token?.id !== tokenId || token.locked) {
@@ -259,11 +260,13 @@ async function moveAvatar(mode) {
       }
       if (offset && (!Number.isFinite(step) || step <= 0)) throw new Error("Scene grid size unavailable.");
 
+      let applied = false;
       await OBR.scene.items.updateItems([tokenId], ([item]) => {
         if (mode !== tokenControl || mode.switching || tokenId !== mode.tokenId || !isPublicToken(item) || item.locked) return;
         if (artwork) {
           item.image = artwork.image;
           item.grid = artwork.grid;
+          applied = true;
         } else if (offset) {
           const [x, y] = offset;
           item.position.x += x * step;
@@ -274,6 +277,7 @@ async function moveAvatar(mode) {
           item.rotation = ((item.rotation + rotation) % 360 + 360) % 360;
         }
       });
+      if (applied) onApplied();
     }
   } catch (error) {
     if (mode !== tokenControl) return;
@@ -286,7 +290,7 @@ async function moveAvatar(mode) {
   }
 }
 
-async function switchAvatarSlot(mode, index) {
+async function switchAvatarSlot(mode, index, onApplied) {
   if (mode.switching) return;
   const tokenId = savedAvatarSlots()[index];
   if (!tokenId) {
@@ -311,6 +315,7 @@ async function switchAvatarSlot(mode, index) {
     mode.tokenId = tokenId;
     mode.switching = false;
     await refresh();
+    if (avatar?.id === tokenId) onApplied();
   } catch {
     if (mode === tokenControl) status.textContent = "Couldn’t switch avatars.";
   } finally {
@@ -318,10 +323,28 @@ async function switchAvatarSlot(mode, index) {
   }
 }
 
-function useAvatarSlot(mode, index) {
+function useAvatarSlot(mode, key) {
+  const index = Number(key) - 1;
+  const now = performance.now();
+  const previous = mode.slotTap;
+  if (previous?.index === index && now - previous.time <= SLOT_DOUBLE_TAP_MS) {
+    previous.returnToChat = true;
+    modeExitKey = key;
+    if (previous.applied) toggleTokenControl();
+    return;
+  }
   if (mode.switching) return;
+
+  const tap = { index, time: now, applied: false, returnToChat: false };
+  mode.slotTap = tap;
+  function onApplied() {
+    if (mode !== tokenControl || mode.slotTap !== tap) return;
+    tap.applied = true;
+    if (tap.returnToChat) toggleTokenControl();
+  }
+
   if (savedAvatarMode() === "talk") {
-    void switchAvatarSlot(mode, index);
+    void switchAvatarSlot(mode, index, onApplied);
     return;
   }
   const artwork = savedAvatarArtSlots()[index];
@@ -330,7 +353,7 @@ function useAvatarSlot(mode, index) {
     return;
   }
   status.textContent = "";
-  queueAvatarAction(mode, { artwork });
+  queueAvatarAction(mode, { artwork, onApplied });
 }
 
 moveButton.addEventListener("blur", stopTokenControl);
@@ -377,7 +400,7 @@ form.addEventListener("keydown", (event) => {
       input.focus();
     } else if (/^[1-9]$/.test(key) && !event.ctrlKey && !event.altKey && !event.metaKey) {
       event.preventDefault();
-      if (!event.repeat) useAvatarSlot(tokenControl, Number(key) - 1);
+      if (!event.repeat) useAvatarSlot(tokenControl, key);
     } else if (Object.hasOwn(movementKeys, key) && !event.ctrlKey && !event.altKey && !event.metaKey) {
       event.preventDefault();
       if (tokenControl.switching) return;
