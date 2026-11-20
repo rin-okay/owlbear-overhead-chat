@@ -98,7 +98,12 @@ select { font: inherit; background: #181321; color: inherit; border: 1px solid #
 .message-heading time { flex: none; font-size: 11px; color: #ab9dbb; font-variant-numeric: tabular-nums; }
 .message-text { white-space: pre-wrap; line-height: 1.15; }
 
-#gm-panel { flex: 1; min-height: 0; overflow-y: auto; }
+#gm-panel, #avatar-panel { flex: 1; min-height: 0; overflow-y: auto; }
+#avatar-panel p { margin: 0 0 8px; color: #ab9dbb; }
+#avatar-panel p:empty { display: none; }
+#avatar-slots { display: grid; gap: 5px; }
+#avatar-slots label { display: grid; grid-template-columns: 1em minmax(0, 1fr); gap: 8px; align-items: center; margin: 0; }
+#avatar-slots select { min-height: 28px; text-transform: none; }
 #gm-panel label { white-space: normal; }
 #extension-version { margin-top: 12px; padding-top: 10px; border-top: 1px solid #544762; color: #ab9dbb; font-size: 11px; }
 #discord-settings h2 { margin: 0 0 6px; font-size: 1em; }
@@ -110,9 +115,9 @@ select { font: inherit; background: #181321; color: inherit; border: 1px solid #
 .discord-actions button { min-height: 32px; padding-inline: 10px; }
 
 #gm-panel > section + section { margin-top: 12px; padding-top: 10px; border-top: 1px solid #544762; }
-:is(#gm-fog-settings, #gm-rumble-settings) input { width: auto; min-height: 0; margin: 0; accent-color: #c7b6f8; }
-:is(#gm-fog-settings, #gm-rumble-settings) p { margin: 4px 0 0; color: #ab9dbb; font-size: 11px; }
-:is(#gm-fog-settings, #gm-rumble-settings) p:empty { display: none; }
+#gm-panel input[type="checkbox"] { width: auto; min-height: 0; margin: 0; accent-color: #c7b6f8; }
+#gm-panel > section:not(#discord-settings) p { margin: 4px 0 0; color: #ab9dbb; font-size: 11px; }
+#gm-panel p:empty { display: none; }
 
 .chat-roll { padding: 0 4px; border-radius: 4px; background: #4c3a67; color: #fff; font-weight: 700; cursor: help; }
 

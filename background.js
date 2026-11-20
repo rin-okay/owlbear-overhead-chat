@@ -1,7 +1,8 @@
-import OBR, { buildBillboard, buildLabel } from "./obr.js";
-import { ABOVE_FOG, AVATAR, SPEECH, BUBBLE_MS, canSpeak, isPublicToken, parseSpeech } from "./rules.js";
+import OBR, { buildBillboard, buildImage, buildLabel } from "./obr.js";
+import { ABOVE_FOG, AVATAR, HABBO_MODE, SPEECH, BUBBLE_MS, canSpeak, isPublicToken, parseSpeech } from "./rules.js";
 
-import { BUBBLE_LINE_HEIGHT, drawBubble, fonts, normalizeAppearance } from "./appearance.js";
+import { BUBBLE_LINE_HEIGHT, drawBubble, drawFloatingBubble, fonts, normalizeAppearance } from "./appearance.js";
+import { FLOAT_LINE, placeFloatingBubbles } from "./floating-layout.js";
 import { openSessionChannel, saveAvatar } from "./session.js";
 import { chatParts, isRollCommand, rollSpans } from "./dice.js";
 import { queueDiscord } from "./discord.js";
@@ -13,6 +14,8 @@ const rollingEntries = new Map();
 let transcriptChannel;
 
 const active = new Map();
+let floating = [];
+let floatingTimer;
 let pending = Promise.resolve();
 let sceneVersion = 0;
 
@@ -26,6 +29,63 @@ async function removeBubble(tokenId, bubble) {
 
 function report(error) {
   console.error("Overhead Chat background", error);
+}
+
+function queueScene(task) {
+  const version = sceneVersion;
+  pending = pending.then(() => {
+    if (version === sceneVersion) return task(version);
+  }).catch(report);
+}
+
+function scheduleFloatingStep() {
+  if (!floating.length || floatingTimer !== undefined) return;
+  floatingTimer = setTimeout(() => {
+    floatingTimer = undefined;
+    queueScene(async (version) => {
+      try {
+        await updateFloating(placeFloatingBubbles(floating, FLOAT_LINE), version);
+      } finally {
+        if (version === sceneVersion) scheduleFloatingStep();
+      }
+    });
+  }, 720);
+}
+
+async function updateFloating(next, version) {
+  const targets = new Map(next.map((bubble) => [bubble.id, bubble]));
+  const removed = floating.filter(({ id }) => !targets.has(id)).map(({ id }) => id);
+  const moved = floating.filter(({ id, y }) => targets.has(id) && targets.get(id).y !== y).map(({ id }) => id);
+  if (removed.length) await OBR.scene.local.deleteItems(removed);
+  if (version !== sceneVersion) return;
+  if (moved.length) {
+    await OBR.scene.local.updateItems(moved, (items) => {
+      for (const item of items) item.position.y = targets.get(item.id).y;
+    });
+  }
+  if (version === sceneVersion) floating = next;
+}
+
+async function showFloating(text, accent, tokenId, position, layer, version) {
+  const dpi = await OBR.scene.grid.getDpi();
+  if (version !== sceneVersion || !Number.isFinite(dpi) || dpi <= 0) return;
+  const { canvas, width, height } = drawFloatingBubble(text, accent);
+  const item = buildImage({
+    url: canvas.toDataURL("image/png"), mime: "image/png", width: canvas.width, height: canvas.height,
+  }, { dpi: dpi * 2, offset: { x: canvas.width / 2, y: canvas.height } })
+    .position(position).layer(layer).locked(true).build();
+  item.disableHit = true;
+  const bubble = { id: item.id, tokenId, width, height, x: position.x, y: position.y, originY: position.y };
+  const placed = placeFloatingBubbles([bubble, ...floating]);
+  await updateFloating(placed.slice(1), version);
+  if (version !== sceneVersion) return;
+  await OBR.scene.local.addItems([item]);
+  if (version !== sceneVersion) {
+    if (await OBR.scene.isReady()) await OBR.scene.local.deleteItems([item.id]);
+    return;
+  }
+  floating.unshift(bubble);
+  scheduleFloatingStep();
 }
 
 async function showSpeech(event, speech, version, receivedAt) {
@@ -101,12 +161,18 @@ async function showSpeech(event, speech, version, receivedAt) {
       !Number.isFinite(bounds?.max?.y) ||
       !Number.isFinite(bounds?.center?.x)) return;
 
+  const gap = Math.min(16, Math.max(4, (bounds.max.y - bounds.min.y) * 0.07));
+  const position = { x: bounds.center.x, y: bounds.min.y - gap };
+  if (roomMetadata[HABBO_MODE] === true) {
+    if (active.size) await Promise.all([...active].map(([id, bubble]) => removeBubble(id, bubble)));
+    if (version === sceneVersion) await showFloating(text, appearance.border, tokenId, position, layer, version);
+    return;
+  }
+  if (floating.length) await updateFloating([], version);
   const previous = active.get(tokenId);
   if (previous) await removeBubble(tokenId, previous);
   if (version !== sceneVersion) return;
 
-  const gap = Math.min(16, Math.max(4, (bounds.max.y - bounds.min.y) * 0.07));
-  const position = { x: bounds.center.x, y: bounds.min.y - gap };
   const { canvas, lines } = drawBubble(text, appearance);
   const bubbleBuilder = buildBillboard({
     url: canvas.toDataURL("image/png"), mime: "image/png", width: canvas.width, height: canvas.height,
@@ -162,11 +228,10 @@ async function showSpeech(event, speech, version, receivedAt) {
 function queueSpeech(event) {
   const speech = parseSpeech(event.data);
   if (!speech) return;
-  const version = sceneVersion;
   const receivedAt = Date.now();
 
   // Validate messages in receive order so the transcript reads in order.
-  pending = pending.then(() => showSpeech(event, speech, version, receivedAt)).catch(report);
+  queueScene((version) => showSpeech(event, speech, version, receivedAt));
 }
 
 OBR.onReady(() => {
@@ -184,15 +249,31 @@ OBR.onReady(() => {
     resetDicePopups();
     for (const bubble of active.values()) clearTimeout(bubble.timer);
     active.clear();
+    clearTimeout(floatingTimer);
+    floatingTimer = undefined;
+    floating = [];
     pending = Promise.resolve();
   });
 
   OBR.scene.items.onChange((items) => {
-    if (!active.size) return;
+    if (!active.size && !floating.length) return;
     const publicTokens = new Set(items.filter(isPublicToken).map((item) => item.id));
     for (const [tokenId, bubble] of active) {
       if (!publicTokens.has(tokenId)) removeBubble(tokenId, bubble).catch(report);
     }
+    if (floating.some(({ tokenId }) => !publicTokens.has(tokenId))) {
+      queueScene((version) => updateFloating(floating.filter(({ tokenId }) => publicTokens.has(tokenId)), version));
+    }
+  });
+
+  OBR.room.onMetadataChange((metadata) => {
+    queueScene(async (version) => {
+      if (metadata[HABBO_MODE] === true) {
+        await Promise.all([...active].map(([id, bubble]) => removeBubble(id, bubble)));
+      } else if (floating.length) {
+        await updateFloating([], version);
+      }
+    });
   });
 
   OBR.contextMenu.create({

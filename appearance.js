@@ -111,3 +111,37 @@ export function drawBubble(text, style) {
   lines.forEach((part, index) => ctx.fillText(part, middle, 8 + (index + 0.5) * lineHeight));
   return { canvas, lines };
 }
+
+export function drawFloatingBubble(text, accent) {
+  const canvas = document.createElement("canvas");
+  const ctx = canvas.getContext("2d");
+  const font = 'bold 12px "Courier New", monospace';
+  ctx.font = font;
+  const lines = text.split("\n").flatMap((paragraph) =>
+    wrapParagraph(paragraph, (line) => ctx.measureText(line).width));
+  const width = Math.max(32, Math.ceil(Math.max(...lines.map((line) => ctx.measureText(line).width))) + 23);
+  const body = lines.length * 14 + 10;
+  const height = body + 7;
+  const tail = Math.floor(width / 2);
+  canvas.width = width * 2;
+  canvas.height = height * 2;
+  ctx.scale(2, 2);
+
+  ctx.fillStyle = "#2c222d";
+  ctx.fillRect(3, 0, width - 6, body + 3);
+  ctx.fillRect(0, 3, width, body - 3);
+  ctx.fillRect(tail - 5, body, 10, 3);
+  ctx.fillRect(tail - 3, body + 3, 6, 2);
+  ctx.fillRect(tail - 1, body + 5, 2, 2);
+  ctx.fillStyle = "#fef8e9";
+  ctx.fillRect(3, 2, width - 6, body - 2);
+  ctx.fillRect(2, 4, width - 4, body - 6);
+  ctx.fillRect(tail - 2, body, 4, 3);
+  ctx.fillStyle = accent;
+  ctx.fillRect(5, 5, 3, body - 10);
+  ctx.fillStyle = "#271f29";
+  ctx.font = font;
+  ctx.textBaseline = "middle";
+  lines.forEach((line, index) => ctx.fillText(line, 13, 12 + index * 14));
+  return { canvas, width, height };
+}

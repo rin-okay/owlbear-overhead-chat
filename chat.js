@@ -1,10 +1,11 @@
 import OBR from "./obr.js";
-import { ABOVE_FOG, AVATAR, RUMBLE_DICE, SPEECH, canSpeak, isPublicToken, parseSpeech } from "./rules.js";
+import { ABOVE_FOG, AVATAR, HABBO_MODE, RUMBLE_DICE, SPEECH, canSpeak, isPublicToken, parseSpeech } from "./rules.js";
 
-import { openSessionChannel, savedAvatar, saveAvatar, savedAppearance, saveAppearance } from "./session.js";
+import { openSessionChannel, savedAvatar, saveAvatar, savedAvatarSlots, savedAppearance, saveAppearance } from "./session.js";
 
 import { drawBubble } from "./appearance.js";
 import { setupDiscordPanel } from "./discord-panel.js";
+import { setupAvatarPanel } from "./avatar-panel.js";
 
 import { rollSpans, validateRollSpans } from "./dice.js";
 import { rollWithRumble } from "./rumble.js";
@@ -31,6 +32,7 @@ let refreshVersion = 0;
 let tokenControl;
 let movingAvatar = false;
 let modeExitKey;
+let refreshAvatarPanel;
 
 const movementKeys = {
   arrowleft: { offset: [-1, 0] }, a: { offset: [-1, 0] },
@@ -170,14 +172,14 @@ async function refresh() {
     if (version !== refreshVersion) return;
 
     const shouldFocus = token && token.id !== avatar?.id;
-    if (tokenControl && (token?.id !== tokenControl.tokenId || token.locked)) stopTokenControl();
+    if (tokenControl && !tokenControl.switching && (token?.id !== tokenControl.tokenId || token.locked)) stopTokenControl();
     avatar = token ?? null;
     selectedAvatarId = tokenId ?? null;
     observedToken = observed ?? null;
     speaker.textContent = token ? `Speaking as ${token.name || "Character"}` : "Pick an avatar";
     status.textContent = hint;
     updateControls();
-    if (shouldFocus) input.focus();
+    if (shouldFocus && !tokenControl) input.focus();
   } catch (error) {
     if (version !== refreshVersion) return;
     console.error("Overhead Chat could not read the avatar", error);
@@ -232,7 +234,7 @@ function holdRotation(mode, key, action) {
 
   function repeat() {
     if (mode !== tokenControl || mode.heldRotation !== held) return;
-    if (!movingAvatar) queueAvatarAction(mode, action);
+    if (!movingAvatar && !mode.switching) queueAvatarAction(mode, action);
     held.timer = setTimeout(repeat, 120);
   }
 
@@ -242,19 +244,20 @@ function holdRotation(mode, key, action) {
 async function moveAvatar(mode) {
   movingAvatar = true;
   try {
-    while (mode === tokenControl && mode.actions.length) {
+    while (mode === tokenControl && !mode.switching && mode.actions.length) {
+      const tokenId = mode.tokenId;
       const { offset, rotation, mirror } = mode.actions.shift();
       const [{ token }, step] = await Promise.all([getAvatar(), offset ? OBR.scene.grid.getDpi() : 0]);
-      if (mode !== tokenControl) return;
-      if (token?.id !== mode.tokenId || token.locked) {
+      if (mode !== tokenControl || mode.switching || tokenId !== mode.tokenId) return;
+      if (token?.id !== tokenId || token.locked) {
         stopTokenControl();
         await refresh();
         return;
       }
       if (offset && (!Number.isFinite(step) || step <= 0)) throw new Error("Scene grid size unavailable.");
 
-      await OBR.scene.items.updateItems([mode.tokenId], ([item]) => {
-        if (mode !== tokenControl || !isPublicToken(item) || item.locked) return;
+      await OBR.scene.items.updateItems([tokenId], ([item]) => {
+        if (mode !== tokenControl || mode.switching || tokenId !== mode.tokenId || !isPublicToken(item) || item.locked) return;
         if (offset) {
           const [x, y] = offset;
           item.position.x += x * step;
@@ -273,7 +276,39 @@ async function moveAvatar(mode) {
     status.textContent = "Couldn’t move your avatar.";
   } finally {
     movingAvatar = false;
-    if (tokenControl?.actions.length) void moveAvatar(tokenControl);
+    if (tokenControl?.actions.length && !tokenControl.switching) void moveAvatar(tokenControl);
+  }
+}
+
+async function switchAvatarSlot(mode, index) {
+  if (mode.switching) return;
+  const tokenId = savedAvatarSlots()[index];
+  if (!tokenId) {
+    status.textContent = `Assign avatar ${index + 1} in the avatar tab first.`;
+    return;
+  }
+
+  mode.switching = true;
+  stopRotation(mode);
+  mode.actions.length = 0;
+  try {
+    const [role, permissions, [token]] = await Promise.all([
+      OBR.player.getRole(), OBR.room.getPermissions(), OBR.scene.items.getItems([tokenId]),
+    ]);
+    if (mode !== tokenControl) return;
+    if (!canSpeak({ id: OBR.player.id, role }, token, permissions) || token.locked) {
+      status.textContent = `Avatar ${index + 1} is unavailable in this scene.`;
+      return;
+    }
+    await OBR.player.setMetadata({ [AVATAR]: { tokenId } });
+    saveAvatar(tokenId);
+    mode.tokenId = tokenId;
+    mode.switching = false;
+    await refresh();
+  } catch {
+    if (mode === tokenControl) status.textContent = "Couldn’t switch avatars.";
+  } finally {
+    mode.switching = false;
   }
 }
 
@@ -319,8 +354,12 @@ form.addEventListener("keydown", (event) => {
       modeExitKey = event.key;
       stopTokenControl();
       input.focus();
+    } else if (/^[1-9]$/.test(key) && !event.ctrlKey && !event.altKey && !event.metaKey) {
+      event.preventDefault();
+      if (!event.repeat) void switchAvatarSlot(tokenControl, Number(key) - 1);
     } else if (Object.hasOwn(movementKeys, key) && !event.ctrlKey && !event.altKey && !event.metaKey) {
       event.preventDefault();
+      if (tokenControl.switching) return;
       const action = movementKeys[key];
       if (event.repeat && (action.rotation || action.mirror || tokenControl.actions.length >= 4)) return;
       queueAvatarAction(tokenControl, action);
@@ -455,8 +494,11 @@ function setupRoomToggle(id, key) {
 function setupSettings() {
   const chatTab = document.querySelector("#chat-tab");
   const settingsTab = document.querySelector("#settings-tab");
+  const avatarTab = document.querySelector("#avatar-tab");
   const chatPanel = document.querySelector("#chat-panel");
   const settingsPanel = document.querySelector("#settings-panel");
+  const avatarPanel = document.querySelector("#avatar-panel");
+  refreshAvatarPanel = setupAvatarPanel(avatarPanel);
   const fields = settingsPanel.querySelector("form");
   const preview = settingsPanel.querySelector("#bubble-preview");
 
@@ -492,6 +534,7 @@ function setupSettings() {
     { tab: chatTab, panel: chatPanel },
     { tab: settingsTab, panel: settingsPanel },
     { tab: document.querySelector("#gm-tab"), panel: document.querySelector("#gm-panel") },
+    { tab: avatarTab, panel: avatarPanel },
   ];
 
   function select(index) {
@@ -504,6 +547,10 @@ function setupSettings() {
 
   chatTab.addEventListener("click", () => select(0));
   settingsTab.addEventListener("click", () => select(1));
+  avatarTab.addEventListener("click", () => {
+    select(3);
+    void refreshAvatarPanel();
+  });
   setupDiscordPanel(() => select(0), () => select(2));
   fields.addEventListener("submit", (event) => event.preventDefault());
   fields.addEventListener("input", () => {
@@ -517,18 +564,22 @@ OBR.onReady(() => {
   setupSettings();
   setupRoomToggle("gm-fog-settings", ABOVE_FOG);
   setupRoomToggle("gm-rumble-settings", RUMBLE_DICE);
+  setupRoomToggle("gm-habbo-settings", HABBO_MODE);
   connectTranscript();
   OBR.player.onChange(({ metadata, role }) => {
     const state = JSON.stringify([metadata[AVATAR]?.tokenId, role]);
     if (state === avatarState) return;
     avatarState = state;
     void refresh();
+    void refreshAvatarPanel();
   });
   OBR.scene.onReadyChange((ready) => {
     if (!ready) stopTokenControl();
     void refresh();
+    void refreshAvatarPanel();
   });
   OBR.scene.items.onChange((items) => {
+    void refreshAvatarPanel(items);
     if (!selectedAvatarId) return;
     const next = items.find((item) => item.id === selectedAvatarId) ?? null;
     const fields = ["id", "name", "visible", "locked", "type", "layer", "createdUserId"];
@@ -537,6 +588,9 @@ OBR.onReady(() => {
       void refresh();
     }
   });
-  OBR.room.onPermissionsChange(refresh);
+  OBR.room.onPermissionsChange(() => {
+    void refresh();
+    void refreshAvatarPanel();
+  });
   void refresh();
 });

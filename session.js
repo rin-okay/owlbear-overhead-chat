@@ -22,6 +22,23 @@ export function saveAvatar(tokenId) {
   }
 }
 
+let avatarSlots;
+
+export function savedAvatarSlots() {
+  if (avatarSlots) return avatarSlots;
+  let stored;
+  try { stored = JSON.parse(localStorage.getItem(avatarKey() + ":slots")); } catch {}
+  avatarSlots = Array.from({ length: 9 }, (_, index) =>
+    typeof stored?.[index] === "string" ? stored[index] : "");
+  return avatarSlots;
+}
+
+export function saveAvatarSlot(index, tokenId) {
+  const slots = savedAvatarSlots();
+  slots[index] = tokenId;
+  try { localStorage.setItem(avatarKey() + ":slots", JSON.stringify(slots)); } catch {}
+}
+
 export async function openSessionChannel() {
   const connectionId = await OBR.player.getConnectionId();
   return new BroadcastChannel(JSON.stringify(["chat.overhead.transcript", OBR.room.id, connectionId]));

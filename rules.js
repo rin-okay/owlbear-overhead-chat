@@ -1,6 +1,7 @@
 export const RUMBLE_DICE = "chat.overhead.rumble-dice.v1";
 export const AVATAR = "chat.overhead.avatar.v1";
 export const ABOVE_FOG = "chat.overhead.above-fog.v1";
+export const HABBO_MODE = "chat.overhead.habbo-mode.v1";
 export const SPEECH = "chat.overhead.speech.v1";
 export const MAX_LENGTH = 180;
 export const BUBBLE_MS = 6000;
