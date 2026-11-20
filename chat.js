@@ -1,5 +1,7 @@
 import OBR from "./obr.js";
-import { ABOVE_FOG, AVATAR, HABBO_MODE, RUMBLE_DICE, SPEECH, canSpeak, isPublicToken, parseSpeech } from "./rules.js";
+import {
+  ABOVE_FOG, AVATAR, GENERAL_CHAT_ROOM, HABBO_MODE, RUMBLE_DICE, SPEECH, canSpeak, isPublicToken, parseSpeech,
+} from "./rules.js";
 
 import {
   openSessionChannel, savedAvatar, saveAvatar, savedAvatarSlots, savedAvatarMode, savedAvatarArtSlots,
@@ -15,6 +17,7 @@ import { rollWithRumble } from "./rumble.js";
 import { rollWithNativeDice } from "./native-dice.js";
 
 const transcript = document.querySelector("#transcript");
+const chatRoom = document.querySelector("#chat-room");
 const entries = document.querySelector("#entries");
 const empty = document.querySelector("#empty");
 const form = document.querySelector("form");
@@ -117,7 +120,7 @@ function connectTranscript() {
     const sendRequest = () => channel.postMessage({ type: "request", ...request });
 
     function requestHistory(before) {
-      request = { requestId: crypto.randomUUID(), before };
+      request = { requestId: crypto.randomUUID(), roomId: chatRoom.value, before };
       older.disabled = true;
       sendRequest();
     }
@@ -125,6 +128,13 @@ function connectTranscript() {
     older.addEventListener("click", () => {
       const first = entries.firstElementChild;
       if (!request && first) requestHistory(Number(first.dataset.sequence));
+    });
+    chatRoom.addEventListener("change", () => {
+      rows.clear();
+      entries.replaceChildren();
+      older.hidden = true;
+      empty.hidden = true;
+      requestHistory();
     });
 
     channel.onmessage = ({ data }) => {
@@ -151,13 +161,16 @@ function connectTranscript() {
       if (data?.type === "line" || data?.type === "replace") {
         const nearBottom = transcript.scrollHeight - transcript.clientHeight - transcript.scrollTop < 32;
         const { entry, oldestSequence } = data;
-        const previous = rows.get(entry.id);
-        if (previous) {
-          const fragment = document.createDocumentFragment();
-          rows.set(entry.id, appendLine(entry, fragment));
-          previous.replaceWith(fragment);
-        } else if (data.type === "line") {
-          rows.set(entry.id, appendLine(entry, entries));
+        const inSelectedRoom = (entry.roomId ?? GENERAL_CHAT_ROOM) === chatRoom.value;
+        if (inSelectedRoom) {
+          const previous = rows.get(entry.id);
+          if (previous) {
+            const fragment = document.createDocumentFragment();
+            rows.set(entry.id, appendLine(entry, fragment));
+            previous.replaceWith(fragment);
+          } else if (data.type === "line") {
+            rows.set(entry.id, appendLine(entry, entries));
+          }
         }
         while (Number(entries.firstElementChild?.dataset.sequence) < oldestSequence) {
           const first = entries.firstElementChild;
@@ -166,7 +179,7 @@ function connectTranscript() {
         }
         if (Number(entries.firstElementChild?.dataset.sequence) === oldestSequence) older.hidden = true;
         empty.hidden = rows.size > 0;
-        if (nearBottom || (entry.own && data.type === "line")) scrollToLatest();
+        if (inSelectedRoom && (nearBottom || (entry.own && data.type === "line"))) scrollToLatest();
       }
     };
     window.addEventListener("pagehide", () => channel.close(), { once: true });
@@ -458,7 +471,7 @@ form.addEventListener("submit", async (event) => {
 
   const draft = input.value;
   const intendedToken = avatar.id;
-  const speech = parseSpeech({ tokenId: intendedToken, text: draft });
+  const speech = parseSpeech({ tokenId: intendedToken, text: draft, roomId: chatRoom.value });
   if (!speech) return;
 
   sending = true;

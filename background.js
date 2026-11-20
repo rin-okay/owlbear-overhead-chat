@@ -1,5 +1,7 @@
 import OBR, { buildBillboard, buildImage, buildLabel } from "./obr.js";
-import { ABOVE_FOG, AVATAR, HABBO_MODE, SPEECH, BUBBLE_MS, canSpeak, isPublicToken, parseSpeech } from "./rules.js";
+import {
+  ABOVE_FOG, AVATAR, HABBO_MODE, SPEECH, BUBBLE_MS, GENERAL_CHAT_ROOM, canSpeak, isChatRoom, isPublicToken, parseSpeech,
+} from "./rules.js";
 
 import { BUBBLE_LINE_HEIGHT, drawBubble, drawFloatingBubble, fonts, normalizeAppearance } from "./appearance.js";
 import { FLOAT_LINE, placeFloatingBubbles } from "./floating-layout.js";
@@ -116,11 +118,12 @@ function storeEntry(entry, type) {
   });
 }
 
-function publishHistory({ requestId, before = Infinity }) {
+function publishHistory({ requestId, roomId = GENERAL_CHAT_ROOM, before = Infinity }) {
+  if (!isChatRoom(roomId)) return;
   const entries = [];
   for (const entry of transcript.values()) {
     if (entry.sequence >= before) break;
-    entries.push(entry);
+    if (entry.roomId === roomId) entries.push(entry);
   }
   transcriptChannel.postMessage({
     type: "history", requestId, entries: entries.slice(-HISTORY_PAGE_SIZE),
@@ -140,7 +143,7 @@ async function acceptSpeech(event, speech, version, receivedAt) {
     : party?.get(event.connectionId);
   if (version !== sceneVersion || !canSpeak(sender, token, permissions ?? [])) return;
 
-  const { tokenId } = speech;
+  const { tokenId, roomId } = speech;
   const phase = event.data.rollPhase;
   const rollId = event.data.rollId;
   if (phase && (typeof rollId !== "string" || !/^[a-f0-9-]{36}$/i.test(rollId) ||
@@ -151,7 +154,8 @@ async function acceptSpeech(event, speech, version, receivedAt) {
     settledRolls.delete(settledRolls.keys().next().value);
   }
   if (settledRolls.has(id) || (previousRoll &&
-      (phase === "pending" || previousRoll.rollPhase !== "pending" || previousRoll.tokenId !== tokenId))) return;
+      (phase === "pending" || previousRoll.rollPhase !== "pending" ||
+       previousRoll.tokenId !== tokenId || previousRoll.roomId !== roomId))) return;
   const parts = chatParts(speech.text, event.data.rolls);
   const text = parts.map((part) => typeof part === "string" ? part : `${part.notation}: ${part.total}`).join("");
   const appearance = normalizeAppearance(event.data.appearance);
@@ -161,6 +165,7 @@ async function acceptSpeech(event, speech, version, receivedAt) {
     parts,
     id,
     tokenId,
+    roomId,
     rollPhase: phase,
     sequence: previousRoll?.sequence ?? ++sequence,
     rolling: phase === "pending",

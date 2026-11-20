@@ -19,6 +19,11 @@
       </nav>
     </header>
     <div id="chat-panel">
+    <select id="chat-room" aria-label="chat room" aria-controls="transcript">
+      <option value="general" selected>general</option>
+      <option value="rin">rin's room</option>
+      <option value="kim">kim's room</option>
+    </select>
     <section id="transcript" aria-label="session chat" role="log" tabindex="0">
       <button type="button" id="older-messages" hidden>load older messages</button>
       <p id="empty">No messages yet.</p>

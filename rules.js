@@ -5,6 +5,12 @@ export const HABBO_MODE = "chat.overhead.habbo-mode.v1";
 export const SPEECH = "chat.overhead.speech.v1";
 export const MAX_LENGTH = 180;
 export const BUBBLE_MS = 6000;
+export const GENERAL_CHAT_ROOM = "general";
+const CHAT_ROOMS = new Set([GENERAL_CHAT_ROOM, "rin", "kim"]);
+
+export function isChatRoom(roomId) {
+  return CHAT_ROOMS.has(roomId);
+}
 
 export function isPublicToken(token) {
   return token?.type === "IMAGE" && token.layer === "CHARACTER" && token.visible === true;
@@ -22,10 +28,10 @@ export function canSpeak(player, token, permissions) {
 
 export function parseSpeech(data) {
   if (!data || typeof data !== "object") return null;
-  const { tokenId, text } = data;
+  const { tokenId, text, roomId = GENERAL_CHAT_ROOM } = data;
   if (typeof tokenId !== "string" || !tokenId || tokenId.length > 128 ||
-      typeof text !== "string" || text.length > MAX_LENGTH) return null;
+      typeof text !== "string" || text.length > MAX_LENGTH || !isChatRoom(roomId)) return null;
   const line = text.replace(/\r\n?/gu, "\n").trim().split("\n")
     .map((part) => part.trim().replace(/[^\S\n]+/gu, " ")).join("\n");
-  return line ? { tokenId, text: line } : null;
+  return line ? { tokenId, text: line, roomId } : null;
 }
