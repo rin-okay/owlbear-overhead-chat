@@ -61,7 +61,8 @@ nav button[aria-pressed="true"], nav button:hover { background: #c7b6f8; color: 
 #settings-panel input[type="color"] { padding: 3px; }
 .colors, .font-controls { display: grid; gap: 8px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .font-controls { grid-template-columns: 2fr 1fr; }
-.dice-edge-controls { display: grid; grid-template-columns: 2fr 1fr; align-items: center; gap: 8px; }
+.dice-edge-controls { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: center; gap: 8px; }
+.dice-edge-controls label:first-child { grid-column: 1 / -1; }
 .dice-edge-controls label:first-child { display: flex; align-items: center; gap: 6px; }
 #settings-panel .dice-edge-controls input[type="checkbox"] { width: auto; min-height: 0; margin: 0; }
 select { font: inherit; background: #181321; color: inherit; border: 1px solid #645775; border-radius: 7px; padding: 0 8px; }

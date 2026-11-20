@@ -152,7 +152,7 @@ export function animateTray(canvas, dice, frames, duration, colors = defaultColo
     }
     if (!width || !height) return false;
     const scale = DICE_SCALE;
-    const { edge, fill, ink } = colors;
+    const { edge, edgeWidth = 4, fill, ink } = colors;
     const base = [1, 3, 5].map((index) => parseInt(fill.slice(index, index + 2), 16));
     const index = progress * (frames.length - 1);
     const first = frames[Math.floor(index)];
@@ -205,11 +205,13 @@ export function animateTray(canvas, dice, frames, duration, colors = defaultColo
       path(ctx, points);
       const shaded = base.map((channel) => Math.max(0, channel - (248 - brightness)));
       ctx.fillStyle = `rgb(${shaded.join(",")})`;
-      ctx.strokeStyle = edge;
-      ctx.lineWidth = 4;
-      ctx.lineJoin = "round";
       ctx.fill();
-      ctx.stroke();
+      if (edgeWidth > 0) {
+        ctx.strokeStyle = edge;
+        ctx.lineWidth = edgeWidth;
+        ctx.lineJoin = "round";
+        ctx.stroke();
+      }
       ctx.save();
       ctx.clip();
       for (const glyph of glyphs) printNumeral(ctx, project, glyph, rotation, position, scale, ink);

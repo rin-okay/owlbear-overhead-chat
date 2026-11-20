@@ -41,7 +41,7 @@ Send `/r 1d20+7` for a standalone roll, or include `r[2d20kh1]` inside a message
 
 With Rumble! off, everyone in the Owlbear room running Overhead Chat, including the roller, sees the same 3D toss in a temporary popup. The popup animates up to eight standard dice (d4, d6, d8, d10, d12, d20) and shows the roll totals. Custom dice and dice beyond the preview limit still count in the chat result.
 
-The dice use the roller’s bubble fill for the body, text color for the numbers, and bubble border for the edges. Players can override their dice edge color in **Settings**. The tray shows each die and modifier in the final calculation, with dropped dice struck through.
+The dice use the roller’s bubble fill for the body, text color for the numbers, and bubble border for the edges. Players can override the dice edge color and set the edge width in **Settings**. A width of 0 hides the dice outlines. The tray shows each die and modifier in the final calculation, with dropped dice struck through.
 
 The shared replay uses the [Dicesuki](https://github.com/donovan-yohan/dicesuki) solo WebAssembly physics engine by Donovan Yohan (MIT), pinned to commit `8fae459b1b31a112d918ec3897e66c5f67b5e409`. Its Rapier simulation produces the faces and motion for the 3D dice. The popup uses Dicesuki's basic white dice styling and [face numbering](./DICESUKI-LICENSE.md).
 

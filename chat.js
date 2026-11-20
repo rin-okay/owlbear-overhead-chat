@@ -349,6 +349,7 @@ function setupSettings() {
   fields.addEventListener("input", () => {
     const values = Object.fromEntries(new FormData(fields));
     values.size = Number(values.size);
+    values.diceEdgeWidth = fields.elements.diceEdgeWidth.valueAsNumber;
     values.diceEdge = fields.elements.customDiceEdge.checked ? fields.elements.diceEdge.value : null;
     const style = saveAppearance(values);
     showDiceEdge(style);

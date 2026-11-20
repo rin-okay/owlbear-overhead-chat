@@ -5,12 +5,12 @@ const POPOVER_ID = "chat.overhead.dice-tray";
 const queue = [];
 let active;
 
-export function queueDicePopup(entry, tray, { border, fill, color, diceEdge } = normalizeAppearance()) {
+export function queueDicePopup(entry, tray, { border, fill, color, diceEdge, diceEdgeWidth } = normalizeAppearance()) {
   if (queue.length >= 8) queue.shift();
   queue.push({
     ...tray,
     name: entry.name,
-    colors: { edge: diceEdge ?? border, fill, ink: color },
+    colors: { edge: diceEdge ?? border, edgeWidth: diceEdgeWidth, fill, ink: color },
     rolls: entry.parts.filter((part) => typeof part === "object")
       .map(({ notation, total, breakdown }) => ({ notation, total, breakdown })),
   });
