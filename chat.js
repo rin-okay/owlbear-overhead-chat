@@ -406,7 +406,10 @@ form.addEventListener("keydown", (event) => {
       if (tokenControl.switching) return;
       const action = movementKeys[key];
       if (event.repeat && (action.rotation || action.mirror || tokenControl.actions.length >= 4)) return;
-      queueAvatarAction(tokenControl, action);
+      const { offset } = action;
+      queueAvatarAction(tokenControl, event.shiftKey && offset
+        ? { offset: [offset[0] / 2, offset[1] / 2] }
+        : action);
       if (action.rotation) holdRotation(tokenControl, physicalKey, action);
     }
     return;
