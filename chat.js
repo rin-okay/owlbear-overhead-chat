@@ -311,16 +311,8 @@ function setupSettings() {
   }
 
   function showAppearance(style) {
-    const { diceEdge, ...bubble } = style;
-    for (const [key, value] of Object.entries(bubble)) fields.elements.namedItem(key).value = value;
-    showDiceEdge(style);
+    for (const [key, value] of Object.entries(style)) fields.elements.namedItem(key).value = value;
     drawPreview(style);
-  }
-
-  function showDiceEdge({ border, diceEdge }) {
-    fields.elements.customDiceEdge.checked = diceEdge !== null;
-    fields.elements.diceEdge.disabled = diceEdge === null;
-    fields.elements.diceEdge.value = diceEdge ?? border;
   }
 
   showAppearance(savedAppearance());
@@ -349,11 +341,7 @@ function setupSettings() {
   fields.addEventListener("input", () => {
     const values = Object.fromEntries(new FormData(fields));
     values.size = Number(values.size);
-    values.diceEdgeWidth = fields.elements.diceEdgeWidth.valueAsNumber;
-    values.diceEdge = fields.elements.customDiceEdge.checked ? fields.elements.diceEdge.value : null;
-    const style = saveAppearance(values);
-    showDiceEdge(style);
-    drawPreview(style);
+    drawPreview(saveAppearance(values));
   });
 }
 

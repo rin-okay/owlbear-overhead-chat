@@ -9,7 +9,7 @@ export const fonts = {
 };
 
 const defaults = {
-  name: "", border: "#8b75b5", fill: "#fbf6ff", color: "#241d31", diceEdge: null, diceEdgeWidth: 4, font: "sans", size: 15,
+  name: "", border: "#8b75b5", fill: "#fbf6ff", color: "#241d31", font: "sans", size: 15,
 };
 
 export function normalizeAppearance(value) {
@@ -18,14 +18,11 @@ export function normalizeAppearance(value) {
     return typeof candidate === "string" && /^#[0-9a-f]{6}$/i.test(candidate) ? candidate : defaults[key];
   };
   const size = value?.size;
-  const diceEdgeWidth = value?.diceEdgeWidth;
   return {
     name: typeof value?.name === "string" ? value.name.trim().replace(/\s+/gu, " ").slice(0, 32) : "",
     border: color("border"),
     fill: color("fill"),
     color: color("color"),
-    diceEdge: color("diceEdge"),
-    diceEdgeWidth: Number.isInteger(diceEdgeWidth) ? Math.max(0, Math.min(8, diceEdgeWidth)) : defaults.diceEdgeWidth,
     font: typeof value?.font === "string" && Object.hasOwn(fonts, value.font) ? value.font : defaults.font,
     size: Number.isInteger(size) ? Math.max(10, Math.min(28, size)) : defaults.size,
   };

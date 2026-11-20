@@ -43,7 +43,7 @@ With Rumble! off, everyone in the Owlbear room running Overhead Chat, including 
 
 Roll `/r 1d100` or `/r 1d%` for percentile dice. The tens die (00–90) and the ones die (0–9) add together, with 00 + 0 counting as 100. Keep and drop modifiers apply to the combined percentile value.
 
-The dice use the roller’s bubble fill for the body, text color for the numbers, and bubble border for the edges. Players can override the dice edge color and set the edge width in **Settings**. A width of 0 hides the dice outlines. The tray shows each die and modifier in the final calculation, with dropped dice struck through.
+The dice use the roller’s bubble fill for the body, text color for the numbers, and bubble border for the 3 px edges. The tray shows each die and modifier in the final calculation, with dropped dice struck through.
 
 The shared replay uses the [Dicesuki](https://github.com/donovan-yohan/dicesuki) solo WebAssembly physics engine by Donovan Yohan (MIT), pinned to commit `8fae459b1b31a112d918ec3897e66c5f67b5e409`. Its Rapier simulation produces the faces and motion for the 3D dice. The popup uses Dicesuki's basic white dice styling and [face numbering](./DICESUKI-LICENSE.md).
 
