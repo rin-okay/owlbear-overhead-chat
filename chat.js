@@ -6,8 +6,9 @@ import { openSessionChannel, savedAvatar, saveAvatar, savedAppearance, saveAppea
 import { drawBubble } from "./appearance.js";
 import { setupDiscordPanel } from "./discord-panel.js";
 
-import { rollInChat, rollSpans, validateRollSpans } from "./dice.js";
+import { rollSpans, validateRollSpans } from "./dice.js";
 import { rollWithRumble } from "./rumble.js";
+import { rollWithNativeDice } from "./native-dice.js";
 
 const transcript = document.querySelector("#transcript");
 const entries = document.querySelector("#entries");
@@ -228,11 +229,13 @@ async function finishRoll(message, spans) {
   let resolution;
   try {
     const useRumble = (await OBR.room.getMetadata())[RUMBLE_DICE] === true;
-    const rolls = [];
-    for (const { notation } of spans) {
-      rolls.push(useRumble ? await rollWithRumble(notation) : rollInChat(notation));
+    if (useRumble) {
+      const rolls = [];
+      for (const { notation } of spans) rolls.push(await rollWithRumble(notation));
+      resolution = { rolls, rollPhase: "resolved" };
+    } else {
+      resolution = { ...await rollWithNativeDice(spans), rollPhase: "resolved" };
     }
-    resolution = { rolls, rollPhase: "resolved" };
   } catch (error) {
     resolution = { rollPhase: "failed", rollError: String(error.message || "Roll failed.").slice(0, 200) };
   }

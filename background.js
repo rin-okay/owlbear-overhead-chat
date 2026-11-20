@@ -5,6 +5,8 @@ import { BUBBLE_LINE_HEIGHT, drawBubble, fonts, normalizeAppearance } from "./ap
 import { openSessionChannel, saveAvatar } from "./session.js";
 import { chatParts, isRollCommand, rollSpans } from "./dice.js";
 import { queueDiscord } from "./discord.js";
+import { parseTray } from "./dice-replay.js";
+import { queueDicePopup, resetDicePopups } from "./dice-popup.js";
 
 const transcript = [];
 const rollingEntries = new Map();
@@ -83,6 +85,11 @@ async function showSpeech(event, speech, version, receivedAt) {
     rollingEntries.set(id, { tokenId, index, timer });
   }
   if (entry.rolling || entry.rollError) return;
+  if (phase === "resolved" && parts.some((part) => typeof part === "object")) {
+    const tray = parseTray(event.data.tray);
+    if (tray) queueDicePopup(entry, tray);
+    if (!previousRoll) rollingEntries.set(id, { tokenId, settled: true });
+  }
   queueDiscord(entry, role, (message) => transcriptChannel?.postMessage({ type: "discord-status", message }));
 
   const [bounds, roomMetadata] = await Promise.all([
@@ -174,6 +181,7 @@ OBR.onReady(() => {
   OBR.scene.onReadyChange((ready) => {
     if (ready) return;
     ++sceneVersion;
+    resetDicePopups();
     for (const bubble of active.values()) clearTimeout(bubble.timer);
     active.clear();
     pending = Promise.resolve();

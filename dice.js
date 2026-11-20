@@ -34,27 +34,27 @@ export function chatParts(text, results) {
   for (const [index, { start, end, notation }] of spans.entries()) {
     if (!notation || notation.length > MAX_NOTATION) return [text];
     if (start > cursor) parts.push(text.slice(cursor, start));
-    parts.push({ ...results[index], notation });
+    const { total, detail } = results[index];
+    parts.push({ total, detail, notation });
     cursor = end;
   }
   if (cursor < text.length) parts.push(text.slice(cursor));
   return parts;
 }
 
-function randomFace(sides) {
+export function randomFace(sides) {
   const draw = new Uint32Array(1);
   const limit = 2 ** 32 - (2 ** 32 % sides);
   do crypto.getRandomValues(draw); while (draw[0] >= limit);
   return draw[0] % sides + 1;
 }
 
-export function rollInChat(notation, face = randomFace) {
+export function parseDice(notation) {
   const expression = notation.toLowerCase().replace(/\s/g, "");
   const term = /([+-]?)(?:(\d*)d(\d+|%)(?:(kh|kl|dh|dl)(\d+))?|(\d+))/y;
-  let total = 0;
   let cursor = 0;
   let diceCount = 0;
-  const details = [];
+  const terms = [];
   while (cursor < expression.length) {
     term.lastIndex = cursor;
     const match = term.exec(expression);
@@ -66,8 +66,7 @@ export function rollInChat(notation, face = randomFace) {
     const factor = sign === "-" ? -1 : 1;
     if (constant !== undefined) {
       if (constant.length > 8) throw new Error("Dice modifiers must have at most eight digits.");
-      total += factor * Number(constant);
-      details.push(sign + constant);
+      terms.push({ text: match[0], constant: factor * Number(constant) });
       continue;
     }
 
@@ -78,14 +77,33 @@ export function rollInChat(notation, face = randomFace) {
     if (countValue < 1 || diceCount > 100 || sidesValue < 2 || sidesValue > 1000 || filterCount > countValue) {
       throw new Error("Use up to 100 dice with 2 to 1,000 sides and a valid keep or drop count.");
     }
-    const values = Array.from({ length: countValue }, () => face(sidesValue));
+    terms.push({ text: match[0], factor, count: countValue, sides: sidesValue, filter, filterCount });
+  }
+  if (!diceCount) throw new Error("Enter a dice expression like 1d20+7.");
+  return terms;
+}
+
+export function scoreDice(terms, face = randomFace) {
+  let total = 0;
+  const details = [];
+  for (const { text, constant, factor, count, sides, filter, filterCount } of terms) {
+    if (constant !== undefined) {
+      total += constant;
+      details.push(text);
+      continue;
+    }
+    const dice = Array.from({ length: count }, () => face(sides));
+    const values = dice.map((die) => typeof die === "number" ? die : die.value);
     const sorted = values.map((value, index) => ({ value, index }))
       .sort((a, b) => filter?.endsWith("l") ? a.value - b.value : b.value - a.value);
     const chosen = new Set(sorted.slice(0, filterCount).map(({ index }) => index));
     const kept = (index) => !filter || (filter.startsWith("k") === chosen.has(index));
-    values.forEach((value, index) => { if (kept(index)) total += factor * value; });
-    details.push(`${match[0]} → [${values.map((value, index) => kept(index) ? value : `${value} dropped`).join(", ")}]`);
+    values.forEach((value, index) => {
+      const keep = kept(index);
+      if (keep) total += factor * value;
+      if (typeof dice[index] === "object") dice[index].kept = keep;
+    });
+    details.push(`${text} → [${values.map((value, index) => kept(index) ? value : `${value} dropped`).join(", ")}]`);
   }
-  if (!diceCount) throw new Error("Enter a dice expression like 1d20+7.");
   return { total, detail: details.join("\n").slice(0, 1200) };
 }
