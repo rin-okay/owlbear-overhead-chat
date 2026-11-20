@@ -1,14 +1,15 @@
 import OBR from "./obr.js";
 import { discordSettings, normalizeWebhook, saveDiscordSettings, sendDiscord } from "./discord.js";
 
-export function setupDiscordPanel(openChat, openDiscord) {
-  const tab = document.querySelector("#discord-tab");
-  const panel = document.querySelector("#discord-panel");
-  const form = panel.querySelector("form");
+export function setupDiscordPanel(openChat, openGm) {
+  const tab = document.querySelector("#gm-tab");
+  const panel = document.querySelector("#gm-panel");
+  const discord = panel.querySelector("#discord-settings");
+  const form = discord.querySelector("form");
   const field = form.elements.namedItem("webhook");
   const enabled = form.elements.namedItem("enabled");
-  const status = panel.querySelector("#discord-status");
-  const test = panel.querySelector("#discord-test");
+  const status = discord.querySelector("#discord-status");
+  const test = discord.querySelector("#discord-test");
 
   function load() {
     const saved = discordSettings();
@@ -38,7 +39,7 @@ export function setupDiscordPanel(openChat, openDiscord) {
     if (await OBR.player.getRole() !== "GM") return;
     load();
     status.textContent = "";
-    openDiscord();
+    openGm();
   });
 
   form.addEventListener("submit", async (event) => {
@@ -56,7 +57,7 @@ export function setupDiscordPanel(openChat, openDiscord) {
     }
   });
 
-  panel.querySelector("#discord-remove").addEventListener("click", async () => {
+  discord.querySelector("#discord-remove").addEventListener("click", async () => {
     if (await OBR.player.getRole() !== "GM") return;
     try {
       saveDiscordSettings({ url: "", enabled: false });

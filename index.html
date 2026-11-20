@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Overhead Chat</title>
+  <title>overhead chat</title>
   <link rel="stylesheet" href="./chat.css">
   <script type="module" src="./chat.js"></script>
 </head>
@@ -11,14 +11,14 @@
   <main>
     <header>
       <img src="./icon.svg" alt="" width="26" height="26">
-      <nav aria-label="Overhead Chat views">
-        <button type="button" id="chat-tab" aria-pressed="true" aria-controls="chat-panel">Chat</button>
-        <button type="button" id="settings-tab" aria-pressed="false" aria-controls="settings-panel">Settings</button>
-        <button type="button" id="discord-tab" aria-pressed="false" aria-controls="discord-panel" hidden>Discord</button>
+      <nav aria-label="overhead chat views">
+        <button type="button" id="chat-tab" aria-pressed="true" aria-controls="chat-panel">chat</button>
+        <button type="button" id="settings-tab" aria-pressed="false" aria-controls="settings-panel">settings</button>
+        <button type="button" id="gm-tab" aria-pressed="false" aria-controls="gm-panel" hidden>gm</button>
       </nav>
     </header>
     <div id="chat-panel">
-    <section id="transcript" aria-label="Session chat" role="log" tabindex="0">
+    <section id="transcript" aria-label="session chat" role="log" tabindex="0">
       <p id="empty">No messages yet.</p>
       <ol id="entries"></ol>
     </section>
@@ -31,7 +31,7 @@
       <p id="status" role="status">Open this panel in an Owlbear Rodeo room.</p>
     </form>
     </div>
-    <section id="settings-panel" aria-label="Chat settings" hidden>
+    <section id="settings-panel" aria-label="chat settings" hidden>
       <form>
         <label>Display name <input name="name" type="text" maxlength="32" placeholder="Use character name"></label>
         <div class="colors">
@@ -52,37 +52,40 @@
           <label>Font size <input name="size" type="number" min="10" max="28" step="1" required></label>
         </div>
       </form>
-      <div id="bubble-preview" aria-label="Bubble preview"></div>
+      <div id="bubble-preview" aria-label="bubble preview"></div>
       <button id="reset-appearance" type="button">Reset to default</button>
-      <section id="gm-fog-settings" aria-label="GM settings" hidden>
+    </section>
+    <section id="gm-panel" aria-label="gm settings" hidden>
+      <section id="gm-fog-settings" aria-label="fog settings" hidden>
         <label class="discord-enabled">
           <input type="checkbox" aria-describedby="above-fog-help" disabled> Show bubbles above fog
         </label>
         <p id="above-fog-help">Room-wide. A bubble can reveal a speaker’s position through fog.</p>
         <p role="status"></p>
       </section>
-      <section id="gm-rumble-settings" aria-label="Rumble settings" hidden>
+      <section id="gm-rumble-settings" aria-label="rumble settings" hidden>
         <label class="discord-enabled">
           <input type="checkbox" aria-describedby="rumble-help" disabled> Use Rumble! for dice rolls
         </label>
         <p id="rumble-help">When off, Overhead Chat shows its own 3D dice tray. When on, open Rumble! in this room before rolling.</p>
         <p role="status"></p>
       </section>
-    </section>
-    <section id="discord-panel" aria-label="Discord settings" hidden>
-      <p>Mirror new Overhead Chat messages to a Discord text channel while this GM tab is open. Set up the relay on one GM browser per room.</p>
-      <form>
-        <label>Discord webhook URL
-          <input name="webhook" type="password" autocomplete="off" spellcheck="false" placeholder="Paste Discord webhook URL">
-        </label>
-        <label class="discord-enabled"><input name="enabled" type="checkbox"> Mirror new chat messages</label>
-        <div class="discord-actions">
-          <button type="submit">Save</button>
-          <button id="discord-test" type="button">Send test</button>
-          <button id="discord-remove" type="button">Remove webhook</button>
-        </div>
-      </form>
-      <p id="discord-status" role="status"></p>
+      <section id="discord-settings" aria-labelledby="discord-heading">
+        <h2 id="discord-heading">discord mirroring</h2>
+        <p>Mirror new Overhead Chat messages to a Discord text channel while a configured GM has the Owlbear room open. Set up the relay on one GM browser per room.</p>
+        <form>
+          <label>Discord webhook URL
+            <input name="webhook" type="password" autocomplete="off" spellcheck="false" placeholder="Paste Discord webhook URL">
+          </label>
+          <label class="discord-enabled"><input name="enabled" type="checkbox"> Mirror new chat messages</label>
+          <div class="discord-actions">
+            <button type="submit">Save</button>
+            <button id="discord-test" type="button">Send test</button>
+            <button id="discord-remove" type="button">Remove webhook</button>
+          </div>
+        </form>
+        <p id="discord-status" role="status"></p>
+      </section>
     </section>
   </main>
 </body>

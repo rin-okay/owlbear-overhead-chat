@@ -31,7 +31,7 @@ The extension sends public room speech. Use it for tokens the room is meant to s
 
 ## Discord relay
 
-In a Discord text channel, create an incoming webhook under **Edit Channel → Integrations** and copy its URL. As the Owlbear room GM, open the **Discord** tab, paste the webhook URL, and use **Send test**. To start sending new messages, turn on **Mirror new chat messages** and save.
+In a Discord text channel, create an incoming webhook under **Edit Channel → Integrations** and copy its URL. As the Owlbear room GM, open the **gm** tab, paste the webhook URL under **discord mirroring**, and use **send test**. To start sending new messages, turn on **mirror new chat messages** and save.
 
 The relay runs while the configured GM has the Owlbear room tab open. It mirrors new public Overhead Chat messages; it does not replay history or bring Discord messages back into Owlbear. Use one configured GM browser per room. The webhook URL stays in that browser’s local storage for that GM and room.
 
@@ -47,4 +47,4 @@ The dice use the roller’s bubble fill for the body, text color for the numbers
 
 The shared replay uses the [Dicesuki](https://github.com/donovan-yohan/dicesuki) solo WebAssembly physics engine by Donovan Yohan (MIT), pinned to commit `8fae459b1b31a112d918ec3897e66c5f67b5e409`. Its Rapier simulation produces the faces and motion for the 3D dice. The popup uses Dicesuki's basic white dice styling and [face numbering](./DICESUKI-LICENSE.md).
 
-The GM can enable **Use Rumble! for dice rolls** in **Settings** to use Rumble’s notation and dice animations. Open Rumble! in the room before rolling in Overhead Chat.
+The GM can enable **use rumble! for dice rolls** in the **gm** tab to use Rumble’s notation and dice animations. Open Rumble! in the room before rolling in Overhead Chat.

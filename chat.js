@@ -305,8 +305,8 @@ function setupSettings() {
   const preview = settingsPanel.querySelector("#bubble-preview");
 
   function drawPreview(style) {
-    const { canvas: bubble } = drawBubble("See you in the tavern!", style);
-    bubble.setAttribute("aria-label", "Speech bubble preview");
+    const { canvas: bubble } = drawBubble("see you in the tavern!", style);
+    bubble.setAttribute("aria-label", "speech bubble preview");
     preview.replaceChildren(bubble);
   }
 
@@ -323,7 +323,7 @@ function setupSettings() {
   const views = [
     { tab: chatTab, panel: chatPanel },
     { tab: settingsTab, panel: settingsPanel },
-    { tab: document.querySelector("#discord-tab"), panel: document.querySelector("#discord-panel") },
+    { tab: document.querySelector("#gm-tab"), panel: document.querySelector("#gm-panel") },
   ];
 
   function select(index) {
