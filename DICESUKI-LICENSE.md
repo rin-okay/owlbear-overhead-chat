@@ -1,7 +1,7 @@
 # Dicesuki
 
-The face numbering and normals in `dice-faces.js` and the d10 mesh proportions
-in `dice-render.js` are adapted from [Dicesuki](https://github.com/donovan-yohan/dicesuki/tree/8fae459b1b31a112d918ec3897e66c5f67b5e409),
+The generated WASM runtime in `vendor/dicesuki`, the face numbering and normals in `dice-faces.js` and the d10 mesh proportions
+in `dice-render.js` are sourced from [Dicesuki](https://github.com/donovan-yohan/dicesuki/tree/8fae459b1b31a112d918ec3897e66c5f67b5e409),
 whose README licenses its application code under MIT.
 
 Copyright (c) Donovan Yohan and Dicesuki contributors

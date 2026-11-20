@@ -1,4 +1,4 @@
-import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.162.0/build/three.module.js";
+import * as THREE from "./vendor/three/three.module.min.js";
 
 import { numberedFaces } from "./dice-faces.js";
 
@@ -71,176 +71,159 @@ function nearestFace(references, normal) {
     candidate.normal.dot(normal) > best.normal.dot(normal) ? candidate : best);
 }
 
-function numeralMaterial(value, materials) {
-  if (materials.has(value)) return materials.get(value);
-  const image = document.createElement("canvas");
-  image.width = image.height = 128;
-  const ink = image.getContext("2d");
-  ink.font = "102px Helvetica, Arial, sans-serif";
-  ink.fillStyle = "#161316";
-  ink.textAlign = "center";
-  ink.textBaseline = "middle";
-  ink.fillText(value, 64, 66);
-  if (value === 6 || value === 9) ink.fillRect(48, 108, 32, 4);
+const light = new THREE.Vector3(5, 10, 7).normalize();
 
-  const map = new THREE.CanvasTexture(image);
-  map.colorSpace = THREE.SRGBColorSpace;
-  map.anisotropy = 4;
-  const material = new THREE.MeshBasicMaterial({ map, transparent: true, depthWrite: false, alphaTest: 0.05 });
-  materials.set(value, material);
-  return material;
-}
-
-function addNumeral(group, plane, materials, value, position, normal, up, width, height = width) {
-  const numeral = new THREE.Mesh(plane, numeralMaterial(value, materials));
-  const right = up.clone().cross(normal).normalize();
-  const vertical = normal.clone().cross(right);
-  numeral.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(right, vertical, normal));
-  numeral.position.copy(position).addScaledVector(normal, 0.003);
-  numeral.scale.set(width, height, 1);
-  numeral.renderOrder = 1;
-  group.add(numeral);
-}
-
-function createDie(sides, kept, plane, materials, bodyMaterials) {
-  const group = new THREE.Group();
-  const hull = [];
+function numberedMesh(sides) {
   const references = numberedFaces[sides].map(([value, x, y, z]) =>
     ({ value, normal: new THREE.Vector3(x, y, z).normalize() }));
-
-  for (const { normal, center, points } of meshFaces(sides)) {
-    for (let index = 1; index < points.length - 1; index++) {
-      hull.push(...points[0], ...points[index], ...points[index + 1]);
-    }
-
-    if (sides === 4) {
-      for (const tip of points) {
-        const vertexValue = nearestFace(references, tip.clone().normalize().negate()).value;
-        addNumeral(group, plane, materials, vertexValue, center.clone().lerp(tip, 0.45),
-          normal, tip.clone().sub(center), 0.31);
-      }
-      continue;
-    }
-
-    const { value } = nearestFace(references, normal);
-    const up = points[0].clone().sub(center);
-    const size = sides === 6 ? 0.69 : sides === 20 ? 0.49 : 0.59;
-    addNumeral(group, plane, materials, value, center, normal, up, size * (value >= 10 ? 1.22 : 1), size);
-  }
-
-  const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute("position", new THREE.Float32BufferAttribute(hull, 3));
-  geometry.computeVertexNormals();
-  const body = new THREE.Mesh(geometry, bodyMaterials[kept ? 0 : 1]);
-  body.castShadow = true;
-  body.receiveShadow = true;
-  group.add(body);
-  return group;
+  return meshFaces(sides).map((face) => {
+    const { center, normal, points } = face;
+    const glyphs = sides === 4
+      ? points.map((tip) => ({
+          position: center.clone().lerp(tip, 0.45),
+          up: tip.clone().sub(center).normalize(),
+          value: nearestFace(references, tip.clone().normalize().negate()).value,
+          size: 0.26,
+        }))
+      : [{
+          position: center,
+          up: points[0].clone().sub(center).normalize(),
+          value: nearestFace(references, normal).value,
+          size: sides === 6 ? 0.61 : sides === 20 ? 0.45 : 0.53,
+        }];
+    return {
+      ...face,
+      glyphs: glyphs.map(({ up, ...glyph }) => ({ ...glyph, up, right: up.clone().cross(normal) })),
+    };
+  });
 }
 
-export async function animateTray(canvas, dice, frames, duration) {
-  const { clientWidth: width, clientHeight: height } = canvas;
-  if (!width || !height) throw new Error("Dice tray is not visible.");
+function path(ctx, points) {
+  ctx.beginPath();
+  ctx.moveTo(...points[0]);
+  for (const point of points.slice(1)) ctx.lineTo(...point);
+  ctx.closePath();
+}
 
-  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-  const scene = new THREE.Scene();
-  const materials = new Map();
-  const dispose = () => {
-    const geometries = new Set();
-    const sceneMaterials = new Set();
-    scene.traverse((object) => {
-      if (object.geometry) geometries.add(object.geometry);
-      if (object.material) sceneMaterials.add(object.material);
-    });
-    geometries.forEach((geometry) => geometry.dispose());
-    sceneMaterials.forEach((material) => {
-      material.map?.dispose();
-      material.dispose();
-    });
-    scene.children.find((object) => object.isDirectionalLight)?.shadow.dispose();
-    renderer.dispose();
+function printNumeral(ctx, project, glyph, rotation, position) {
+  const center = glyph.position.clone().applyQuaternion(rotation).add(position);
+  const right = glyph.right.clone().applyQuaternion(rotation).multiplyScalar(glyph.size);
+  const up = glyph.up.clone().applyQuaternion(rotation).multiplyScalar(glyph.size);
+  const [x, y] = project(center);
+  const [rx, ry] = project(center.clone().add(right));
+  const [ux, uy] = project(center.clone().add(up));
+  ctx.save();
+  ctx.transform(rx - x, ry - y, x - ux, y - uy, x, y);
+  ctx.font = "0.92px Helvetica, Arial, sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillStyle = "#201b20";
+  ctx.fillText(glyph.value, 0, 0.035);
+  if (glyph.value === 6 || glyph.value === 9) ctx.fillRect(-0.19, 0.34, 0.38, 0.031);
+  ctx.restore();
+}
+
+export function animateTray(canvas, dice, frames, duration) {
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Dice canvas unavailable.");
+  const models = new Map([...new Set(dice.map(({ sides }) => sides))]
+    .map((sides) => [sides, numberedMesh(sides)]));
+  const pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
+  const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const other = new THREE.Quaternion();
+  let width, height, cameraHeight, focalLength;
+  const project = ({ x, y, z }) => {
+    const scale = focalLength / Math.max(1, cameraHeight - y);
+    return [width / 2 + x * scale, height / 2 + z * scale];
   };
-  window.addEventListener("pagehide", dispose, { once: true });
 
-  try {
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-    renderer.setSize(width, height, false);
-    renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-    scene.background = new THREE.Color("#17131b");
-
-    const camera = new THREE.PerspectiveCamera(40, width / height, 0.1, 60);
-    const halfFov = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
-    const cameraHeight = Math.max(3.7, 6.15 / camera.aspect) / halfFov;
-    camera.up.set(0, 0, -1);
-    camera.position.set(0, cameraHeight, 0);
-    camera.lookAt(0, 0, 0);
-    scene.add(new THREE.HemisphereLight("#f7edf2", "#736981", 1.45));
-    const key = new THREE.DirectionalLight("#fff4eb", 2.25);
-    key.position.set(5, 10, 7);
-    key.castShadow = true;
-    key.shadow.mapSize.set(1024, 1024);
-    Object.assign(key.shadow.camera, { left: -9, right: 9, top: 9, bottom: -9, near: 0.5, far: 27 });
-    key.shadow.camera.updateProjectionMatrix();
-    key.shadow.normalBias = 0.017;
-    scene.add(key);
-
-    const floor = new THREE.Mesh(new THREE.PlaneGeometry(36, 36),
-      new THREE.MeshStandardMaterial({ color: "#211b24", roughness: 1 }));
-    floor.rotation.x = -Math.PI / 2;
-    floor.position.y = -0.5;
-    floor.receiveShadow = true;
-    scene.add(floor);
-
-    const plane = new THREE.PlaneGeometry(1, 1);
-    const bodyMaterials = ["#ffffff", "#9a909f"].map((color) =>
-      new THREE.MeshStandardMaterial({ color, roughness: 0.62 }));
-    const models = dice.map(({ sides, kept }) => {
-      const model = createDie(sides, kept, plane, materials, bodyMaterials);
-      scene.add(model);
-      return model;
-    });
-    const other = new THREE.Quaternion();
-
-    function draw(progress) {
-      const index = progress * (frames.length - 1);
-      const first = frames[Math.floor(index)];
-      const second = frames[Math.ceil(index)];
-      const fraction = index % 1;
-      models.forEach((model, die) => {
-        model.position.fromArray(first[die]);
-        const [x, y, z] = second[die];
-        model.position.x += (x - model.position.x) * fraction;
-        model.position.y += (y - model.position.y) * fraction;
-        model.position.z += (z - model.position.z) * fraction;
-        model.quaternion.fromArray(first[die], 3).normalize()
-          .slerp(other.fromArray(second[die], 3).normalize(), fraction);
-      });
-      renderer.render(scene, camera);
+  function draw(progress) {
+    if (width !== canvas.clientWidth || height !== canvas.clientHeight) {
+      width = canvas.clientWidth;
+      height = canvas.clientHeight;
+      if (!width || !height) return false;
+      canvas.width = width * pixelRatio;
+      canvas.height = height * pixelRatio;
+      ctx.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+      focalLength = height * 1.374;
+      cameraHeight = Math.max(3.65, 6.15 * height / width) * 2.748;
     }
+    if (!width || !height) return false;
+    const index = progress * (frames.length - 1);
+    const first = frames[Math.floor(index)];
+    const second = frames[Math.ceil(index)];
+    const fraction = index % 1;
+    const visible = [];
+    const shadows = [];
+    ctx.fillStyle = "#211b24";
+    ctx.fillRect(0, 0, width, height);
 
-    if (matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      draw(1);
-      return;
-    }
+    for (const [die, { sides, kept }] of dice.entries()) {
+      const position = new THREE.Vector3().fromArray(first[die])
+        .lerp(new THREE.Vector3().fromArray(second[die]), fraction);
+      const rotation = new THREE.Quaternion().fromArray(first[die], 3).normalize()
+        .slerp(other.fromArray(second[die], 3).normalize(), fraction);
 
-    await new Promise((resolve, reject) => {
-      const start = performance.now();
-      function frame(now) {
-        try {
-          const progress = THREE.MathUtils.clamp((now - start) / duration, 0, 1);
-          draw(progress);
-          if (progress < 1) requestAnimationFrame(frame);
-          else resolve();
-        } catch (error) {
-          reject(error);
-        }
+      for (const face of models.get(sides)) {
+        const world = face.points.map((point) => point.clone().applyQuaternion(rotation).add(position));
+        shadows.push(world.map(({ x, y, z }) => project({
+          x: x - (y + 0.5) * light.x / light.y,
+          y: -0.5,
+          z: z - (y + 0.5) * light.z / light.y,
+        })));
+
+        const center = face.center.clone().applyQuaternion(rotation).add(position);
+        const normal = face.normal.clone().applyQuaternion(rotation);
+        if (normal.dot(new THREE.Vector3(0, cameraHeight, 0).sub(center)) <= 0) continue;
+        const brightness = Math.round((kept ? 181 : 113) + Math.max(0, normal.dot(light)) * (kept ? 67 : 65));
+        visible.push({ points: world.map(project), depth: center.y, brightness, glyphs: face.glyphs, rotation, position });
       }
-      requestAnimationFrame(frame);
-    });
-  } catch (error) {
-    window.removeEventListener("pagehide", dispose);
-    dispose();
-    throw error;
+    }
+
+    ctx.fillStyle = "#100b13";
+    ctx.beginPath();
+    for (const points of shadows) {
+      // Perspective projection can flip the winding of shadow polygons.
+      const area = points.reduce((sum, [x, y], index) => {
+        const [nextX, nextY] = points[(index + 1) % points.length];
+        return sum + x * nextY - y * nextX;
+      }, 0);
+      if (area < 0) points.reverse();
+      ctx.moveTo(...points[0]);
+      for (const point of points.slice(1)) ctx.lineTo(...point);
+      ctx.closePath();
+    }
+    ctx.fill();
+
+    visible.sort((a, b) => a.depth - b.depth);
+    for (const { points, brightness, glyphs, rotation, position } of visible) {
+      path(ctx, points);
+      ctx.fillStyle = `rgb(${brightness}, ${brightness - 3}, ${brightness - 2})`;
+      ctx.strokeStyle = ctx.fillStyle;
+      ctx.lineWidth = 0.45;
+      ctx.fill();
+      ctx.stroke();
+      ctx.save();
+      ctx.clip();
+      for (const glyph of glyphs) printNumeral(ctx, project, glyph, rotation, position);
+      ctx.restore();
+    }
+    return true;
   }
+
+  return new Promise((resolve, reject) => {
+    let start;
+    function frame(now) {
+      try {
+        start ??= now;
+        const progress = reducedMotion ? 1 : Math.min(1, (now - start) / duration);
+        if (draw(progress) && progress === 1) resolve();
+        else if (now - start > 4500) reject(new Error("Dice canvas has no layout."));
+        else requestAnimationFrame(frame);
+      } catch (error) {
+        reject(error);
+      }
+    }
+    requestAnimationFrame(frame);
+  });
 }

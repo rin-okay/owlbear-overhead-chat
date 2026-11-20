@@ -2,7 +2,7 @@ import { parseDice, randomFace, scoreDice } from "./dice.js";
 import { MAX_DICE_SHOWN } from "./dice-replay.js";
 
 const physicalSides = new Set([4, 6, 8, 10, 12, 20]);
-const workerUrl = new URL("./dice-physics.js", import.meta.url);
+const workerUrl = new URL("./dice-worker.js", import.meta.url);
 
 function simulateDice(sides) {
   return new Promise((resolve, reject) => {
@@ -38,7 +38,13 @@ export async function rollWithNativeDice(spans) {
   let simulation;
   if (physical.length) {
     try {
-      simulation = await simulateDice(physical.map((die) => die.sides));
+      const sizes = physical.map((die) => die.sides);
+      try {
+        simulation = await simulateDice(sizes);
+      } catch {
+        const { simulate } = await import("./dice-physics.js");
+        simulation = await simulate(sizes);
+      }
       physical.forEach((die, index) => { die.value = simulation.values[index]; });
     } catch (error) {
       console.warn("Overhead Chat dice physics unavailable", error);

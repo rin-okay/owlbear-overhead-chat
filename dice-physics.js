@@ -1,11 +1,10 @@
 import { encodeReplay } from "./dice-replay.js";
 
-// Dicesuki's solo room runs its Rapier engine inside this worker.
-const CORE_URL = "https://cdn.jsdelivr.net/gh/donovan-yohan/dicesuki@8fae459b1b31a112d918ec3897e66c5f67b5e409/src/generated/wasm-room/dicesuki_wasm.js";
+// Pinned Dicesuki build. See DICESUKI-LICENSE.md.
+import init, { WasmRoom } from "./vendor/dicesuki/dicesuki_wasm.js";
 const TICK_MS = 1000 / 60;
 
-async function simulate(sides) {
-  const { default: init, WasmRoom } = await import(CORE_URL);
+export async function simulate(sides) {
   await init();
   const room = new WasmRoom("overhead-chat", 11, 6);
   const handle = (message) => room.handleMessage(JSON.stringify(message)).map(JSON.parse);
@@ -47,10 +46,3 @@ async function simulate(sides) {
   }
 }
 
-self.onmessage = async ({ data }) => {
-  try {
-    self.postMessage(await simulate(data));
-  } catch (error) {
-    self.postMessage({ error: error.message });
-  }
-};
