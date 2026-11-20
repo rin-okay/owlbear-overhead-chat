@@ -33,12 +33,13 @@ let movingAvatar = false;
 let modeExitKey;
 
 const movementKeys = {
-  arrowleft: [-1, 0], a: [-1, 0],
-  arrowright: [1, 0], d: [1, 0],
-  arrowup: [0, -1], w: [0, -1],
-  arrowdown: [0, 1], s: [0, 1],
-  q: [0, 0, -15], ",": [0, 0, -15],
-  e: [0, 0, 15], ".": [0, 0, 15],
+  arrowleft: { offset: [-1, 0] }, a: { offset: [-1, 0] },
+  arrowright: { offset: [1, 0] }, d: { offset: [1, 0] },
+  arrowup: { offset: [0, -1] }, w: { offset: [0, -1] },
+  arrowdown: { offset: [0, 1] }, s: { offset: [0, 1] },
+  q: { rotation: -15 }, ",": { rotation: -15 },
+  e: { rotation: 15 }, ".": { rotation: 15 },
+  r: { mirror: true },
 };
 
 function appendLine(entry, target) {
@@ -215,23 +216,26 @@ async function moveAvatar(mode) {
   movingAvatar = true;
   try {
     while (mode === tokenControl && mode.actions.length) {
-      const [x, y, rotation = 0] = mode.actions.shift();
-      const [{ token }, step] = await Promise.all([getAvatar(), rotation ? 0 : OBR.scene.grid.getDpi()]);
+      const { offset, rotation, mirror } = mode.actions.shift();
+      const [{ token }, step] = await Promise.all([getAvatar(), offset ? OBR.scene.grid.getDpi() : 0]);
       if (mode !== tokenControl) return;
       if (token?.id !== mode.tokenId || token.locked) {
         stopTokenControl();
         await refresh();
         return;
       }
-      if (!rotation && (!Number.isFinite(step) || step <= 0)) throw new Error("Scene grid size unavailable.");
+      if (offset && (!Number.isFinite(step) || step <= 0)) throw new Error("Scene grid size unavailable.");
 
       await OBR.scene.items.updateItems([mode.tokenId], ([item]) => {
         if (mode !== tokenControl || !isPublicToken(item) || item.locked) return;
-        if (rotation) {
-          item.rotation = ((item.rotation + rotation) % 360 + 360) % 360;
-        } else {
+        if (offset) {
+          const [x, y] = offset;
           item.position.x += x * step;
           item.position.y += y * step;
+        } else if (mirror) {
+          item.scale.x = -item.scale.x;
+        } else {
+          item.rotation = ((item.rotation + rotation) % 360 + 360) % 360;
         }
       });
     }
@@ -284,7 +288,7 @@ input.addEventListener("keydown", (event) => {
     } else if (Object.hasOwn(movementKeys, key) && !event.ctrlKey && !event.altKey && !event.metaKey) {
       event.preventDefault();
       const action = movementKeys[key];
-      if (event.repeat && (action[2] || tokenControl.actions.length >= 4)) return;
+      if (event.repeat && (action.mirror || tokenControl.actions.length >= 4)) return;
       tokenControl.actions.push(action);
       if (!movingAvatar) void moveAvatar(tokenControl);
     }
