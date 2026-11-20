@@ -16,7 +16,8 @@ const empty = document.querySelector("#empty");
 const form = document.querySelector("form");
 const speaker = document.querySelector("#speaker");
 const input = document.querySelector("#message");
-const send = form.querySelector("button");
+const send = form.querySelector("[type=submit]");
+const moveButton = form.querySelector("#move-avatar");
 const status = document.querySelector("#status");
 
 let avatar = null;
@@ -32,7 +33,7 @@ let movingAvatar = false;
 const movementKeys = {
   ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1],
 };
-const controlHint = "Token control mode. Use arrow keys to move, or Tab to return to chat.";
+const controlHint = "Token control mode. Use arrow keys to move. Press F2 or Esc to return to chat.";
 
 function appendLine(entry, target) {
   const line = document.createElement("li");
@@ -130,6 +131,7 @@ function connectTranscript() {
 function updateControls() {
   input.disabled = !avatar;
   send.disabled = !avatar || sending;
+  moveButton.disabled = !avatar || avatar.locked || sending;
 }
 
 async function getAvatar() {
@@ -184,7 +186,21 @@ function stopTokenControl() {
   if (!tokenControl) return;
   tokenControl = undefined;
   input.readOnly = false;
+  moveButton.setAttribute("aria-pressed", "false");
   if (status.textContent === controlHint) status.textContent = "";
+}
+
+function toggleTokenControl() {
+  if (tokenControl) {
+    stopTokenControl();
+  } else {
+    if (moveButton.disabled) return;
+    tokenControl = { tokenId: avatar.id, moves: [] };
+    input.readOnly = true;
+    moveButton.setAttribute("aria-pressed", "true");
+    status.textContent = controlHint;
+  }
+  input.focus();
 }
 
 async function moveAvatar(mode) {
@@ -221,25 +237,18 @@ async function moveAvatar(mode) {
 input.addEventListener("blur", stopTokenControl);
 window.addEventListener("blur", stopTokenControl);
 document.addEventListener("pointerdown", (event) => {
-  if (event.target !== input) stopTokenControl();
+  if (event.target !== input && !moveButton.contains(event.target)) stopTokenControl();
 });
+moveButton.addEventListener("mousedown", (event) => {
+  if (tokenControl) event.preventDefault();
+});
+moveButton.addEventListener("click", toggleTokenControl);
 
 input.addEventListener("keydown", (event) => {
   if (event.isComposing || event.keyCode === 229) return;
-  if (event.key === "Tab" && !event.ctrlKey && !event.altKey && !event.metaKey) {
-    if (event.shiftKey) {
-      stopTokenControl();
-    } else if (tokenControl || (avatar && !avatar.locked && !sending)) {
-      event.preventDefault();
-      if (event.repeat) return;
-      if (tokenControl) {
-        stopTokenControl();
-      } else {
-        tokenControl = { tokenId: avatar.id, moves: [] };
-        input.readOnly = true;
-        status.textContent = controlHint;
-      }
-    }
+  if (event.key === "F2" && !event.ctrlKey && !event.altKey && !event.metaKey) {
+    event.preventDefault();
+    if (!event.repeat) toggleTokenControl();
     return;
   }
   if (tokenControl) {

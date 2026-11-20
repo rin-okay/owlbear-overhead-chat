@@ -86,6 +86,8 @@ select { font: inherit; background: #181321; color: inherit; border: 1px solid #
 #message::placeholder { color: #ab9dbb; font-size: 12px; }
 #message:disabled { opacity: .56; }
 #message[readonly] { border-color: #c7b6f8; }
+#move-avatar { background: #312940; color: #e2d4f6; padding-inline: 10px; }
+#move-avatar:enabled:hover, #move-avatar[aria-pressed="true"] { background: #c7b6f8; color: #271c3a; }
 .message-heading { display: flex; align-items: baseline; gap: 8px; }
 .message-heading .name { min-width: 0; font-weight: 700; }
 .message-heading time { flex: none; font-size: 11px; color: #ab9dbb; font-variant-numeric: tabular-nums; }
