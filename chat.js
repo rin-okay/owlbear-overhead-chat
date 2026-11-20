@@ -1,10 +1,13 @@
 import OBR from "./obr.js";
-import { ABOVE_FOG, AVATAR, SPEECH, canSpeak, parseSpeech } from "./rules.js";
+import { ABOVE_FOG, AVATAR, RUMBLE_DICE, SPEECH, canSpeak, parseSpeech } from "./rules.js";
 
 import { openSessionChannel, savedAvatar, saveAvatar, savedAppearance, saveAppearance } from "./session.js";
 
 import { drawBubble } from "./appearance.js";
 import { setupDiscordPanel } from "./discord-panel.js";
+
+import { rollInChat, rollSpans, validateRollSpans } from "./dice.js";
+import { rollWithRumble } from "./rumble.js";
 
 const transcript = document.querySelector("#transcript");
 const entries = document.querySelector("#entries");
@@ -44,7 +47,20 @@ function appendLine(entry, target) {
 
   const message = document.createElement("div");
   message.className = "message-text";
-  message.textContent = entry.text;
+  for (const part of entry.parts ?? [entry.text]) {
+    if (typeof part === "string") {
+      message.append(part);
+      continue;
+    }
+
+    const result = document.createElement("span");
+    result.className = "chat-roll";
+    result.tabIndex = 0;
+    result.title = `${part.notation}\n${part.detail}\nTotal: ${part.total}`;
+    result.setAttribute("aria-label", result.title);
+    result.textContent = String(part.total);
+    message.append(result);
+  }
   line.append(heading, message);
   target.append(line);
 }
@@ -146,6 +162,7 @@ form.addEventListener("submit", async (event) => {
 
   sending = true;
   updateControls();
+  let resolvingRoll = false;
   try {
     const { token } = await getAvatar();
     if (token?.id !== intendedToken) {
@@ -154,20 +171,33 @@ form.addEventListener("submit", async (event) => {
       return;
     }
 
-    await OBR.broadcast.sendMessage(SPEECH, { ...speech, appearance: savedAppearance() }, { destination: "ALL" });
+    const rolls = [];
+    const spans = rollSpans(speech.text);
+    if (spans.length) {
+      resolvingRoll = true;
+      validateRollSpans(spans);
+      const useRumble = (await OBR.room.getMetadata())[RUMBLE_DICE] === true;
+      status.textContent = useRumble ? "Waiting for Rumble!…" : "Rolling…";
+      for (const { notation } of spans) {
+        rolls.push(useRumble ? await rollWithRumble(notation) : rollInChat(notation));
+      }
+      resolvingRoll = false;
+    }
+
+    await OBR.broadcast.sendMessage(SPEECH, { ...speech, rolls, appearance: savedAppearance() }, { destination: "ALL" });
     if (input.value === draft) input.value = "";
     status.textContent = "";
   } catch (error) {
     console.error("Overhead Chat send failed", error);
-    status.textContent = "Couldn’t send your message. Your draft is still here.";
+    status.textContent = resolvingRoll ? error.message : "Couldn’t send your message. Your draft is still here.";
   } finally {
     sending = false;
     updateControls();
   }
 });
 
-function setupFogSetting() {
-  const setting = document.querySelector("#gm-fog-settings");
+function setupRoomToggle(id, key) {
+  const setting = document.getElementById(id);
   const checkbox = setting.querySelector("input");
   const feedback = setting.querySelector("[role=status]");
   let saved = false;
@@ -175,7 +205,7 @@ function setupFogSetting() {
 
   function sync(metadata) {
     revision++;
-    saved = metadata[ABOVE_FOG] === true;
+    saved = metadata[key] === true;
     checkbox.checked = saved;
     checkbox.disabled = false;
     feedback.textContent = "";
@@ -200,7 +230,7 @@ function setupFogSetting() {
     checkbox.disabled = true;
     try {
       if (await OBR.player.getRole() !== "GM") return;
-      await OBR.room.setMetadata({ [ABOVE_FOG]: requested });
+      await OBR.room.setMetadata({ [key]: requested });
       saved = requested;
       feedback.textContent = "";
     } catch {
@@ -263,7 +293,8 @@ function setupSettings() {
 
 OBR.onReady(() => {
   setupSettings();
-  setupFogSetting();
+  setupRoomToggle("gm-fog-settings", ABOVE_FOG);
+  setupRoomToggle("gm-rumble-settings", RUMBLE_DICE);
   connectTranscript();
   OBR.player.onChange(({ metadata, role }) => {
     const state = JSON.stringify([metadata[AVATAR]?.tokenId, role]);

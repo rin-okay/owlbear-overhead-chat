@@ -34,3 +34,9 @@ The extension sends public room speech. Use it for tokens the room is meant to s
 In a Discord text channel, create an incoming webhook under **Edit Channel → Integrations** and copy its URL. As the Owlbear room GM, open the **Discord** tab, paste the webhook URL, and use **Send test**. To start sending new messages, turn on **Mirror new chat messages** and save.
 
 The relay runs while the configured GM has the Owlbear room tab open. It mirrors new public Overhead Chat messages; it does not replay history or bring Discord messages back into Owlbear. Use one configured GM browser per room. The webhook URL stays in that browser’s local storage for that GM and room.
+
+## Rolling dice
+
+Send `/r 1d20+7` for a standalone roll, or include `r[2d20kh1]` inside a message. Hover over a result in the chat log to see the expression and dice breakdown.
+
+The GM can enable **Use Rumble! for dice rolls** in **Settings** to use Rumble’s notation and dice animations. Open Rumble! in the room and choose **Everyone** as the recipient before rolling in Overhead Chat.

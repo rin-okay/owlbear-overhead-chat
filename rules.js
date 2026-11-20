@@ -1,3 +1,4 @@
+export const RUMBLE_DICE = "chat.overhead.rumble-dice.v1";
 export const AVATAR = "chat.overhead.avatar.v1";
 export const ABOVE_FOG = "chat.overhead.above-fog.v1";
 export const SPEECH = "chat.overhead.speech.v1";
