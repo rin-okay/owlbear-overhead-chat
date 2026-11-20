@@ -85,6 +85,7 @@ select { font: inherit; background: #181321; color: inherit; border: 1px solid #
 #speaker { font-size: 11px; }
 #message::placeholder { color: #ab9dbb; font-size: 12px; }
 #message:disabled { opacity: .56; }
+#message[readonly] { border-color: #c7b6f8; }
 .message-heading { display: flex; align-items: baseline; gap: 8px; }
 .message-heading .name { min-width: 0; font-weight: 700; }
 .message-heading time { flex: none; font-size: 11px; color: #ab9dbb; font-variant-numeric: tabular-nums; }

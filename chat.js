@@ -1,5 +1,5 @@
 import OBR from "./obr.js";
-import { ABOVE_FOG, AVATAR, RUMBLE_DICE, SPEECH, canSpeak, parseSpeech } from "./rules.js";
+import { ABOVE_FOG, AVATAR, RUMBLE_DICE, SPEECH, canSpeak, isPublicToken, parseSpeech } from "./rules.js";
 
 import { openSessionChannel, savedAvatar, saveAvatar, savedAppearance, saveAppearance } from "./session.js";
 
@@ -26,6 +26,13 @@ let avatarState = "";
 let sending = false;
 let rollInProgress = false;
 let refreshVersion = 0;
+let tokenControl;
+let movingAvatar = false;
+
+const movementKeys = {
+  ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1],
+};
+const controlHint = "Token control mode. Use arrow keys to move, or Tab to return to chat.";
 
 function appendLine(entry, target) {
   const line = document.createElement("li");
@@ -154,16 +161,18 @@ async function refresh() {
     if (version !== refreshVersion) return;
 
     const shouldFocus = token && token.id !== avatar?.id;
+    if (tokenControl && (token?.id !== tokenControl.tokenId || token.locked)) stopTokenControl();
     avatar = token ?? null;
     selectedAvatarId = tokenId ?? null;
     observedToken = observed ?? null;
     speaker.textContent = token ? `Speaking as ${token.name || "Character"}` : "Pick an avatar";
-    status.textContent = hint;
+    status.textContent = tokenControl ? controlHint : hint;
     updateControls();
     if (shouldFocus) input.focus();
   } catch (error) {
     if (version !== refreshVersion) return;
     console.error("Overhead Chat could not read the avatar", error);
+    stopTokenControl();
     avatar = null;
     speaker.textContent = "Pick an avatar";
     status.textContent = "Couldn’t read your avatar. Close and reopen chat to retry.";
@@ -171,15 +180,87 @@ async function refresh() {
   }
 }
 
+function stopTokenControl() {
+  if (!tokenControl) return;
+  tokenControl = undefined;
+  input.readOnly = false;
+  if (status.textContent === controlHint) status.textContent = "";
+}
+
+async function moveAvatar(mode) {
+  movingAvatar = true;
+  try {
+    while (mode === tokenControl && mode.moves.length) {
+      const [x, y] = mode.moves.shift();
+      const [{ token }, step] = await Promise.all([getAvatar(), OBR.scene.grid.getDpi()]);
+      if (mode !== tokenControl) return;
+      if (token?.id !== mode.tokenId || token.locked) {
+        stopTokenControl();
+        await refresh();
+        return;
+      }
+      if (!Number.isFinite(step) || step <= 0) throw new Error("Scene grid size unavailable.");
+
+      await OBR.scene.items.updateItems([mode.tokenId], ([item]) => {
+        if (mode !== tokenControl || !isPublicToken(item) || item.locked) return;
+        item.position.x += x * step;
+        item.position.y += y * step;
+      });
+    }
+  } catch (error) {
+    if (mode !== tokenControl) return;
+    console.error("Overhead Chat token movement failed", error);
+    stopTokenControl();
+    status.textContent = "Couldn’t move your avatar.";
+  } finally {
+    movingAvatar = false;
+    if (tokenControl?.moves.length) void moveAvatar(tokenControl);
+  }
+}
+
+input.addEventListener("blur", stopTokenControl);
+window.addEventListener("blur", stopTokenControl);
+document.addEventListener("pointerdown", (event) => {
+  if (event.target !== input) stopTokenControl();
+});
+
 input.addEventListener("keydown", (event) => {
-  if (event.key !== "Enter" || event.shiftKey || event.isComposing || event.keyCode === 229) return;
+  if (event.isComposing || event.keyCode === 229) return;
+  if (event.key === "Tab" && !event.ctrlKey && !event.altKey && !event.metaKey) {
+    if (event.shiftKey) {
+      stopTokenControl();
+    } else if (tokenControl || (avatar && !avatar.locked && !sending)) {
+      event.preventDefault();
+      if (event.repeat) return;
+      if (tokenControl) {
+        stopTokenControl();
+      } else {
+        tokenControl = { tokenId: avatar.id, moves: [] };
+        input.readOnly = true;
+        status.textContent = controlHint;
+      }
+    }
+    return;
+  }
+  if (tokenControl) {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      stopTokenControl();
+    } else if (Object.hasOwn(movementKeys, event.key) && !event.ctrlKey && !event.altKey && !event.metaKey) {
+      event.preventDefault();
+      if (tokenControl.moves.length < 4) tokenControl.moves.push(movementKeys[event.key]);
+      if (!movingAvatar) void moveAvatar(tokenControl);
+    }
+    return;
+  }
+  if (event.key !== "Enter" || event.shiftKey) return;
   event.preventDefault();
   form.requestSubmit();
 });
 
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
-  if (sending || !avatar) return;
+  if (sending || !avatar || tokenControl) return;
 
   const draft = input.value;
   const intendedToken = avatar.id;
@@ -368,7 +449,10 @@ OBR.onReady(() => {
     avatarState = state;
     void refresh();
   });
-  OBR.scene.onReadyChange(refresh);
+  OBR.scene.onReadyChange((ready) => {
+    if (!ready) stopTokenControl();
+    void refresh();
+  });
   OBR.scene.items.onChange((items) => {
     if (!selectedAvatarId) return;
     const next = items.find((item) => item.id === selectedAvatarId) ?? null;
