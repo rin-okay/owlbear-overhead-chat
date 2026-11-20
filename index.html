@@ -64,9 +64,20 @@
       </div>
     </section>
     <section id="avatar-panel" aria-label="avatar slots" hidden>
-      <p>Press 1–9 in move mode to switch to the assigned token.</p>
-      <div id="avatar-slots"></div>
-      <p role="status"></p>
+      <div class="avatar-modes" role="group" aria-label="avatar hotkey mode">
+        <button id="avatar-talk" type="button" aria-pressed="true" aria-controls="avatar-talk-panel">talk as</button>
+        <button id="avatar-change" type="button" aria-pressed="false" aria-controls="avatar-change-panel">change to</button>
+      </div>
+      <div id="avatar-talk-panel">
+        <p>Press 1–9 in move mode to switch to the assigned token.</p>
+        <div id="avatar-slots"></div>
+        <p role="status"></p>
+      </div>
+      <div id="avatar-change-panel" hidden>
+        <p>Choose artwork from Characters. Press 1–9 in move mode to apply it to your current avatar.</p>
+        <div id="avatar-art-slots"></div>
+        <p role="status"></p>
+      </div>
     </section>
     <section id="gm-panel" aria-label="gm settings" hidden>
       <section id="gm-fog-settings" aria-label="fog settings" hidden>

@@ -23,6 +23,8 @@ export function saveAvatar(tokenId) {
 }
 
 let avatarSlots;
+let avatarMode;
+let avatarArtSlots;
 
 export function savedAvatarSlots() {
   if (avatarSlots) return avatarSlots;
@@ -37,6 +39,50 @@ export function saveAvatarSlot(index, tokenId) {
   const slots = savedAvatarSlots();
   slots[index] = tokenId;
   try { localStorage.setItem(avatarKey() + ":slots", JSON.stringify(slots)); } catch {}
+}
+
+export function savedAvatarMode() {
+  if (avatarMode) return avatarMode;
+  try {
+    if (localStorage.getItem(avatarKey() + ":mode") === "change") avatarMode = "change";
+  } catch {}
+  return avatarMode ??= "talk";
+}
+
+export function saveAvatarMode(mode) {
+  avatarMode = mode === "change" ? "change" : "talk";
+  try { localStorage.setItem(avatarKey() + ":mode", avatarMode); } catch {}
+}
+
+function normalizeAvatarArt(asset) {
+  const { name, image, grid } = asset ?? {};
+  if (!image || !grid ||
+      typeof image.url !== "string" || !image.url ||
+      typeof image.mime !== "string" || !image.mime ||
+      ![image.width, image.height, grid.dpi].every((value) => Number.isFinite(value) && value > 0) ||
+      !Number.isFinite(grid.offset?.x) || !Number.isFinite(grid.offset?.y)) return null;
+  return {
+    name: typeof name === "string" && name.trim() ? name : "Character art",
+    image: { url: image.url, mime: image.mime, width: image.width, height: image.height },
+    grid: { dpi: grid.dpi, offset: { x: grid.offset.x, y: grid.offset.y } },
+  };
+}
+
+export function savedAvatarArtSlots() {
+  if (avatarArtSlots) return avatarArtSlots;
+  let stored;
+  try { stored = JSON.parse(localStorage.getItem(avatarKey() + ":art")); } catch {}
+  avatarArtSlots = Array.from({ length: 9 }, (_, index) => normalizeAvatarArt(stored?.[index]));
+  return avatarArtSlots;
+}
+
+export function saveAvatarArtSlot(index, asset) {
+  const artwork = normalizeAvatarArt(asset);
+  if (asset && !artwork) return null;
+  const slots = savedAvatarArtSlots();
+  slots[index] = artwork;
+  try { localStorage.setItem(avatarKey() + ":art", JSON.stringify(slots)); } catch {}
+  return artwork;
 }
 
 export async function openSessionChannel() {

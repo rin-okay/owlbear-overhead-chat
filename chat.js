@@ -1,7 +1,10 @@
 import OBR from "./obr.js";
 import { ABOVE_FOG, AVATAR, HABBO_MODE, RUMBLE_DICE, SPEECH, canSpeak, isPublicToken, parseSpeech } from "./rules.js";
 
-import { openSessionChannel, savedAvatar, saveAvatar, savedAvatarSlots, savedAppearance, saveAppearance } from "./session.js";
+import {
+  openSessionChannel, savedAvatar, saveAvatar, savedAvatarSlots, savedAvatarMode, savedAvatarArtSlots,
+  savedAppearance, saveAppearance,
+} from "./session.js";
 
 import { drawBubble } from "./appearance.js";
 import { setupDiscordPanel } from "./discord-panel.js";
@@ -246,7 +249,7 @@ async function moveAvatar(mode) {
   try {
     while (mode === tokenControl && !mode.switching && mode.actions.length) {
       const tokenId = mode.tokenId;
-      const { offset, rotation, mirror } = mode.actions.shift();
+      const { offset, rotation, mirror, artwork } = mode.actions.shift();
       const [{ token }, step] = await Promise.all([getAvatar(), offset ? OBR.scene.grid.getDpi() : 0]);
       if (mode !== tokenControl || mode.switching || tokenId !== mode.tokenId) return;
       if (token?.id !== tokenId || token.locked) {
@@ -258,7 +261,10 @@ async function moveAvatar(mode) {
 
       await OBR.scene.items.updateItems([tokenId], ([item]) => {
         if (mode !== tokenControl || mode.switching || tokenId !== mode.tokenId || !isPublicToken(item) || item.locked) return;
-        if (offset) {
+        if (artwork) {
+          item.image = artwork.image;
+          item.grid = artwork.grid;
+        } else if (offset) {
           const [x, y] = offset;
           item.position.x += x * step;
           item.position.y += y * step;
@@ -273,7 +279,7 @@ async function moveAvatar(mode) {
     if (mode !== tokenControl) return;
     console.error("Overhead Chat token movement failed", error);
     stopTokenControl();
-    status.textContent = "Couldn’t move your avatar.";
+    status.textContent = "Couldn’t update your avatar.";
   } finally {
     movingAvatar = false;
     if (tokenControl?.actions.length && !tokenControl.switching) void moveAvatar(tokenControl);
@@ -310,6 +316,21 @@ async function switchAvatarSlot(mode, index) {
   } finally {
     mode.switching = false;
   }
+}
+
+function useAvatarSlot(mode, index) {
+  if (mode.switching) return;
+  if (savedAvatarMode() === "talk") {
+    void switchAvatarSlot(mode, index);
+    return;
+  }
+  const artwork = savedAvatarArtSlots()[index];
+  if (!artwork) {
+    status.textContent = `Choose artwork for slot ${index + 1} in the avatar tab first.`;
+    return;
+  }
+  status.textContent = "";
+  queueAvatarAction(mode, { artwork });
 }
 
 moveButton.addEventListener("blur", stopTokenControl);
@@ -356,7 +377,7 @@ form.addEventListener("keydown", (event) => {
       input.focus();
     } else if (/^[1-9]$/.test(key) && !event.ctrlKey && !event.altKey && !event.metaKey) {
       event.preventDefault();
-      if (!event.repeat) void switchAvatarSlot(tokenControl, Number(key) - 1);
+      if (!event.repeat) useAvatarSlot(tokenControl, Number(key) - 1);
     } else if (Object.hasOwn(movementKeys, key) && !event.ctrlKey && !event.altKey && !event.metaKey) {
       event.preventDefault();
       if (tokenControl.switching) return;

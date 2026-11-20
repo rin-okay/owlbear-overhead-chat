@@ -101,9 +101,14 @@ select { font: inherit; background: #181321; color: inherit; border: 1px solid #
 #gm-panel, #avatar-panel { flex: 1; min-height: 0; overflow-y: auto; }
 #avatar-panel p { margin: 0 0 8px; color: #ab9dbb; }
 #avatar-panel p:empty { display: none; }
-#avatar-slots { display: grid; gap: 5px; }
+.avatar-modes { display: flex; gap: 6px; margin-bottom: 8px; }
+.avatar-modes button, .avatar-art-slot button { min-height: 28px; background: #312940; color: #e2d4f6; padding-inline: 8px; }
+.avatar-modes button[aria-pressed="true"] { background: #c7b6f8; color: #271c3a; }
+#avatar-slots, #avatar-art-slots { display: grid; gap: 5px; }
 #avatar-slots label { display: grid; grid-template-columns: 1em minmax(0, 1fr); gap: 8px; align-items: center; margin: 0; }
 #avatar-slots select { min-height: 28px; text-transform: none; }
+.avatar-art-slot { display: grid; grid-template-columns: 1em minmax(0, 1fr) auto; gap: 8px; align-items: center; }
+.avatar-art-slot button:first-of-type { overflow: hidden; text-align: left; text-overflow: ellipsis; white-space: nowrap; }
 #gm-panel label { white-space: normal; }
 #extension-version { margin-top: 12px; padding-top: 10px; border-top: 1px solid #544762; color: #ab9dbb; font-size: 11px; }
 #discord-settings h2 { margin: 0 0 6px; font-size: 1em; }
