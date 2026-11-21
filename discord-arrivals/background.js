@@ -69,7 +69,15 @@ async function provision({connectionId, data}, epoch) {
     const plan = await planToken({room:OBR.room.id, player:player.id, profile, config, items, party});
     if (!sameScene(epoch)) return;
     if (!plan.existing) {
-      const item = buildImage({url:profile.avatar, mime:"image/png", width:256, height:256},
+      if (profile.tokenImage) {
+        const image = await fetch(profile.tokenImage,{signal:AbortSignal.timeout(10000)});
+        if (!image.ok || image.headers.get("Content-Type") !== "image/png") {
+          throw Error("The Discord portrait could not be framed. Try connecting again.");
+        }
+        await image.arrayBuffer();
+      }
+      if (!sameScene(epoch)) return;
+      const item = buildImage({url:profile.tokenImage ?? profile.avatar, mime:"image/png", width:256, height:256},
         {dpi:256, offset:{x:128, y:128}})
         .id(plan.id).name(profile.name).layer("CHARACTER").position(config.spawn)
         .createdUserId(player.id).metadata(plan.metadata).build();
