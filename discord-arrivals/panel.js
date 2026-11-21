@@ -18,23 +18,9 @@ async function selectedItem() {
 }
 
 async function setupGM() {
-  if (!await OBR.scene.isReady()) {
-    status("Open the scene you want to configure, then reopen this panel.");
-    return;
-  }
-  let active = true;
-  OBR.scene.onReadyChange(() => {
-    active = false;
-    el("save").disabled = true;
-    status("The scene changed. Reopen this panel to edit the current scene.");
-  });
-  const previous = (await OBR.scene.getMetadata())[CONFIG] ?? {};
-  const cfg = {...defaults, ...previous};
+  let cfg;
+  let generation = 0;
   const select = el("vision");
-  el("enabled").checked = cfg.enabled;
-  el("worker").value = cfg.worker ?? "";
-  select.value = cfg.vision;
-  el("radius").value = cfg.radius;
   function render() {
     el("spawn-status").textContent = point(cfg.spawn)
       ? "Spawn point: " + Math.round(cfg.spawn.x) + ", " + Math.round(cfg.spawn.y)
@@ -43,45 +29,85 @@ async function setupGM() {
     setVisible("smoke-options", select.value === "smoke-template");
     setVisible("native-options", select.value === "native");
   }
+  function checkScene(expected) {
+    if (!expected || expected !== cfg) throw Error("The scene changed. Try again once its settings load.");
+  }
   select.addEventListener("change", render);
   listen("set-spawn", async () => {
+    const current = cfg;
     const item = await selectedItem();
+    checkScene(current);
     if (!point(item.position)) throw Error("The selected item has no usable position.");
-    cfg.spawn = {x:item.position.x, y:item.position.y};
+    current.spawn = {x:item.position.x, y:item.position.y};
     render();
   });
   listen("set-template", async () => {
+    const current = cfg;
     const item = await selectedItem();
+    checkScene(current);
     if (!character(item) || !Object.keys(smokeFields(item)).length) {
       throw Error("No recognized Smoke & Spectre metadata was found on that character. Check its vision settings or choose the GM enable option.");
     }
-    cfg.templateId = item.id;
+    current.templateId = item.id;
     render();
   });
   listen("save", async () => {
-    if (!active || await OBR.player.getRole() !== "GM") throw Error("Reopen this panel as GM in the intended scene.");
-    cfg.enabled = el("enabled").checked;
-    cfg.worker = httpsOrigin(el("worker").value.trim());
-    cfg.vision = select.value;
-    cfg.radius = Number(el("radius").value);
-    if (cfg.enabled && !point(cfg.spawn)) throw Error("Set the scene’s spawn point first.");
-    if ((el("worker").value.trim() && !cfg.worker) || (cfg.enabled && !workerOrigin(cfg, location.origin))) {
+    const current = cfg;
+    if (await OBR.player.getRole() !== "GM") throw Error("Only the GM can edit these settings.");
+    checkScene(current);
+    const worker = el("worker").value.trim();
+    const settings = {
+      ...current, enabled:el("enabled").checked, worker:httpsOrigin(worker),
+      vision:select.value, radius:Number(el("radius").value),
+    };
+    if (settings.enabled && !point(settings.spawn)) throw Error("Set the scene’s spawn point first.");
+    if ((worker && !settings.worker) || (settings.enabled && !workerOrigin(settings, location.origin))) {
       throw Error("Enter the deployed Cloudflare Worker’s HTTPS address, without a path.");
     }
-    if (cfg.enabled && cfg.vision === "smoke-template" && !cfg.templateId) throw Error("Select a vision template first.");
-    if (cfg.vision === "native" && (!Number.isInteger(cfg.radius) || cfg.radius < 1 || cfg.radius > 100)) {
+    if (settings.enabled && settings.vision === "smoke-template" && !settings.templateId) throw Error("Select a vision template first.");
+    if (settings.vision === "native" && (!Number.isInteger(settings.radius) || settings.radius < 1 || settings.radius > 100)) {
       throw Error("Set a whole-number radius from 1 to 100.");
     }
     const permissions = await OBR.room.getPermissions();
-    if (!active) throw Error("The scene changed. Reopen the panel and try again.");
-    await OBR.scene.setMetadata({[CONFIG]:cfg});
-    status(cfg.enabled && !permissions.includes("CHARACTER_UPDATE")
+    checkScene(current);
+    await OBR.scene.setMetadata({[CONFIG]:settings});
+    if (current !== cfg) return;
+    status(settings.enabled && !permissions.includes("CHARACTER_UPDATE")
       ? "Saved. Enable Character Update in Owlbear’s player permissions so players can move their tokens."
       : "Scene settings saved.");
   });
-  render();
-  setVisible("gm", true);
-  status("");
+  async function loadScene(ready) {
+    const request = ++generation;
+    cfg = undefined;
+    setVisible("gm", false);
+    setVisible("check-scene", false);
+    status("Waiting for Owlbear to finish opening the scene…");
+    try {
+      const available = ready ?? await OBR.scene.isReady();
+      if (request !== generation) return;
+      if (!available) {
+        status("Open a scene to configure Discord Arrivals.");
+        return;
+      }
+      const metadata = await OBR.scene.getMetadata();
+      if (request !== generation) return;
+      cfg = {...defaults, ...metadata[CONFIG]};
+      el("enabled").checked = cfg.enabled;
+      el("worker").value = cfg.worker ?? "";
+      select.value = cfg.vision;
+      el("radius").value = cfg.radius;
+      render();
+      setVisible("gm", true);
+      status("");
+    } catch (error) {
+      if (request === generation) readableError(error);
+    } finally {
+      if (request === generation && !cfg) setVisible("check-scene", true);
+    }
+  }
+  listen("check-scene", () => loadScene());
+  OBR.scene.onReadyChange((ready) => { void loadScene(ready); });
+  await loadScene();
 }
 
 async function setupPlayer() {
