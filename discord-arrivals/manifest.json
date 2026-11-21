@@ -1,0 +1,15 @@
+{
+  "name": "Discord Arrivals",
+  "version": "0.1.1",
+  "manifest_version": 1,
+  "description": "Offer Discord sign-in and spawn player-owned avatar tokens at a GM-defined point.",
+  "icon": "/owlbear-overhead-chat/discord-arrivals/arrivals.svg",
+  "background_url": "/owlbear-overhead-chat/discord-arrivals/background.html",
+  "action": {
+    "title": "Discord Arrivals",
+    "icon": "/owlbear-overhead-chat/discord-arrivals/arrivals.svg",
+    "popover": "/owlbear-overhead-chat/discord-arrivals/panel.html",
+    "width": 360,
+    "height": 510
+  }
+}

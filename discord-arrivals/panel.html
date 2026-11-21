@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Discord Arrivals</title>
+<link rel="stylesheet" href="./style.css">
+<script type="module" src="./panel.js"></script>
+</head>
+<body>
+<h1>discord arrivals</h1>
+<section id="gm" hidden>
+  <label class="check"><input id="enabled" type="checkbox"> offer discord sign-in in this scene</label>
+  <label>cloudflare worker address<input id="worker" type="url" placeholder="https://your-worker.workers.dev"></label>
+  <div class="actions"><button id="set-spawn" type="button">set spawn from selected item</button></div>
+  <small id="spawn-status">Select a map item at the desired spawn point, then use the button.</small>
+  <label>vision
+    <select id="vision">
+      <option value="smoke-manual">smoke &amp; spectre scene defaults (GM enables)</option>
+      <option value="smoke-template">smoke &amp; spectre template (experimental)</option>
+      <option value="native">owlbear native dynamic fog</option>
+      <option value="none">none</option>
+    </select>
+  </label>
+  <div id="smoke-options" hidden>
+    <button id="set-template" type="button">use selected character as template</button>
+    <small id="template-status"></small>
+  </div>
+  <label id="native-options" hidden>vision radius (grid spaces)<input id="radius" type="number" min="1" max="100" step="1" value="12"></label>
+  <div class="actions"><button id="save" type="button" class="primary">save scene settings</button></div>
+</section>
+<section id="player" hidden>
+  <p>Use your Discord profile picture to create a character token you can control.</p>
+  <div class="actions">
+    <button id="connect" type="button" class="primary" disabled>connect discord</button>
+    <button id="skip" type="button">skip first-join prompt</button>
+  </div>
+  <details id="paste-details">
+    <summary>paste a sign-in code</summary>
+    <form id="paste">
+      <label>sign-in code<textarea id="code" rows="2" maxlength="4096" required></textarea></label>
+      <div><button type="submit">finish setup</button></div>
+    </form>
+  </details>
+</section>
+<p id="status" role="status" aria-live="polite">Connecting to Owlbear Rodeo…</p>
+</body>
+</html>
