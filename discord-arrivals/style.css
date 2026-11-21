@@ -1,5 +1,8 @@
 :root { color-scheme: dark; font: 14px/1.45 system-ui, sans-serif; color: #eee7f6; background: #211a29; }
 body { margin: 0; padding: 18px; }
+.arrivals-panel { box-sizing: border-box; min-height: 100vh; display: flex; flex-direction: column; }
+.arrivals-panel > #check-scene { align-self: flex-start; }
+.arrivals-version { margin-top: auto; padding-top: 12px; text-align: right; }
 h1 { font-size: 20px; margin: 0 0 12px; }
 p { margin: 0 0 12px; }
 small, #status { color: #d2c2df; }
