@@ -1,0 +1,276 @@
+import { isPublicToken } from "./rules.js";
+import {
+  FACINGS, SKILLS, SKILL_CHANGED, SKILL_REQUEST, SKILL_RESULT, readSkills, skillConnections, writeSkills,
+} from "./skills.js?v=2.6.0";
+
+function characterLabel(token) {
+  return token.name || "unnamed character";
+}
+
+function facingFor(settings, token) {
+  const facing = settings.facings?.[token?.image?.url];
+  return FACINGS.some(([angle]) => angle === facing) ? facing : 0;
+}
+
+export function setupSkillPanel(obr, getAvatar, keyAllowed) {
+  const playerPanel = document.querySelector("#player-skills");
+  const playerStatus = document.querySelector("#skill-settings-status");
+  const castStatus = document.querySelector("#skill-cast-status");
+  const facing = document.querySelector("#skill-facing");
+  const preview = document.querySelector("#skill-avatar-preview");
+  const portrait = preview.querySelector("img");
+  const arrow = preview.querySelector("span");
+  const bindInputs = Object.fromEntries(Object.keys(SKILLS).map((id) =>
+    [id, document.querySelector("#skill-bind-" + id)]));
+  const pending = new Map();
+  let preferences = readSkills(obr, "player");
+  let avatar;
+  let available = [];
+  let enabled = false;
+  let castStatusTimer;
+  let listRevision = 0;
+
+  function binding(id) {
+    const key = preferences.bindings?.[id];
+    return key === "" || keyAllowed(key) ? key : SKILLS[id].key;
+  }
+
+  function setCastStatus(text) {
+    clearTimeout(castStatusTimer);
+    castStatus.textContent = text;
+    if (text) castStatusTimer = setTimeout(() => { castStatus.textContent = ""; }, 4200);
+  }
+
+  function render() {
+    facing.disabled = !avatar;
+    facing.value = String(facingFor(preferences, avatar));
+    arrow.style.transform = `rotate(${facing.value}deg)`;
+    for (const [id, select] of Object.entries(bindInputs)) {
+      select.closest("label").hidden = !available.includes(id);
+      select.value = binding(id);
+      select.disabled = !enabled;
+    }
+  }
+
+  for (const [angle, label] of FACINGS) facing.add(new Option(label, angle));
+  facing.addEventListener("change", () => {
+    const url = avatar?.image?.url;
+    if (!url) return;
+    savePreferences({ ...preferences, facings: { ...preferences.facings, [url]: Number(facing.value) } });
+  });
+  for (const [id, select] of Object.entries(bindInputs)) {
+    select.add(new Option("unbound", ""));
+    for (const key of "abcdefghijklmnopqrstuvwxyz") {
+      if (keyAllowed(key)) select.add(new Option(key.toUpperCase(), key));
+    }
+    select.addEventListener("change", () => {
+      const key = select.value;
+      const other = Object.keys(SKILLS).find((other) => key && other !== id && binding(other) === key);
+      if (other && available.includes(other)) {
+        playerStatus.textContent = "That key is already bound to a skill.";
+        render();
+        return;
+      }
+      const bindings = { ...preferences.bindings, [id]: key };
+      if (other) bindings[other] = "";
+      savePreferences({ ...preferences, bindings });
+    });
+  }
+
+  function savePreferences(next) {
+    try {
+      writeSkills(obr, "player", next);
+      preferences = next;
+      playerStatus.textContent = enabled ? "" : playerStatus.textContent;
+    } catch {
+      playerStatus.textContent = "Couldn’t save skills settings in this browser.";
+    }
+    render();
+  }
+
+  function clearPending(type) {
+    clearTimeout(pending.get(type)?.timeout);
+    pending.delete(type);
+  }
+
+  async function request(type, token, id, revision) {
+    const { gm, self } = await skillConnections(obr);
+    if (type === "list" && revision !== listRevision) return;
+    const showStatus = type === "cast" ? setCastStatus : (text) => { playerStatus.textContent = text; };
+    if (!gm) {
+      showStatus("The GM needs to be connected to use skills.");
+      return;
+    }
+    const requestId = crypto.randomUUID();
+    const expected = {
+      requestId, gm: gm.connectionId, target: self.connectionId, tokenId: token.id,
+      timeout: setTimeout(() => {
+        if (pending.get(type)?.requestId !== requestId) return;
+        clearPending(type);
+        showStatus("No reply from the GM’s Overhead Chat. Check that the GM has the updated extension enabled.");
+      }, 3000),
+    };
+    clearPending(type);
+    pending.set(type, expected);
+    try {
+      await obr.broadcast.sendMessage(SKILL_REQUEST, {
+        requestId, tokenId: token.id, type, ...(type === "cast" ? { skill: id, facing: facingFor(preferences, token) } : {}),
+      }, { destination: "ALL" });
+    } catch (error) {
+      if (pending.get(type) === expected) clearPending(type);
+      throw error;
+    }
+  }
+
+  function refresh(token = getAvatar(), force = false) {
+    const changed = token?.id !== avatar?.id || token?.image?.url !== avatar?.image?.url;
+    if (!changed && !force) return;
+    avatar = token;
+    const revision = ++listRevision;
+    clearPending("list");
+    if (changed) {
+      available = [];
+      enabled = false;
+    }
+    const url = avatar?.image?.url;
+    preview.hidden = !url;
+    if (url && portrait.getAttribute("src") !== url) portrait.src = url;
+    if (!url) portrait.removeAttribute("src");
+    render();
+    if (!avatar) {
+      playerStatus.textContent = "Choose an avatar to view its skills.";
+      return;
+    }
+    playerStatus.textContent = "Checking skills for " + characterLabel(avatar) + "…";
+    void request("list", avatar, undefined, revision).catch(() => {
+      if (revision === listRevision) playerStatus.textContent = "Couldn’t load this avatar’s skills.";
+    });
+  }
+
+  obr.broadcast.onMessage(SKILL_RESULT, ({ connectionId, data }) => {
+    for (const [type, expected] of pending) {
+      if (connectionId !== expected.gm || data?.requestId !== expected.requestId ||
+          data.connectionId !== expected.target || data.tokenId !== expected.tokenId) continue;
+      clearPending(type);
+      if (type === "cast") setCastStatus(data.error || "");
+      if (data.tokenId !== avatar?.id || !Array.isArray(data.skills)) return;
+      available = data.skills.filter((id) => Object.hasOwn(SKILLS, id));
+      enabled = data.enabled === true;
+      playerStatus.textContent = data.error || (enabled ? "" : "The GM hasn’t enabled skill hotkeys.");
+      render();
+    }
+  });
+  obr.broadcast.onMessage(SKILL_CHANGED, async ({ connectionId }) => {
+    try {
+      if ((await skillConnections(obr)).gm?.connectionId === connectionId) refresh(getAvatar(), true);
+    } catch (error) {
+      console.error("Overhead Chat skills", error);
+    }
+  });
+  obr.party.onChange(() => {
+    if (!playerPanel.closest("[hidden]")) refresh(getAvatar(), true);
+  });
+
+  async function cast(id, token) {
+    if (pending.has("cast")) return;
+    try {
+      await request("cast", token, id);
+    } catch {
+      setCastStatus("Couldn’t send the cast to the GM.");
+    }
+  }
+
+  return { refresh, cast, skillForKey: (key) => Object.keys(SKILLS).find((id) => binding(id) === key) };
+}
+
+export function setupSkillGrants(obr) {
+  const enabled = document.querySelector("#skill-enabled");
+  const tokens = document.querySelector("#skill-token");
+  const grant = document.querySelector("#skill-grant-missile");
+  const status = document.querySelector("#skill-gm-status");
+  let revision = 0;
+  let allowed = false;
+  let saving = false;
+  let roster;
+
+  function render(config) {
+    enabled.disabled = !allowed || saving;
+    enabled.checked = config.enabled === true;
+    tokens.disabled = !allowed || saving || tokens.options.length <= 1;
+    grant.disabled = !allowed || saving || !tokens.value;
+    grant.checked = Array.isArray(config.missileTokens) && config.missileTokens.includes(tokens.value);
+  }
+
+  async function refresh(sceneItems) {
+    const requested = ++revision;
+    try {
+      const { self, gm } = await skillConnections(obr);
+      if (requested !== revision) return;
+      allowed = self.role === "GM" && self.connectionId === gm?.connectionId;
+      if (!allowed || !await obr.scene.isReady()) {
+        if (requested !== revision) return;
+        tokens.replaceChildren(new Option("choose a token", ""));
+        status.textContent = allowed ? "Open a scene to grant skills."
+          : self.role === "GM" ? "Another connected GM is handling skills." : "";
+      } else {
+        const [items, selection] = await Promise.all([
+          sceneItems ?? obr.scene.items.getItems(isPublicToken), obr.player.getSelection(),
+        ]);
+        if (requested !== revision) return;
+        roster = rosterKey(items);
+        const choice = tokens.value || selection?.[0];
+        items.sort((a, b) => characterLabel(a).localeCompare(characterLabel(b)));
+        tokens.replaceChildren(new Option("choose a token", ""),
+          ...items.map((token) => new Option(characterLabel(token), token.id)));
+        tokens.value = items.some((token) => token.id === choice) ? choice : "";
+        status.textContent = "";
+      }
+      render(readSkills(obr, "gm"));
+    } catch {
+      if (requested === revision) status.textContent = "Couldn’t load skill grants.";
+    }
+  }
+
+  async function save(change) {
+    if (saving) return;
+    saving = true;
+    enabled.disabled = tokens.disabled = grant.disabled = true;
+    try {
+      const { self, gm } = await skillConnections(obr);
+      if (self.role !== "GM" || gm?.connectionId !== self.connectionId) throw Error("The connected skills GM must save grants.");
+      const config = readSkills(obr, "gm");
+      if (change.tokenId) {
+        const [token] = await obr.scene.items.getItems([change.tokenId]);
+        if (!isPublicToken(token) || change.tokenId !== tokens.value) throw Error("Choose a token in the open scene.");
+        const ids = new Set(Array.isArray(config.missileTokens) ? config.missileTokens : []);
+        if (change.grant) ids.add(token.id);
+        else ids.delete(token.id);
+        config.missileTokens = [...ids];
+      } else config.enabled = change.enabled;
+      writeSkills(obr, "gm", config);
+      status.textContent = "";
+      await obr.broadcast.sendMessage(SKILL_CHANGED, {}, { destination: "ALL" });
+    } catch (error) {
+      status.textContent = error.message || "Couldn’t save skill settings.";
+    } finally {
+      saving = false;
+      render(readSkills(obr, "gm"));
+    }
+  }
+  enabled.addEventListener("change", () => { void save({ enabled: enabled.checked }); });
+  tokens.addEventListener("change", () => render(readSkills(obr, "gm")));
+  grant.addEventListener("change", () => { void save({ tokenId: tokens.value, grant: grant.checked }); });
+  const isOpen = () => !tokens.closest("[hidden]");
+  const rosterKey = (items) => JSON.stringify(items.map((item) => [item.id, item.name]).sort());
+  obr.scene.onReadyChange(() => { if (isOpen()) void refresh(); });
+  obr.scene.items.onChange((items) => {
+    if (!allowed || !isOpen()) return;
+    const characters = items.filter(isPublicToken);
+    if (roster !== rosterKey(characters)) {
+      roster = rosterKey(characters);
+      void refresh(characters);
+    }
+  });
+  obr.party.onChange(() => { if (isOpen()) void refresh(); });
+  return refresh;
+}

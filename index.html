@@ -4,8 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>overhead chat</title>
-  <link rel="stylesheet" href="./chat.css?v=2.5.1">
-  <script type="module" src="./chat.js?v=2.5.2"></script>
+  <link rel="stylesheet" href="./chat.css?v=2.6.0">
+  <script type="module" src="./chat.js?v=2.6.0"></script>
 </head>
 <body>
   <main>
@@ -41,6 +41,7 @@
       </div>
       <p id="move-warning" role="status"></p>
       <p id="status" role="status">Open this panel in an Owlbear Rodeo room.</p>
+      <p id="skill-cast-status" class="skill-feedback" role="status"></p>
     </form>
     </div>
     <section id="settings-panel" aria-label="chat settings" hidden>
@@ -72,6 +73,16 @@
       <div class="appearance-actions">
         <button id="open-tutorial" type="button" aria-controls="tutorial-panel">movement tutorial</button>
       </div>
+      <details id="player-skills">
+        <summary>skills</summary>
+        <div class="skill-facing-controls">
+          <div id="skill-avatar-preview" hidden aria-hidden="true"><img alt=""><span>➜</span></div>
+          <label>forward at zero rotation <select id="skill-facing" disabled></select></label>
+        </div>
+        <label class="skill-field" hidden>spear attack <select id="skill-bind-spear" aria-label="spear attack key"></select></label>
+        <label class="skill-field" hidden>magic missile <select id="skill-bind-missile" aria-label="magic missile key"></select></label>
+        <p id="skill-settings-status" class="skill-feedback" role="status"></p>
+      </details>
     </section>
     <section id="tutorial-panel" aria-labelledby="tutorial-title" hidden>
       <h2 id="tutorial-title" tabindex="-1">getting around</h2>
@@ -129,6 +140,13 @@
         <p id="habbo-help">Use pixel-style chat bubbles that rise and stack above tokens.</p>
         <p role="status"></p>
         <p id="habbo-scale-status" role="status"></p>
+      </section>
+      <section id="gm-skills" aria-label="skill grants">
+        <label class="discord-enabled"><input id="skill-enabled" type="checkbox" disabled> enable skill hotkeys</label>
+        <p>Requires Embers in this room. Everyone gets spear attack. Grants are saved in this GM browser.</p>
+        <label class="skill-field">token <select id="skill-token" disabled><option value="">choose a token</option></select></label>
+        <label class="discord-enabled"><input id="skill-grant-missile" type="checkbox" disabled> grant magic missile</label>
+        <p id="skill-gm-status" role="status"></p>
       </section>
       <section id="discord-settings" aria-labelledby="discord-heading">
         <h2 id="discord-heading">discord mirroring</h2>

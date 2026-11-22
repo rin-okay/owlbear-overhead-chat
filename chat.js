@@ -10,8 +10,9 @@ import {
 } from "./session.js";
 
 import { drawBubble } from "./appearance.js?v=2.5.2";
-import { setupDiscordPanel } from "./discord-panel.js?v=2.5.2";
+import { setupDiscordPanel } from "./discord-panel.js?v=2.6.0";
 import { setupAvatarPanel } from "./avatar-panel.js?v=2.3.10";
+import { setupSkillGrants, setupSkillPanel } from "./skill-panel.js?v=2.6.0";
 
 import { rollSpans, validateRollSpans } from "./dice.js";
 import { rollWithRumble } from "./rumble.js";
@@ -42,6 +43,7 @@ let tokenControl;
 let movingAvatar = false;
 let modeExitKey;
 let refreshAvatarPanel;
+let skillPanel;
 let moveWarningTimer;
 let moveWarningFade;
 const SLOT_DOUBLE_TAP_MS = 500;
@@ -233,6 +235,7 @@ async function refresh() {
     observedToken = observed ?? null;
     speaker.textContent = token ? `Speaking as ${token.name || "Character"}` : "Pick an avatar";
     status.textContent = hint;
+    skillPanel?.refresh(avatar);
     updateControls();
     if (shouldFocus && !tokenControl) input.focus();
   } catch (error) {
@@ -243,6 +246,7 @@ async function refresh() {
       return;
     }
     avatar = null;
+    skillPanel?.refresh(null);
     speaker.textContent = "Pick an avatar";
     status.textContent = "Couldn’t read your avatar. Close and reopen chat to retry.";
     updateControls();
@@ -319,11 +323,15 @@ async function moveAvatar(mode) {
   try {
     while (mode === tokenControl && !mode.switching && mode.actions.length) {
       const tokenId = mode.tokenId;
-      const { offset, rotation, mirror, artwork, onApplied } = mode.actions.shift();
+      const { offset, rotation, mirror, artwork, onApplied, skill } = mode.actions.shift();
       const [{ token }, step] = await Promise.all([getAvatar(), offset ? OBR.scene.grid.getDpi() : 0]);
       if (mode !== tokenControl || mode.switching || tokenId !== mode.tokenId) return;
       if (token?.id !== tokenId || token.locked) throw new Error("Avatar is unavailable or locked.");
       if (offset && (!Number.isFinite(step) || step <= 0)) throw new Error("Scene grid size unavailable.");
+      if (skill) {
+        await skillPanel.cast(skill, token);
+        continue;
+      }
 
       let applied = false;
       await OBR.scene.items.updateItems([tokenId], ([item]) => {
@@ -482,6 +490,12 @@ form.addEventListener("keydown", (event) => {
       }
       queueAvatarAction(tokenControl, action);
       if (action.rotation) holdRotation(tokenControl, physicalKey, action);
+    } else if (!event.ctrlKey && !event.altKey && !event.metaKey && !event.shiftKey) {
+      const skill = skillPanel?.skillForKey(key);
+      if (skill && !tokenControl.switching) {
+        event.preventDefault();
+        if (!event.repeat && tokenControl.actions.length < 4) queueAvatarAction(tokenControl, { skill });
+      }
     }
     return;
   }
@@ -664,6 +678,12 @@ function setupSettings() {
   const tutorialPanel = document.querySelector("#tutorial-panel");
   const tutorialButton = document.querySelector("#open-tutorial");
   const doneButton = document.querySelector("#tutorial-done");
+  skillPanel = setupSkillPanel(OBR, () => avatar, (key) =>
+    typeof key === "string" && /^[a-z]$/.test(key) && !Object.hasOwn(movementKeys, key));
+  const refreshSkillGrants = setupSkillGrants(OBR);
+  document.querySelector("#player-skills").addEventListener("toggle", (event) => {
+    if (event.currentTarget.open) skillPanel.refresh(avatar, true);
+  });
   const updateAvatarPanel = setupAvatarPanel(avatarPanel);
   refreshAvatarPanel = (items) => updateAvatarPanel(items, playerRole);
   const fields = settingsPanel.querySelector("form");
@@ -711,6 +731,7 @@ function setupSettings() {
       panel.hidden = index !== view;
     });
     if (index === 0) scrollToLatest();
+    if (index === 2) void refreshSkillGrants();
   }
 
   function showTutorial() {
@@ -770,7 +791,7 @@ OBR.onReady(() => {
     if (!selectedAvatarId) return;
     const next = items.find((item) => item.id === selectedAvatarId) ?? null;
     const fields = ["id", "name", "visible", "locked", "type", "layer", "createdUserId"];
-    if (fields.some((field) => next?.[field] !== observedToken?.[field])) {
+    if (fields.some((field) => next?.[field] !== observedToken?.[field]) || next?.image?.url !== observedToken?.image?.url) {
       observedToken = next;
       void refresh();
     }

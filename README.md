@@ -35,6 +35,12 @@ The GM can turn on **habbo hotel mode** in the **gm** tab for pixel-style bubble
 
 [Owlbear Rodeo's extension installation guide](https://docs.owlbear.rodeo/extensions/tutorial-hello-world/install-your-extension/) · [Owlbear Rodeo's player permissions guide](https://docs.owlbear.rodeo/docs/permissions/)
 
+## Skill hotkeys with Embers
+
+Enable [Embers](https://extensions.owlbear.rodeo/embers) in the room, then turn on **enable skill hotkeys** in Overhead Chat’s **gm** tab. Pick a character token and toggle **grant magic missile**. The grant follows that token when a player changes avatars. The enable switch and grants are saved in the GM’s browser for the room. A GM running this release must be connected to approve casts.
+
+Open **settings → skills** to mark which way your avatar artwork faces at zero rotation and to rebind the skills available to the current avatar. The direction is saved per artwork. In move mode, press **F** for spear attack or **G** for Magic Missile if the GM granted it. The missile travels eight grid widths along the avatar’s current facing, including rotation and mirroring. Walls, target hits, and damage are adjudicated at the table.
+
 ## Discord relay
 
 In a Discord text channel, create an incoming webhook under **Edit Channel → Integrations** and copy its URL. As the Owlbear room GM, open the **gm** tab, paste the webhook URL under **discord mirroring**, and use **send test**. To start sending new messages, turn on **mirror new general messages** and save. To include the other tabs, also enable **also mirror the other public chat tabs**. Existing relay settings default to General after the update.

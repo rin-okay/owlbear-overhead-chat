@@ -12,6 +12,7 @@ import { chatParts, isRollCommand, rollSpans } from "./dice.js";
 import { queueDiscord } from "./discord.js?v=2.3.9";
 import { parseTray } from "./dice-replay.js";
 import { queueDicePopup, resetDicePopups } from "./dice-popup.js";
+import { setupSkillHost } from "./skill-host.js?v=2.6.0";
 
 const HISTORY_LIMIT = 1000;
 const HISTORY_PAGE_SIZE = 100;
@@ -316,6 +317,7 @@ function queueSpeech(event) {
 }
 
 OBR.onReady(() => {
+  setupSkillHost(OBR);
   openSessionChannel().then((channel) => {
     transcriptChannel = channel;
     channel.onmessage = ({ data }) => {
