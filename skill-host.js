@@ -1,5 +1,5 @@
 import { canSpeak } from "./rules.js";
-import { isProjectileToken, isProjectileWall, projectileImpact } from "./projectile-collision.js?v=2.6.10";
+import { isProjectileToken, isProjectileWall, openMeleeDoor, projectileImpact } from "./projectile-collision.js?v=2.6.13";
 import { HIT_MARKERS } from "./hit-markers.js?v=2.6.10";
 import {
   DEFAULT_WEAPON, EMBERS_EFFECTS, SKILLS, SKILL_REQUEST, SKILL_RESULT,
@@ -87,6 +87,7 @@ export function setupSkillHost(obr) {
       }
       const instructions = [instruction];
       let hitTokenIds = [];
+      let doorId;
       if (checksHit) {
         if (!obstacles) {
           await answer({ ...result, error: "Couldn’t check the scene for walls and tokens. Try again." });
@@ -103,6 +104,7 @@ export function setupSkillHost(obr) {
         const impact = projectileImpact(source, end, obstacles.flat(), token.id, dpi, blastRadius);
         hitTokenIds = impact.hitTokenIds;
         if (projectile) instruction.effectProperties.destination = impact.destination;
+        else doorId = impact.doorId;
         if (skill.impact) {
           const { effect, size, delay } = skill.impact;
           instructions.push({
@@ -114,6 +116,10 @@ export function setupSkillHost(obr) {
       await obr.broadcast.sendMessage(EMBERS_EFFECTS, {
         instructions, spellData: { name: skill.name, caster: sender.id },
       }, { destination: "ALL" });
+      if (doorId && version === sceneVersion) {
+        await openMeleeDoor(obr, doorId, sender.role, () => version === sceneVersion)
+          .catch((error) => console.error("Overhead Chat could not open the door", error));
+      }
       if (version === sceneVersion && hitTokenIds.length) {
         await obr.broadcast.sendMessage(HIT_MARKERS, {
           requestId: data.requestId, tokenIds: hitTokenIds, delay: skill.impact?.delay ?? skill.hitDelay,

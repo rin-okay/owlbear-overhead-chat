@@ -29,6 +29,26 @@ export function isProjectileWall(item) {
     !Array.isArray(viewers);
 }
 
+function isClosedSmokeDoor(item) {
+  return item?.type === "CURVE" && isProjectileWall(item) &&
+    item.metadata[SMOKE + "isDoor"] === true && !item.metadata[SMOKE + "isDoorLocked"] &&
+    !item.metadata[SMOKE + "isWindow"];
+}
+
+export async function openMeleeDoor(obr, id, role, current) {
+  const allowed = role === "GM" || (role === "PLAYER" &&
+    (await obr.scene.getMetadata())[SMOKE + "playerDoors"] === true);
+  if (!allowed || !current()) return;
+  await obr.scene.items.updateItems([id], (items) => {
+    if (!current()) return;
+    for (const door of items) {
+      if (!isClosedSmokeDoor(door)) continue;
+      door.metadata[SMOKE + "disabled"] = true;
+      door.metadata[SMOKE + "doorOpen"] = true;
+    }
+  });
+}
+
 export function isProjectileToken(item) {
   return item.type === "IMAGE" && item.layer === "CHARACTER" && item.visible === true &&
     !item.metadata?.[SMOKE + "hiddenToken"] && !item.metadata?.["com.battle-system.spectre/isSpectre"];
@@ -87,7 +107,7 @@ function collectWalls(items) {
     const world = points.map((point) => validPoint(point) ? project(point, item) : undefined);
     if (item.style?.closed) world.push(world[0]);
     for (let i = 1; i < world.length; i++) {
-      if (validPoint(world[i - 1]) && validPoint(world[i])) walls.push([world[i - 1], world[i]]);
+      if (validPoint(world[i - 1]) && validPoint(world[i])) walls.push({ a: world[i - 1], b: world[i], item });
     }
   }
   return walls;
@@ -95,8 +115,19 @@ function collectWalls(items) {
 
 function closestWall(source, direction, walls) {
   let distance = Infinity;
-  for (const [a, b] of walls) distance = Math.min(distance, wallDistance(source, direction, a, b));
-  return distance;
+  let blocker;
+  for (const { a, b, item } of walls) {
+    const hit = wallDistance(source, direction, a, b);
+    if (hit < distance - EPSILON) {
+      distance = hit;
+      blocker = item;
+    } else if (Math.abs(hit - distance) <= EPSILON) {
+      // A door sharing the impact point with another wall must not open.
+      distance = Math.min(distance, hit);
+      if (blocker !== item) blocker = undefined;
+    }
+  }
+  return { distance, blocker };
 }
 
 const advance = (point, direction, distance) => ({
@@ -110,7 +141,7 @@ export function projectileImpact(source, destination, items, casterId, dpi, blas
   if (!Number.isFinite(range) || range <= EPSILON) return { destination, hitTokenIds: [] };
   const direction = { x: delta.x / range, y: delta.y / range };
   const walls = collectWalls(items);
-  const wall = closestWall(source, direction, walls);
+  const { distance: wall, blocker } = closestWall(source, direction, walls);
   const targets = [];
   let closestToken;
   let tokenDistance = Infinity;
@@ -132,7 +163,11 @@ export function projectileImpact(source, destination, items, casterId, dpi, blas
   // Embers needs a nonzero travel length, even when the caster overlaps a target.
   const end = distance === range ? destination
     : advance(source, direction, Math.max(distance, Math.min(range, dpi / 100)));
-  if (blastRadius <= 0) return { destination: end, hitTokenIds: hitToken ? [closestToken] : [] };
+  if (blastRadius <= 0) {
+    const result = { destination: end, hitTokenIds: hitToken ? [closestToken] : [] };
+    if (hitWall && isClosedSmokeDoor(blocker)) result.doorId = blocker.id;
+    return result;
+  }
 
   const impact = advance(source, direction, distance);
   // Start the cover ray just on the caster's side of the impact wall.
@@ -144,7 +179,7 @@ export function projectileImpact(source, destination, items, casterId, dpi, blas
     const length = Math.hypot(cover.x, cover.y);
     if (length <= EPSILON) return true;
     const ray = { x: cover.x / length, y: cover.y / length };
-    return closestWall(coverOrigin, ray, walls) > length + EPSILON;
+    return closestWall(coverOrigin, ray, walls).distance > length + EPSILON;
   }).map(({ id }) => id);
   return { destination: end, hitTokenIds };
 }
