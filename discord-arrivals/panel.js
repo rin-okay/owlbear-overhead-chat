@@ -1,5 +1,5 @@
 import OBR from "./obr.js";
-import { AVATAR, CLAIM, CONFIG, MODAL, RESULT, character, defaults, dismissKey, httpsOrigin, linkKey, point, smokeFields, workerOrigin } from "./model.mjs";
+import { AVATAR, CLAIM, CONFIG, MODAL, RESULT, character, defaults, httpsOrigin, linkKey, point, smokeFields, workerOrigin } from "./model.mjs";
 
 const el = (id) => document.getElementById(id);
 const status = (message) => { el("status").textContent = message; };
@@ -133,9 +133,8 @@ async function setupPlayer() {
   const [metadata, room, connection] = await Promise.all([
     OBR.scene.getMetadata(), OBR.room.getMetadata(), OBR.player.getConnectionId(),
   ]);
-  if (!metadata[CONFIG]?.enabled) { status("The GM hasn’t enabled Discord arrivals in this scene."); return; }
+  if (!metadata[CONFIG]?.enabled) { status("The GM hasn’t enabled Discord Arrivals in this scene."); return false; }
   const player = OBR.player.id;
-  const key = dismissKey(OBR.room.id, player);
   const linked = room[linkKey(player)];
   const [existing] = linked ? await OBR.scene.items.getItems([linked.tokenId]) : [];
   if (existing?.createdUserId === player && character(existing)) {
@@ -143,10 +142,10 @@ async function setupPlayer() {
     listen("find-token", () => focusToken(existing.id));
     setVisible("find-token", true);
     status("Discord is linked and your token is in this scene.");
-    return;
+    return true;
   }
   const worker = workerOrigin(metadata[CONFIG], location.origin);
-  if (!worker) { status("Ask the GM to set the Cloudflare Worker address in Discord Arrivals."); return; }
+  if (!worker) { status("Ask the GM to set the Cloudflare Worker address in Discord Arrivals."); return false; }
   const start = new URL("/oauth/start", worker);
   start.search = new URLSearchParams({room:OBR.room.id, player, connection}).toString();
   const connect = el("connect");
@@ -156,12 +155,14 @@ async function setupPlayer() {
   function clearClaim() {
     clearInterval(retry);
     claim = undefined;
+    connect.textContent = "connect discord";
   }
   async function submit(ticket) {
     if (typeof ticket !== "string" || !/^[\w-]{1,4000}\.[\w-]{43}$/.test(ticket)) throw Error("Paste the full sign-in code.");
     if (claim?.ticket === ticket) return;
     clearClaim();
     claim = {ticket, request:crypto.randomUUID(), started:Date.now()};
+    connect.textContent = "restart discord sign-in";
     retry = setInterval(send, 5500);
     await send();
   }
@@ -169,7 +170,7 @@ async function setupPlayer() {
     if (!claim) return;
     if (Date.now() - claim.started > 120000) {
       clearClaim();
-      status("The GM isn’t responding. Ask them to open the room, then paste your sign-in code and try again.");
+      status("The GM hasn’t responded. Keep the GM in this room with the scene open, then connect Discord again or re-submit your code.");
       return;
     }
     const request = claim;
@@ -218,9 +219,11 @@ async function setupPlayer() {
     }
   });
   connect.addEventListener("click", () => {
+    clearClaim();
+    el("code").value = "";
+    document.querySelector("#oauth-link")?.remove();
     popup = window.open(start.href, "_blank");
     if (!popup) {
-      document.querySelector("#oauth-link")?.remove();
       const link = document.createElement("a");
       link.id = "oauth-link";
       link.href = start.href;
@@ -244,30 +247,47 @@ async function setupPlayer() {
     void submit(el("code").value.trim()).catch(readableError);
   });
   listen("skip", async () => {
-    try { localStorage.setItem(key, "skipped"); } catch {}
     clearClaim();
-    if (welcome) await OBR.modal.close(MODAL);
-    else status("First-join prompt skipped. You can still connect here whenever you’re ready.");
+    popup = undefined;
+    await OBR.modal.close(MODAL);
   });
   window.addEventListener("pagehide", () => { clearClaim(); unsubscribe(); }, {once:true});
   connect.disabled = false;
+  setVisible("skip", welcome);
   setVisible("player", true);
   status(linked ? "Your linked token isn’t available in this scene. Connect Discord to recover it." : "");
+  return true;
 }
 
 async function waitForPlayerScene() {
   let started = false;
+  let checking = false;
+  let readyEvent = false;
   const start = async () => {
-    if (started) return;
-    started = true;
-    unsubscribe();
-    await setupPlayer();
+    if (started || checking) return;
+    checking = true;
+    setVisible("check-scene", false);
+    try {
+      if (await OBR.scene.isReady() || readyEvent) {
+        started = await setupPlayer();
+        if (started) unsubscribe();
+      } else {
+        status("Waiting for the GM to open a scene in this room…");
+      }
+    } catch (error) {
+      readableError(error);
+    } finally {
+      checking = false;
+      if (!started) setVisible("check-scene", true);
+    }
   };
   const unsubscribe = OBR.scene.onReadyChange((ready) => {
+    readyEvent = ready;
     if (ready) void start().catch(readableError);
   });
-  if (await OBR.scene.isReady()) await start();
-  else if (!started) status("Waiting for the GM to open a scene…");
+  window.addEventListener("pagehide", () => { if (!started) unsubscribe(); }, {once:true});
+  listen("check-scene", start);
+  await start();
 }
 
 OBR.onReady(async () => {

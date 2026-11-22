@@ -1,5 +1,5 @@
 import OBR, { buildImage, buildLight } from "./obr.js";
-import { ARRIVAL, CLAIM, CONFIG, MODAL, RESULT, character, dismissKey, linkKey, workerOrigin } from "./model.mjs";
+import { ARRIVAL, CLAIM, CONFIG, MODAL, RESULT, character, linkKey, workerOrigin } from "./model.mjs";
 import { planToken } from "./provision.mjs";
 
 let offered = false;
@@ -18,7 +18,6 @@ async function offer() {
   const player = OBR.player.id;
   const [scene, room] = await Promise.all([OBR.scene.getMetadata(), OBR.room.getMetadata()]);
   if (!sameScene(epoch) || !scene[CONFIG]?.enabled) return;
-  try { if (localStorage.getItem(dismissKey(OBR.room.id, player)) === "skipped") return; } catch {}
   const link = room[linkKey(player)];
   if (link?.tokenId) {
     const [token] = await OBR.scene.items.getItems([link.tokenId]);
@@ -49,7 +48,8 @@ async function provision({connectionId, data}, epoch) {
     if (!await OBR.scene.isReady()) throw Error("Waiting for the GM to open a scene.");
     const configBefore = (await OBR.scene.getMetadata())[CONFIG];
     const worker = workerOrigin(configBefore, location.origin);
-    if (!configBefore?.enabled || !worker || !sameScene(epoch)) return;
+    if (!sameScene(epoch)) return;
+    if (!configBefore?.enabled || !worker) throw Error("The GM needs to enable Discord Arrivals and save a Worker address in this scene.");
     const verification = await fetch(new URL("/oauth/verify", worker), {
       method:"POST", headers:{"Content-Type":"application/json"}, signal:AbortSignal.timeout(10000),
       body:JSON.stringify({ticket:data.ticket, room:OBR.room.id, player:player.id, connection:connectionId}),
