@@ -1,5 +1,5 @@
 import OBR from "./obr.js";
-import { canSpeak } from "./rules.js";
+import { isPublicToken } from "./rules.js";
 import {
   savedAvatarSlots, saveAvatarSlot, savedAvatarMode, saveAvatarMode,
   savedAvatarArtSlots, saveAvatarArtSlot,
@@ -12,12 +12,15 @@ export function setupAvatarPanel(panel) {
   const talkButton = panel.querySelector("#avatar-talk");
   const changeButton = panel.querySelector("#avatar-change");
   const status = talkPanel.querySelector("[role=status]");
+  let canTalk = false;
   const selects = Array.from({ length: 9 }, (_, index) => {
     const row = document.createElement("label");
     row.append(String(index + 1));
     const select = document.createElement("select");
     select.disabled = true;
-    select.addEventListener("change", () => saveAvatarSlot(index, select.value));
+    select.addEventListener("change", () => {
+      if (canTalk) saveAvatarSlot(index, select.value);
+    });
     row.append(select);
     list.append(row);
     return select;
@@ -33,28 +36,35 @@ export function setupAvatarPanel(panel) {
     changeButton.setAttribute("aria-pressed", String(change));
     talkPanel.hidden = change;
     changePanel.hidden = !change;
-    void load();
   }
 
   for (const [button, mode] of [[talkButton, "talk"], [changeButton, "change"]]) {
     button.addEventListener("click", () => {
+      if (!canTalk) return;
       saveAvatarMode(mode);
       showMode(mode);
+      void loadTokens();
     });
   }
-  showMode(savedAvatarMode());
-  return load;
+  return (items, role) => {
+    const gm = role === "GM";
+    if (gm !== canTalk) {
+      canTalk = gm;
+      talkButton.hidden = !gm;
+      showMode(gm ? savedAvatarMode() : "change");
+      ++revision;
+    }
+    return loadTokens(items);
+  };
 
-  async function load(items) {
-    if (panel.hidden || talkPanel.hidden) return;
+  async function loadTokens(items) {
+    if (!canTalk || panel.hidden || talkPanel.hidden) return;
     const requested = ++revision;
     try {
       const ready = await OBR.scene.isReady();
-      const [role, permissions, tokens] = ready ? await Promise.all([
-        OBR.player.getRole(), OBR.room.getPermissions(), items ?? OBR.scene.items.getItems(),
-      ]) : [null, [], []];
+      const tokens = ready ? (items ?? await OBR.scene.items.getItems()) : [];
       if (requested !== revision || panel.hidden || talkPanel.hidden) return;
-      const choices = tokens.filter((token) => !token.locked && canSpeak({ id: OBR.player.id, role }, token, permissions))
+      const choices = tokens.filter((token) => isPublicToken(token) && !token.locked)
         .map(({ id, name }) => ({ id, name: name || "Unnamed token" }))
         .sort((a, b) => a.name.localeCompare(b.name));
       status.textContent = ready ? "" : "Open a scene to assign avatars.";

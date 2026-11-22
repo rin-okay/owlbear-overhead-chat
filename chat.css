@@ -60,7 +60,6 @@ nav button { min-height: 32px; background: #312940; color: #e2d4f6; }
 nav button[aria-pressed="true"], nav button:hover { background: #c7b6f8; color: #271c3a; }
 #chat-panel { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 12px; }
 #chat-room { flex: none; min-height: 32px; }
-.chat-room-label { flex: none; margin: 0 0 -8px; font-size: 11px; white-space: normal; }
 #settings-panel { flex: 1; min-height: 0; overflow-y: auto; }
 #settings-panel form { display: grid; gap: 8px; }
 #settings-panel label { margin: 0; white-space: normal; }

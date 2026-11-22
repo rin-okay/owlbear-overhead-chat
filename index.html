@@ -4,8 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>overhead chat</title>
-  <link rel="stylesheet" href="./chat.css?v=2.3.9">
-  <script type="module" src="./chat.js?v=2.3.9"></script>
+  <link rel="stylesheet" href="./chat.css?v=2.3.10">
+  <script type="module" src="./chat.js?v=2.3.10"></script>
 </head>
 <body>
   <main>
@@ -19,7 +19,6 @@
       </nav>
     </header>
     <div id="chat-panel">
-    <label class="chat-room-label" for="chat-room">public chat · visible to everyone in this owlbear room</label>
     <select id="chat-room" aria-label="public chat tab" aria-controls="transcript">
       <option value="general" selected>general</option>
       <option value="rin">rin's room</option>
@@ -91,15 +90,15 @@
     </section>
     <section id="avatar-panel" aria-label="avatar slots" hidden>
       <div class="avatar-modes" role="group" aria-label="avatar hotkey mode">
-        <button id="avatar-talk" type="button" aria-pressed="true" aria-controls="avatar-talk-panel">talk as</button>
-        <button id="avatar-change" type="button" aria-pressed="false" aria-controls="avatar-change-panel">change to</button>
+        <button id="avatar-talk" type="button" aria-pressed="false" aria-controls="avatar-talk-panel" hidden>talk as</button>
+        <button id="avatar-change" type="button" aria-pressed="true" aria-controls="avatar-change-panel">change to</button>
       </div>
-      <div id="avatar-talk-panel">
+      <div id="avatar-talk-panel" hidden>
         <p>Press 1–9 in move mode to switch to the assigned token.</p>
         <div id="avatar-slots"></div>
         <p role="status"></p>
       </div>
-      <div id="avatar-change-panel" hidden>
+      <div id="avatar-change-panel">
         <p>Choose artwork from Characters. Press 1–9 in move mode to apply it to your current avatar.</p>
         <div id="avatar-art-slots"></div>
         <p role="status"></p>

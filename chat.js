@@ -9,8 +9,8 @@ import {
 } from "./session.js";
 
 import { drawBubble } from "./appearance.js";
-import { setupDiscordPanel } from "./discord-panel.js?v=2.3.9";
-import { setupAvatarPanel } from "./avatar-panel.js";
+import { setupDiscordPanel } from "./discord-panel.js?v=2.3.10";
+import { setupAvatarPanel } from "./avatar-panel.js?v=2.3.10";
 
 import { rollSpans, validateRollSpans } from "./dice.js";
 import { rollWithRumble } from "./rumble.js";
@@ -33,6 +33,7 @@ let avatar = null;
 let selectedAvatarId = null;
 let observedToken = null;
 let avatarState = "";
+let playerRole;
 let sending = false;
 let rollInProgress = false;
 let refreshVersion = 0;
@@ -357,7 +358,7 @@ async function moveAvatar(mode) {
 }
 
 async function switchAvatarSlot(mode, index, onApplied) {
-  if (mode.switching) return;
+  if (mode.switching || playerRole !== "GM") return;
   const tokenId = savedAvatarSlots()[index];
   if (!tokenId) {
     status.textContent = `Assign avatar ${index + 1} in the avatar tab first.`;
@@ -368,11 +369,11 @@ async function switchAvatarSlot(mode, index, onApplied) {
   stopRotation(mode);
   mode.actions.length = 0;
   try {
-    const [role, permissions, [token]] = await Promise.all([
-      OBR.player.getRole(), OBR.room.getPermissions(), OBR.scene.items.getItems([tokenId]),
+    const [role, [token]] = await Promise.all([
+      OBR.player.getRole(), OBR.scene.items.getItems([tokenId]),
     ]);
-    if (mode !== tokenControl) return;
-    if (!canSpeak({ id: OBR.player.id, role }, token, permissions) || token.locked) {
+    if (mode !== tokenControl || role !== "GM" || playerRole !== "GM") return;
+    if (!isPublicToken(token) || token.locked) {
       status.textContent = `Avatar ${index + 1} is unavailable in this scene.`;
       return;
     }
@@ -409,7 +410,7 @@ function useAvatarSlot(mode, key) {
     if (tap.returnToChat) toggleTokenControl();
   }
 
-  if (savedAvatarMode() === "talk") {
+  if (playerRole === "GM" && savedAvatarMode() === "talk") {
     void switchAvatarSlot(mode, index, onApplied);
     return;
   }
@@ -614,7 +615,8 @@ function setupSettings() {
   const tutorialPanel = document.querySelector("#tutorial-panel");
   const tutorialButton = document.querySelector("#open-tutorial");
   const doneButton = document.querySelector("#tutorial-done");
-  refreshAvatarPanel = setupAvatarPanel(avatarPanel);
+  const updateAvatarPanel = setupAvatarPanel(avatarPanel);
+  refreshAvatarPanel = (items) => updateAvatarPanel(items, playerRole);
   const fields = settingsPanel.querySelector("form");
   const preview = settingsPanel.querySelector("#bubble-preview");
 
@@ -696,12 +698,18 @@ OBR.onReady(() => {
   setupRoomToggle("gm-habbo-settings", HABBO_MODE);
   connectTranscript();
   OBR.player.onChange(({ metadata, role }) => {
+    playerRole = role;
     const state = JSON.stringify([metadata[AVATAR]?.tokenId, role]);
     if (state === avatarState) return;
     avatarState = state;
     void refresh();
     void refreshAvatarPanel();
   });
+  void OBR.player.getRole().then((role) => {
+    if (playerRole !== undefined) return;
+    playerRole = role;
+    return refreshAvatarPanel();
+  }).catch(console.error);
   OBR.scene.onReadyChange((ready) => {
     if (!ready) stopTokenControl();
     void refresh();
