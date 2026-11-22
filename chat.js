@@ -10,9 +10,10 @@ import {
 } from "./session.js";
 
 import { drawBubble } from "./appearance.js?v=2.6.1";
-import { setupDiscordPanel } from "./discord-panel.js?v=2.6.3";
+import { setupDiscordPanel } from "./discord-panel.js?v=2.6.4";
 import { setupAvatarPanel } from "./avatar-panel.js?v=2.3.10";
 import { setupSkillGrants, setupSkillPanel } from "./skill-panel.js?v=2.6.3";
+import { listenForChatShortcut } from "./chat-shortcut.js?v=2.6.4";
 
 import { rollSpans, validateRollSpans } from "./dice.js";
 import { rollWithRumble } from "./rumble.js";
@@ -40,6 +41,7 @@ let sending = false;
 let rollInProgress = false;
 let refreshVersion = 0;
 let tokenControl;
+let pendingChatShortcut;
 let movingAvatar = false;
 let modeExitKey;
 let refreshAvatarPanel;
@@ -238,9 +240,13 @@ async function refresh() {
     status.textContent = hint;
     skillPanel?.refresh(avatar);
     updateControls();
-    if (shouldFocus && !tokenControl) input.focus();
+    const shortcut = pendingChatShortcut;
+    pendingChatShortcut = undefined;
+    if (shortcut === "move" && !moveButton.disabled) startTokenControl();
+    else if ((shortcut || shouldFocus) && !tokenControl && !input.disabled) input.focus();
   } catch (error) {
     if (version !== refreshVersion) return;
+    pendingChatShortcut = undefined;
     console.error("Overhead Chat could not read the avatar", error);
     if (tokenControl) {
       warnMoveFailed();
@@ -265,18 +271,23 @@ function stopTokenControl() {
   updateControls();
 }
 
-function toggleTokenControl() {
-  if (tokenControl) {
-    stopTokenControl();
-    input.focus();
-  } else {
-    if (moveButton.disabled) return;
+function startTokenControl() {
+  if (moveButton.disabled) return;
+  if (!tokenControl) {
     tokenControl = { tokenId: avatar.id, actions: [] };
     input.readOnly = true;
     input.setAttribute("aria-describedby", "move-mode-label status");
     moveModeLabel.hidden = false;
     moveButton.setAttribute("aria-pressed", "true");
-    moveButton.focus();
+  }
+  moveButton.focus();
+}
+
+function toggleTokenControl() {
+  if (!tokenControl) startTokenControl();
+  else {
+    stopTokenControl();
+    input.focus();
   }
 }
 
@@ -461,11 +472,6 @@ form.addEventListener("keydown", (event) => {
       return;
     }
     modeExitKey = undefined;
-  }
-  if (event.key === "F2" && !event.ctrlKey && !event.altKey && !event.metaKey) {
-    event.preventDefault();
-    if (!event.repeat) toggleTokenControl();
-    return;
   }
   if (tokenControl) {
     const key = event.key.toLowerCase();
@@ -749,6 +755,7 @@ function setupSettings() {
 
   function select(index) {
     tutorialPanel.hidden = true;
+    if (index !== 0) pendingChatShortcut = undefined;
     views.forEach(({ tab, panel }, view) => {
       tab.setAttribute("aria-pressed", String(index === view));
       panel.hidden = index !== view;
@@ -767,7 +774,8 @@ function setupSettings() {
     select(0);
     if (!input.disabled) input.focus();
   });
-  if (new URLSearchParams(location.search).has("welcome")) showTutorial();
+  const welcome = new URLSearchParams(location.search).has("welcome");
+  if (welcome) showTutorial();
 
   chatTab.addEventListener("click", () => select(0));
   settingsTab.addEventListener("click", () => select(1));
@@ -776,6 +784,20 @@ function setupSettings() {
     void refreshAvatarPanel();
   });
   skillsTab.addEventListener("click", () => select(4));
+  function openFromShortcut(mode) {
+    select(0);
+    if (mode === "chat") stopTokenControl();
+    pendingChatShortcut = mode;
+    void refresh();
+  }
+  document.addEventListener("keydown", (event) => {
+    if ((event.key !== "F1" && event.key !== "F2") || event.ctrlKey || event.altKey ||
+        event.metaKey || event.shiftKey || event.isComposing) return;
+    event.preventDefault();
+    event.stopPropagation();
+    if (!event.repeat) openFromShortcut(event.key === "F1" ? "chat" : "move");
+  }, true);
+  if (!welcome) listenForChatShortcut(OBR, openFromShortcut);
   setupDiscordPanel(() => select(0), () => select(2));
   fields.addEventListener("submit", (event) => event.preventDefault());
   fields.addEventListener("input", () => {

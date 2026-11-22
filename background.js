@@ -13,6 +13,7 @@ import { queueDiscord } from "./discord.js?v=2.3.9";
 import { parseTray } from "./dice-replay.js";
 import { queueDicePopup, resetDicePopups } from "./dice-popup.js";
 import { setupSkillHost } from "./skill-host.js?v=2.6.3";
+import { requestChatShortcut } from "./chat-shortcut.js?v=2.6.4";
 
 const HISTORY_LIMIT = 1000;
 const HISTORY_PAGE_SIZE = 100;
@@ -317,6 +318,26 @@ function queueSpeech(event) {
 }
 
 OBR.onReady(() => {
+  let shortcutRevision = 0;
+  async function openFromShortcut(mode) {
+    const revision = ++shortcutRevision;
+    await OBR.action.open();
+    if (revision === shortcutRevision) requestChatShortcut(OBR, mode);
+  }
+  for (const [key, mode, label, icon] of [
+    ["F1", "chat", "Focus Overhead Chat (F1)", "./toolbar-chat.svg"],
+    ["F2", "move", "Move chat avatar (F2)", "./icon.svg"],
+  ]) {
+    OBR.tool.create({
+      id: "chat.overhead.shortcut." + mode,
+      shortcut: key,
+      icons: [{ icon: new URL(icon, import.meta.url).href, label }],
+      onClick() {
+        void openFromShortcut(mode).catch(report);
+        return false;
+      },
+    }).catch(report);
+  }
   setupSkillHost(OBR);
   openSessionChannel().then((channel) => {
     transcriptChannel = channel;
