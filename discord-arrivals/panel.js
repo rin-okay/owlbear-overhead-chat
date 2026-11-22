@@ -129,6 +129,30 @@ async function focusToken(tokenId) {
   });
 }
 
+async function continueToTutorial(tokenId, connection) {
+  const requestId = crypto.randomUUID();
+  let unsubscribe;
+  let timeout;
+  const opened = new Promise((resolve) => {
+    unsubscribe = OBR.broadcast.onMessage("chat.overhead.arrival-guide.opened.v1", ({connectionId, data}) => {
+      if (connectionId === connection && data?.requestId === requestId) resolve(true);
+    });
+    timeout = setTimeout(() => resolve(false), 10_000);
+  });
+  const button = el("continue-to-tutorial");
+  button.disabled = true;
+  try {
+    await OBR.broadcast.sendMessage("chat.overhead.arrival-guide.v1", {tokenId, requestId}, {destination:"LOCAL"});
+    if (!await opened) throw Error("Overhead Chat didn’t confirm it opened. Check that it’s enabled, then try Continue again.");
+    if (welcome) await OBR.modal.close(MODAL);
+    else await OBR.action.close();
+  } finally {
+    clearTimeout(timeout);
+    unsubscribe();
+    button.disabled = false;
+  }
+}
+
 async function setupPlayer() {
   const [metadata, room, connection] = await Promise.all([
     OBR.scene.getMetadata(), OBR.room.getMetadata(), OBR.player.getConnectionId(),
@@ -201,11 +225,7 @@ async function setupPlayer() {
       connect.disabled = true;
       el("paste-details").hidden = true;
       status(data.needsVision ? "Your token is ready. The GM can enable Smoke & Spectre vision on it." : "Your token is ready.");
-      listen("continue-to-tutorial", async () => {
-        await OBR.broadcast.sendMessage("chat.overhead.arrival-guide.v1", {
-          tokenId: token.id, closeWelcome: welcome,
-        }, { destination: "LOCAL" });
-      });
+      listen("continue-to-tutorial", () => continueToTutorial(token.id, connection));
       setVisible("continue-to-tutorial", true);
       listen("find-token", () => focusToken(token.id));
       setVisible("find-token", true);

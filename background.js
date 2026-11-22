@@ -374,7 +374,6 @@ OBR.onReady(() => {
       const [token] = await OBR.scene.items.getItems([data.tokenId]);
       if (!isPublicToken(token) || token.createdUserId !== OBR.player.id ||
           !token.metadata?.["chat.overhead.discord-arrivals/token"]) return;
-      if (data.closeWelcome) await OBR.modal.close("chat.overhead.discord-arrivals/welcome").catch(report);
       await OBR.popover.open({
         id: "chat.overhead.arrival-guide.v1",
         url: new URL("./index.html?welcome=1", import.meta.url).href,
@@ -383,6 +382,13 @@ OBR.onReady(() => {
         anchorOrigin: { horizontal: "LEFT", vertical: "TOP" },
         transformOrigin: { horizontal: "LEFT", vertical: "TOP" },
       });
+      if (typeof data.requestId === "string") {
+        await OBR.broadcast.sendMessage("chat.overhead.arrival-guide.opened.v1", {
+          requestId: data.requestId,
+        }, { destination: "LOCAL" });
+      } else if (data.closeWelcome) {
+        await OBR.modal.close("chat.overhead.discord-arrivals/welcome");
+      }
     } catch (error) {
       report(error);
     }
