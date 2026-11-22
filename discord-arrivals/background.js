@@ -103,7 +103,7 @@ async function provision({connectionId, data}, epoch) {
     }
     if (!sameScene(epoch)) return;
     await OBR.room.setMetadata({[linkKey(player.id)]:{profile:profile.profile, tokenId:plan.id}});
-    await answer(connectionId, data.request, { tokenId:plan.id, needsVision:plan.needsVision });
+    await answer(connectionId, data.request, { tokenId:plan.id, needsVision:plan.needsVision, created:!plan.existing });
     if (plan.needsVision && !plan.existing) {
       await OBR.notification.show("Discord Arrivals: use Enable Vision on " + profile.name + " to apply the Smoke & Spectre scene defaults.");
     }

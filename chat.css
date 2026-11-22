@@ -74,6 +74,13 @@ select { font: inherit; background: #181321; color: inherit; border: 1px solid #
 .appearance-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 .appearance-actions button { min-height: 32px; background: #312940; color: #e2d4f6; }
 .appearance-actions button:hover { background: #c7b6f8; color: #271c3a; }
+#tutorial-panel { flex: 1; min-height: 0; overflow-y: auto; padding: 0 4px 4px; }
+#tutorial-panel h2 { font-size: 18px; margin: 0 0 10px; }
+#tutorial-panel h3 { font-size: 14px; margin: 0; }
+#tutorial-panel ul { margin: 4px 0 12px; padding-left: 18px; }
+#tutorial-panel li + li { margin-top: 4px; }
+#tutorial-panel kbd { text-transform: none; }
+#tutorial-done { min-height: 32px; }
 
 #message {
   font: 16px/1.35 system-ui, sans-serif;

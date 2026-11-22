@@ -7,7 +7,7 @@ import { BUBBLE_LINE_HEIGHT, drawBubble, drawFloatingBubble, fonts, normalizeApp
 import { FLOAT_LINE, placeFloatingBubbles } from "./floating-layout.js";
 import { openSessionChannel, saveAvatar } from "./session.js";
 import { chatParts, isRollCommand, rollSpans } from "./dice.js";
-import { queueDiscord } from "./discord.js?v=2.3.5";
+import { queueDiscord } from "./discord.js?v=2.3.6";
 import { parseTray } from "./dice-replay.js";
 import { queueDicePopup, resetDicePopups } from "./dice-popup.js";
 
@@ -368,6 +368,25 @@ OBR.onReady(() => {
     for (const result of results) if (result.status === "rejected") report(result.reason);
   });
   OBR.broadcast.onMessage(SPEECH, queueSpeech);
+  OBR.broadcast.onMessage("chat.overhead.arrival-guide.v1", async ({ connectionId: sender, data }) => {
+    try {
+      if (typeof data?.tokenId !== "string" || sender !== await OBR.player.getConnectionId()) return;
+      const [token] = await OBR.scene.items.getItems([data.tokenId]);
+      if (!isPublicToken(token) || token.createdUserId !== OBR.player.id ||
+          !token.metadata?.["chat.overhead.discord-arrivals/token"]) return;
+      if (data.closeWelcome) await OBR.modal.close("chat.overhead.discord-arrivals/welcome").catch(report);
+      await OBR.popover.open({
+        id: "chat.overhead.arrival-guide.v1",
+        url: new URL("./index.html?welcome=1", import.meta.url).href,
+        width: 380, height: 440,
+        anchorReference: "POSITION", anchorPosition: { left: 12, top: 76 },
+        anchorOrigin: { horizontal: "LEFT", vertical: "TOP" },
+        transformOrigin: { horizontal: "LEFT", vertical: "TOP" },
+      });
+    } catch (error) {
+      report(error);
+    }
+  });
 
   OBR.contextMenu.create({
     id: "chat.overhead.set-avatar.v1",

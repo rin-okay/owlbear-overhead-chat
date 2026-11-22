@@ -1,5 +1,5 @@
 import OBR from "./obr.js";
-import { discordSettings, normalizeWebhook, saveDiscordSettings, sendDiscord } from "./discord.js?v=2.3.5";
+import { discordSettings, normalizeWebhook, saveDiscordSettings, sendDiscord } from "./discord.js?v=2.3.6";
 
 export function setupDiscordPanel(openChat, openGm) {
   const tab = document.querySelector("#gm-tab");

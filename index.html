@@ -4,8 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>overhead chat</title>
-  <link rel="stylesheet" href="./chat.css">
-  <script type="module" src="./chat.js?v=2.3.5"></script>
+  <link rel="stylesheet" href="./chat.css?v=2.3.6">
+  <script type="module" src="./chat.js?v=2.3.6"></script>
 </head>
 <body>
   <main>
@@ -69,6 +69,24 @@
         <button id="reset-appearance" type="button">Reset to default</button>
         <button id="export-appearance" type="button">export color settings</button>
       </div>
+      <div class="appearance-actions">
+        <button id="open-tutorial" type="button" aria-controls="tutorial-panel">movement tutorial</button>
+      </div>
+    </section>
+    <section id="tutorial-panel" aria-labelledby="tutorial-title" hidden>
+      <h2 id="tutorial-title" tabindex="-1">getting around</h2>
+      <h3>move your token</h3>
+      <ul>
+        <li>Click the move button or press <kbd>F2</kbd> with the chat box focused.</li>
+        <li>Use <kbd>WASD</kbd> or the arrow keys. Hold <kbd>Shift</kbd> for a half step.</li>
+        <li><kbd>Q</kbd> / <kbd>E</kbd> turn, <kbd>R</kbd> flips, and <kbd>Esc</kbd> exits move mode.</li>
+      </ul>
+      <h3>move around the map</h3>
+      <ul>
+        <li>Mouse mode: scroll the wheel over the map to zoom. Hold the wheel down and drag to pan, or drag with the Hand tool.</li>
+        <li>Trackpad mode: scroll with two fingers to pan and pinch to zoom.</li>
+      </ul>
+      <button id="tutorial-done" type="button">open chat</button>
     </section>
     <section id="avatar-panel" aria-label="avatar slots" hidden>
       <div class="avatar-modes" role="group" aria-label="avatar hotkey mode">

@@ -111,8 +111,22 @@ async function setupGM() {
 }
 
 async function focusToken(tokenId) {
-  const bounds = await OBR.scene.items.getItemBounds([tokenId]);
-  await OBR.viewport.animateToBounds(bounds);
+  const [bounds, dpi, viewportWidth, viewportHeight] = await Promise.all([
+    OBR.scene.items.getItemBounds([tokenId]),
+    OBR.scene.grid.getDpi(),
+    OBR.viewport.getWidth(),
+    OBR.viewport.getHeight(),
+  ]);
+  const minimumSpan = 10 * dpi;
+  const maxArrivalZoom = 0.75;
+  const width = Math.max(bounds.width, minimumSpan, viewportWidth / maxArrivalZoom);
+  const height = Math.max(bounds.height, minimumSpan, viewportHeight / maxArrivalZoom);
+  const { x, y } = bounds.center;
+  await OBR.viewport.animateToBounds({
+    center: bounds.center, width, height,
+    min: { x: x - width / 2, y: y - height / 2 },
+    max: { x: x + width / 2, y: y + height / 2 },
+  });
 }
 
 async function setupPlayer() {
@@ -192,6 +206,11 @@ async function setupPlayer() {
         await focusToken(token.id);
       } catch {
         // The token stays ready if this client cannot move the camera.
+      }
+      if (data.created === true) {
+        await OBR.broadcast.sendMessage("chat.overhead.arrival-guide.v1", {
+          tokenId: token.id, closeWelcome: welcome,
+        }, { destination: "LOCAL" });
       }
     } catch (error) {
       readableError(error);
