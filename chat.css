@@ -56,6 +56,8 @@ form { flex: none; }
 
 [hidden] { display: none !important; }
 nav { display: flex; gap: 6px; }
+header nav { flex-wrap: wrap; }
+header nav button { padding-inline: 10px; }
 nav button { min-height: 32px; background: #312940; color: #e2d4f6; }
 nav button[aria-pressed="true"], nav button:hover { background: #c7b6f8; color: #271c3a; }
 #chat-panel { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 12px; }
@@ -109,7 +111,7 @@ select { font: inherit; background: #181321; color: inherit; border: 1px solid #
 .message-heading time { flex: none; font-size: 11px; color: #ab9dbb; font-variant-numeric: tabular-nums; }
 .message-text { white-space: pre-wrap; line-height: 1.15; }
 
-#gm-panel, #avatar-panel { flex: 1; min-height: 0; overflow-y: auto; }
+#gm-panel, #avatar-panel, #skills-panel { flex: 1; min-height: 0; overflow-y: auto; }
 #avatar-panel p { margin: 0 0 8px; color: #ab9dbb; }
 #avatar-panel p:empty { display: none; }
 .avatar-modes { display: flex; gap: 6px; margin-bottom: 8px; }
@@ -134,8 +136,9 @@ select { font: inherit; background: #181321; color: inherit; border: 1px solid #
 #gm-panel input[type="checkbox"] { width: auto; min-height: 0; margin: 0; accent-color: #c7b6f8; }
 .habbo-scale { display: flex; align-items: center; gap: 6px; margin-top: 6px; }
 .habbo-scale input { width: 5em; }
-#player-skills { margin-top: 12px; }
-#player-skills summary { cursor: pointer; }
+#skills-views { margin-bottom: 10px; }
+#gm-skills > p { margin: 0 0 8px; color: #ab9dbb; font-size: 11px; }
+#gm-skills > p:empty { display: none; }
 .skill-facing-controls { display: flex; align-items: center; gap: 7px; margin: 8px 0; }
 .skill-facing-controls label { margin: 0; }
 #skill-facing { display: block; margin-top: 2px; }

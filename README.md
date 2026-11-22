@@ -37,9 +37,9 @@ The GM can turn on **habbo hotel mode** in the **gm** tab for pixel-style bubble
 
 ## Skill hotkeys with Embers
 
-Enable [Embers](https://extensions.owlbear.rodeo/embers) in the room, then turn on **enable skill hotkeys** in Overhead Chat’s **gm** tab. Pick a character token and toggle **grant magic missile**. The grant follows that token when a player changes avatars. The enable switch and grants are saved in the GM’s browser for the room. A GM running this release must be connected to approve casts.
+Enable [Embers](https://extensions.owlbear.rodeo/embers) in the room, then turn on **enable skill hotkeys** in **skills → grants** as GM. Choose a token to grant Magic Missile or a melee weapon variant. Everyone starts with generic slash. The enable switch and grants are saved in the GM’s browser for the room. A GM running this release must be connected to approve casts.
 
-Open **settings → skills** to mark which way your avatar artwork faces at zero rotation and to rebind the skills available to the current avatar. The direction is saved per artwork. In move mode, press **F** for spear attack or **G** for Magic Missile if the GM granted it. The missile travels eight grid widths along the avatar’s current facing, including rotation and mirroring. Walls, target hits, and damage are adjudicated at the table.
+Open **skills** to set your avatar’s facing at zero rotation, pick a granted weapon, and rebind available skills. Facing is saved per artwork, and weapon choice is saved per token. In move mode, press **F** for melee weapon attack or **G** for Magic Missile if the GM granted it. The missile travels eight grid widths along the avatar’s current facing, including rotation and mirroring. Walls, target hits, and damage are adjudicated at the table.
 
 ## Discord relay
 

@@ -1,7 +1,8 @@
 import { canSpeak } from "./rules.js";
 import {
-  EMBERS_EFFECTS, SKILLS, SKILL_REQUEST, SKILL_RESULT, availableSkills, readSkills, skillConnections, skillEffect,
-} from "./skills.js?v=2.6.0";
+  DEFAULT_WEAPON, EMBERS_EFFECTS, SKILLS, SKILL_REQUEST, SKILL_RESULT,
+  availableSkills, availableWeapons, readSkills, skillConnections, skillEffect,
+} from "./skills.js?v=2.6.2";
 
 export function setupSkillHost(obr) {
   const lastCast = new Map();
@@ -35,13 +36,19 @@ export function setupSkillHost(obr) {
       }
       const config = readSkills(obr, "gm");
       const skills = availableSkills(config, token.id);
-      const result = { enabled: config.enabled === true, skills };
+      const weapons = config.enabled === true ? availableWeapons(config.weaponsByToken?.[token.id]) : [];
+      const result = { enabled: config.enabled === true, skills, weapons };
       if (data.type === "list") {
         await answer(result);
         return;
       }
       if (!skills.includes(data.skill)) {
         await answer({ ...result, error: config.enabled ? "This avatar hasn’t been granted that skill." : "The GM hasn’t enabled skill hotkeys." });
+        return;
+      }
+      const weapon = data.weapon ?? DEFAULT_WEAPON;
+      if (data.skill === "spear" && !weapons.includes(weapon)) {
+        await answer({ ...result, error: "This avatar hasn’t been granted that weapon." });
         return;
       }
       const now = Date.now();
@@ -54,11 +61,16 @@ export function setupSkillHost(obr) {
         obr.scene.grid.getDpi(), obr.scene.items.getItemBounds([token.id]), obr.player.getRole(),
       ]);
       if (version !== sceneVersion || currentRole !== "GM") return;
-      if (!availableSkills(readSkills(obr, "gm"), token.id).includes(data.skill)) {
+      const latest = readSkills(obr, "gm");
+      if (!availableSkills(latest, token.id).includes(data.skill)) {
         await answer({ error: "This avatar no longer has that skill." });
         return;
       }
-      const instruction = skillEffect(data.skill, token, bounds.center, dpi, data.facing);
+      if (data.skill === "spear" && !availableWeapons(latest.weaponsByToken?.[token.id]).includes(weapon)) {
+        await answer({ ...result, weapons: availableWeapons(latest.weaponsByToken?.[token.id]), error: "This avatar no longer has that weapon." });
+        return;
+      }
+      const instruction = skillEffect(data.skill, token, bounds.center, dpi, data.facing, weapon);
       if (!instruction) {
         await answer({ ...result, error: "Couldn’t determine avatar facing. Check the scene grid and facing setting." });
         return;

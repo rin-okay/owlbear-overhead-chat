@@ -2,9 +2,22 @@ export const SKILL_REQUEST = "chat.overhead.skills/request.v1";
 export const SKILL_RESULT = "chat.overhead.skills/result.v1";
 export const SKILL_CHANGED = "chat.overhead.skills/changed.v1";
 export const EMBERS_EFFECTS = "eu.armindo.embers/effects";
+export const DEFAULT_WEAPON = "generic_slash";
+
+// These IDs match Embers' Melee Weapon Attack variants.
+export const WEAPONS = {
+  generic_slash: "generic slash",
+  club: "club", dagger: "dagger", falchion: "falchion", generic_whirlwind: "generic whirlwind",
+  glaive: "glaive", great_axe: "greataxe", great_club: "greatclub", great_sword: "greatsword",
+  halberd: "halberd", hammer: "hammer", hand_axe: "handaxe", laser_sword: "laser sword",
+  mace: "mace", maul: "maul", quarterstaff: "quarterstaff", rapier: "rapier",
+  scimitar: "scimitar", shortsword: "shortsword", spear: "spear", sword: "sword",
+  warhammer: "warhammer", wrench: "wrench",
+};
 
 export const SKILLS = {
-  spear: { name: "spear attack", key: "f", effect: "generic.weapon_attacks.melee.single.spear" },
+  // Keep the original skill ID so existing bindings and clients still work.
+  spear: { name: "melee weapon attack", key: "f" },
   missile: { name: "magic missile", key: "g", effect: "magic_missile", range: 8 },
 };
 export const FACINGS = [
@@ -34,6 +47,10 @@ export function availableSkills(config, tokenId) {
     ? ["spear", "missile"] : ["spear"];
 }
 
+export function availableWeapons(grants) {
+  return Object.keys(WEAPONS).filter((id) => id === DEFAULT_WEAPON || (Array.isArray(grants) && grants.includes(id)));
+}
+
 export async function skillConnections(obr) {
   const [connectionId, role, party] = await Promise.all([
     obr.player.getConnectionId(), obr.player.getRole(), obr.party.getPlayers(),
@@ -46,10 +63,12 @@ export async function skillConnections(obr) {
   return { self, players, gm };
 }
 
-export function skillEffect(skillId, token, center, dpi, facing) {
+export function skillEffect(skillId, token, center, dpi, facing, weapon = DEFAULT_WEAPON) {
   if (!Object.hasOwn(SKILLS, skillId) || !FACINGS.some(([angle]) => angle === facing) ||
       ![center?.x, center?.y, token.rotation, dpi].every(Number.isFinite) || dpi <= 0) return;
   const skill = SKILLS[skillId];
+  const effect = skill.effect ?? (Object.hasOwn(WEAPONS, weapon) && "generic.weapon_attacks.melee.single." + weapon);
+  if (!effect) return;
   const base = facing * Math.PI / 180;
   const x = Math.cos(base) * (token.scale?.x < 0 ? -1 : 1);
   const y = Math.sin(base) * (token.scale?.y < 0 ? -1 : 1);
@@ -67,5 +86,5 @@ export function skillEffect(skillId, token, center, dpi, facing) {
     effectProperties.rotation = rotation;
     effectProperties.size = 2;
   }
-  return { type: "effect", id: skill.effect, layer: "ATTACHMENT", effectProperties };
+  return { type: "effect", id: effect, layer: "ATTACHMENT", effectProperties };
 }

@@ -10,9 +10,9 @@ import {
 } from "./session.js";
 
 import { drawBubble } from "./appearance.js?v=2.6.1";
-import { setupDiscordPanel } from "./discord-panel.js?v=2.6.1";
+import { setupDiscordPanel } from "./discord-panel.js?v=2.6.2";
 import { setupAvatarPanel } from "./avatar-panel.js?v=2.3.10";
-import { setupSkillGrants, setupSkillPanel } from "./skill-panel.js?v=2.6.0";
+import { setupSkillGrants, setupSkillPanel } from "./skill-panel.js?v=2.6.2";
 
 import { rollSpans, validateRollSpans } from "./dice.js";
 import { rollWithRumble } from "./rumble.js";
@@ -44,6 +44,7 @@ let movingAvatar = false;
 let modeExitKey;
 let refreshAvatarPanel;
 let skillPanel;
+let showSkillsForRole;
 let moveWarningTimer;
 let moveWarningFade;
 const SLOT_DOUBLE_TAP_MS = 500;
@@ -672,18 +673,39 @@ function setupSettings() {
   const chatTab = document.querySelector("#chat-tab");
   const settingsTab = document.querySelector("#settings-tab");
   const avatarTab = document.querySelector("#avatar-tab");
+  const skillsTab = document.querySelector("#skills-tab");
   const chatPanel = document.querySelector("#chat-panel");
   const settingsPanel = document.querySelector("#settings-panel");
   const avatarPanel = document.querySelector("#avatar-panel");
+  const skillsPanel = document.querySelector("#skills-panel");
   const tutorialPanel = document.querySelector("#tutorial-panel");
   const tutorialButton = document.querySelector("#open-tutorial");
   const doneButton = document.querySelector("#tutorial-done");
   skillPanel = setupSkillPanel(OBR, () => avatar, (key) =>
     typeof key === "string" && /^[a-z]$/.test(key) && !Object.hasOwn(movementKeys, key));
   const refreshSkillGrants = setupSkillGrants(OBR);
-  document.querySelector("#player-skills").addEventListener("toggle", (event) => {
-    if (event.currentTarget.open) skillPanel.refresh(avatar, true);
-  });
+  const skillsViews = document.querySelector("#skills-views");
+  const loadoutTab = document.querySelector("#skill-loadout-tab");
+  const grantsTab = document.querySelector("#skill-grants-tab");
+  const loadout = document.querySelector("#player-skills");
+  const grants = document.querySelector("#gm-skills");
+
+  function selectSkillView(showGrants) {
+    const isGrants = showGrants && !skillsViews.hidden;
+    loadout.hidden = isGrants;
+    grants.hidden = !isGrants;
+    grantsTab.setAttribute("aria-pressed", String(isGrants));
+    loadoutTab.setAttribute("aria-pressed", String(!isGrants));
+    if (skillsPanel.hidden) return;
+    if (isGrants) void refreshSkillGrants();
+    else skillPanel.refresh(avatar, true);
+  }
+  showSkillsForRole = (role) => {
+    skillsViews.hidden = role !== "GM";
+    if (skillsViews.hidden && !grants.hidden) selectSkillView(false);
+  };
+  loadoutTab.addEventListener("click", () => selectSkillView(false));
+  grantsTab.addEventListener("click", () => selectSkillView(true));
   const updateAvatarPanel = setupAvatarPanel(avatarPanel);
   refreshAvatarPanel = (items) => updateAvatarPanel(items, playerRole);
   const fields = settingsPanel.querySelector("form");
@@ -722,6 +744,7 @@ function setupSettings() {
     { tab: settingsTab, panel: settingsPanel },
     { tab: document.querySelector("#gm-tab"), panel: document.querySelector("#gm-panel") },
     { tab: avatarTab, panel: avatarPanel },
+    { tab: skillsTab, panel: skillsPanel },
   ];
 
   function select(index) {
@@ -731,7 +754,7 @@ function setupSettings() {
       panel.hidden = index !== view;
     });
     if (index === 0) scrollToLatest();
-    if (index === 2) void refreshSkillGrants();
+    if (index === 4) selectSkillView(!grants.hidden);
   }
 
   function showTutorial() {
@@ -752,6 +775,7 @@ function setupSettings() {
     select(3);
     void refreshAvatarPanel();
   });
+  skillsTab.addEventListener("click", () => select(4));
   setupDiscordPanel(() => select(0), () => select(2));
   fields.addEventListener("submit", (event) => event.preventDefault());
   fields.addEventListener("input", () => {
@@ -770,6 +794,7 @@ OBR.onReady(() => {
   connectTranscript();
   OBR.player.onChange(({ metadata, role }) => {
     playerRole = role;
+    showSkillsForRole(role);
     const state = JSON.stringify([metadata[AVATAR]?.tokenId, role]);
     if (state === avatarState) return;
     avatarState = state;
@@ -779,6 +804,7 @@ OBR.onReady(() => {
   void OBR.player.getRole().then((role) => {
     if (playerRole !== undefined) return;
     playerRole = role;
+    showSkillsForRole(role);
     return refreshAvatarPanel();
   }).catch(console.error);
   OBR.scene.onReadyChange((ready) => {
