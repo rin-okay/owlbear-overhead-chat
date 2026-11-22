@@ -5,8 +5,17 @@ function storageKey() {
 }
 
 export function normalizeWebhook(value) {
-  const match = /^https:\/\/discord\.com\/api\/(?:v\d+\/)?webhooks\/(\d{17,22})\/([A-Za-z0-9_-]{30,150})\/?$/iu.exec(value.trim());
-  return match ? `https://discord.com/api/webhooks/${match[1]}/${match[2]}` : "";
+  if (typeof value !== "string") return "";
+  const input = value.trim().replace(/^<([^<>]+)>$/u, "$1");
+  const match = /^https:\/\/(?:(?:www|ptb|canary)\.)?discord(?:app)?\.com\/api\/(?:v\d+\/)?webhooks\/(\d{17,22})\/([A-Za-z0-9_-]{30,150})\/?(\?[^#\s]*)?$/iu.exec(input);
+  if (!match) return "";
+  const [, id, token, query] = match;
+  const params = new URLSearchParams(query);
+  const thread = params.get("thread_id");
+  if ([...params.keys()].some((key) => key !== "wait" && key !== "thread_id")) return "";
+  if (thread !== null && (!/^\d{17,22}$/u.test(thread) || params.getAll("thread_id").length !== 1)) return "";
+  const url = `https://discord.com/api/webhooks/${id}/${token}`;
+  return thread ? `${url}?thread_id=${thread}` : url;
 }
 
 export function discordSettings() {
@@ -27,6 +36,8 @@ export function saveDiscordSettings(settings) {
 const plainText = (value) => String(value).replace(/([\\*_~`|<>])/gu, "\\$1");
 
 export async function sendDiscord(url, entry, stillEnabled = () => true) {
+  const requestUrl = new URL(url);
+  requestUrl.searchParams.set("wait", "true");
   const timestamp = Math.floor((entry.receivedAt ?? Date.now()) / 1000);
   const body = JSON.stringify({
     content: `**${plainText(entry.name).replace(/\s+/gu, " ")}** <t:${timestamp}:t>\n${plainText(entry.text)}`,
@@ -37,7 +48,7 @@ export async function sendDiscord(url, entry, stillEnabled = () => true) {
     if (!await stillEnabled()) return false;
     let response;
     try {
-      response = await fetch(`${url}?wait=true`, {
+      response = await fetch(requestUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body,
