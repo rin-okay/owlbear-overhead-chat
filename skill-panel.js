@@ -1,8 +1,8 @@
 import { isPublicToken } from "./rules.js";
 import {
-  DEFAULT_WEAPON, FACINGS, SKILLS, SKILL_CHANGED, SKILL_REQUEST, SKILL_RESULT, SPELLS, WEAPONS,
-  availableSpells, availableWeapons, readSkills, skillConnections, spellParameter, validSpellParameter, writeSkills,
-} from "./skills.js?v=2.7.2";
+  DEFAULT_WEAPON, FACINGS, FRIENDLY_FIRE_MODES, SKILLS, SKILL_CHANGED, SKILL_REQUEST, SKILL_RESULT, SPELLS, TEAMS, WEAPONS,
+  availableSpells, availableWeapons, friendlyFireMode, readSkills, skillConnections, spellParameter, tokenTeams, validSpellParameter, writeSkills,
+} from "./skills.js?v=2.7.3";
 
 function characterLabel(token) {
   return token.name || "unnamed character";
@@ -207,6 +207,9 @@ export function setupSkillPanel(obr, getAvatar, keyAllowed) {
 
 export function setupSkillGrants(obr) {
   const enabled = document.querySelector("#skill-enabled");
+  const friendlyFire = document.querySelector("#skill-friendly-fire");
+  const team = document.querySelector("#grant-team-type");
+  const teamGrant = document.querySelector("#skill-grant-team");
   const tokens = document.querySelector("#skill-token");
   const spell = document.querySelector("#grant-spell-type");
   const spellGrant = document.querySelector("#skill-grant-spell");
@@ -225,13 +228,23 @@ export function setupSkillGrants(obr) {
     if (id !== DEFAULT_WEAPON) weapon.add(new Option(name, id));
   }
   for (const id of SPELLS) spell.add(new Option(SKILLS[id].name, id));
+  for (const name of TEAMS) team.add(new Option(name, name));
+  for (const mode of FRIENDLY_FIRE_MODES) friendlyFire.add(new Option(mode, mode));
 
   function render(config) {
     enabled.disabled = !allowed || saving;
     enabled.checked = config.enabled === true;
+    friendlyFire.disabled = !allowed || saving;
+    friendlyFire.value = friendlyFireMode(config);
     tokens.disabled = !allowed || saving || tokens.options.length <= 1;
     const disableGrants = !allowed || saving || !tokens.value;
-    spell.disabled = weapon.disabled = disableGrants;
+    spell.disabled = weapon.disabled = team.disabled = disableGrants;
+    teamGrant.disabled = disableGrants || !team.value;
+    const assignedTeams = tokenTeams(config, tokens.value);
+    teamGrant.checked = assignedTeams.includes(team.value);
+    for (const option of team.options) {
+      option.text = option.value + (assignedTeams.includes(option.value) ? " (assigned)" : "");
+    }
     spellGrant.disabled = disableGrants || !spell.value;
     weaponGrant.disabled = disableGrants || !weapon.value;
     const grantedSpells = availableSpells(config, tokens.value);
@@ -289,7 +302,8 @@ export function setupSkillGrants(obr) {
     if (saving) return;
     saving = true;
     enabled.disabled = tokens.disabled = spell.disabled = spellGrant.disabled =
-      parameterField.disabled = weapon.disabled = weaponGrant.disabled = true;
+      parameterField.disabled = weapon.disabled = weaponGrant.disabled =
+      friendlyFire.disabled = team.disabled = teamGrant.disabled = true;
     try {
       const { self, gm } = await skillConnections(obr);
       if (self.role !== "GM" || gm?.connectionId !== self.connectionId) throw Error("The connected skills GM must save grants.");
@@ -297,7 +311,13 @@ export function setupSkillGrants(obr) {
       if (change.tokenId) {
         const [token] = await obr.scene.items.getItems([change.tokenId]);
         if (!isPublicToken(token) || change.tokenId !== tokens.value) throw Error("Choose a token in the open scene.");
-        if (change.weapon) {
+        if (change.team) {
+          if (!TEAMS.includes(change.team)) return;
+          const assigned = new Set(tokenTeams(config, token.id));
+          if (change.grant) assigned.add(change.team);
+          else assigned.delete(change.team);
+          config.teamsByToken = { ...config.teamsByToken, [token.id]: [...assigned] };
+        } else if (change.weapon) {
           if (!Object.hasOwn(WEAPONS, change.weapon) || change.weapon === DEFAULT_WEAPON) return;
           const granted = new Set(availableWeapons(config.weaponsByToken?.[token.id]).filter((id) => id !== DEFAULT_WEAPON));
           if (change.grant) granted.add(change.weapon);
@@ -323,6 +343,9 @@ export function setupSkillGrants(obr) {
             config.spellsByToken = { ...config.spellsByToken, [token.id]: [...ids] };
           }
         }
+      } else if (Object.hasOwn(change, "friendlyFire")) {
+        if (!FRIENDLY_FIRE_MODES.includes(change.friendlyFire)) return;
+        config.friendlyFire = change.friendlyFire;
       } else config.enabled = change.enabled;
       writeSkills(obr, "gm", config);
       status.textContent = "";
@@ -335,7 +358,12 @@ export function setupSkillGrants(obr) {
     }
   }
   enabled.addEventListener("change", () => { void save({ enabled: enabled.checked }); });
+  friendlyFire.addEventListener("change", () => { void save({ friendlyFire: friendlyFire.value }); });
   tokens.addEventListener("change", () => render(readSkills(obr, "gm")));
+  team.addEventListener("change", () => render(readSkills(obr, "gm")));
+  teamGrant.addEventListener("change", () => {
+    if (tokens.value && team.value) void save({ tokenId: tokens.value, team: team.value, grant: teamGrant.checked });
+  });
   spell.addEventListener("change", () => render(readSkills(obr, "gm")));
   spellGrant.addEventListener("change", () => {
     if (tokens.value && spell.value) void save({ tokenId: tokens.value, spell: spell.value, grant: spellGrant.checked });

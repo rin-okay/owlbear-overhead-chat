@@ -174,7 +174,7 @@ export function coneHits(source, rotation, length, items, casterId, dpi) {
   }).map(({ id }) => id);
 }
 
-export function projectileImpact(source, destination, items, casterId, dpi, blastRadius = 0) {
+export function projectileImpact(source, destination, items, casterId, dpi, blastRadius = 0, canIntercept = () => true) {
   const delta = subtract(destination, source);
   const range = Math.hypot(delta.x, delta.y);
   if (!Number.isFinite(range) || range <= EPSILON) return { destination, hitTokenIds: [] };
@@ -189,6 +189,7 @@ export function projectileImpact(source, destination, items, casterId, dpi, blas
     const circle = tokenCircle(item, dpi);
     if (!circle) continue;
     targets.push({ id: item.id, ...circle });
+    if (!canIntercept(item)) continue;
     const distance = circleDistance(source, direction, circle);
     if (distance < tokenDistance) {
       tokenDistance = distance;

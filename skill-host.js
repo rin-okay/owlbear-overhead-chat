@@ -1,10 +1,10 @@
 import { canSpeak, MELEE_HIT_TIMING, normalizeMeleeHitTiming } from "./rules.js?v=2.6.16";
-import { coneHits, isProjectileToken, isProjectileWall, openMeleeDoor, projectileImpact } from "./projectile-collision.js?v=2.7.1";
+import { coneHits, isProjectileToken, isProjectileWall, openMeleeDoor, projectileImpact } from "./projectile-collision.js?v=2.7.3";
 import { HIT_MARKERS, MELEE_HIT_CUE } from "./hit-markers.js?v=2.6.16";
 import {
   DEFAULT_WEAPON, EMBERS_EFFECTS, MELEE_DURATION_MS, SKILLS, SKILL_REQUEST, SKILL_RESULT,
-  availableSkills, availableWeapons, readSkills, skillConnections, skillEffect, spellParameter,
-} from "./skills.js?v=2.7.2";
+  availableSkills, availableWeapons, friendlyFireMode, readSkills, skillConnections, skillEffect, spellParameter, tokenTeams,
+} from "./skills.js?v=2.7.3";
 
 export function setupSkillHost(obr) {
   const lastCast = new Map();
@@ -94,13 +94,21 @@ export function setupSkillHost(obr) {
           await answer({ ...result, error: "Couldn’t check the scene for walls and tokens. Try again." });
           return;
         }
+        const mode = friendlyFireMode(latest);
+        const casterTeams = tokenTeams(latest, token.id);
+        const isAlly = (item) => casterTeams.length > 0 && isProjectileToken(item) &&
+          tokenTeams(latest, item.id).some((team) => casterTeams.includes(team));
         const items = obstacles.flat();
+        const hitsAllies = mode === "enabled" || (mode === "aoe" && (skill.impact || skill.cone));
+        const targets = hitsAllies ? items : items.filter((item) => !isAlly(item));
         const { source, rotation, destination, size } = instruction.effectProperties;
         if (skill.cone) {
-          hitTokenIds = coneHits(source, rotation, size * dpi, items, token.id, dpi);
+          hitTokenIds = coneHits(source, rotation, size * dpi, targets, token.id, dpi);
         } else if (projectile) {
           const blastRadius = skill.impact ? parameter * dpi : 0;
-          const impact = projectileImpact(source, destination, items, token.id, dpi, blastRadius);
+          // In AoE mode an ally can be caught in the blast without stopping its projectile.
+          const canIntercept = mode === "aoe" && skill.impact ? (item) => !isAlly(item) : undefined;
+          const impact = projectileImpact(source, destination, targets, token.id, dpi, blastRadius, canIntercept);
           instruction.effectProperties.destination = impact.destination;
           hitTokenIds = impact.hitTokenIds;
           if (skill.impact) {
@@ -115,7 +123,7 @@ export function setupSkillHost(obr) {
           const angle = rotation * Math.PI / 180;
           const reach = skill.meleeReach * dpi;
           const end = { x: source.x + reach * Math.cos(angle), y: source.y + reach * Math.sin(angle) };
-          const impact = projectileImpact(source, end, items, token.id, dpi);
+          const impact = projectileImpact(source, end, targets, token.id, dpi);
           hitTokenIds = impact.hitTokenIds;
           doorId = impact.doorId;
         }

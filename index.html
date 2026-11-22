@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>overhead chat</title>
   <link rel="stylesheet" href="./chat.css?v=2.7.2">
-  <script type="module" src="./chat.js?v=2.7.2"></script>
+  <script type="module" src="./chat.js?v=2.7.3"></script>
 </head>
 <body>
   <main>
@@ -136,8 +136,11 @@
       </section>
       <section id="gm-skills" aria-label="skill grants" hidden>
         <label class="discord-enabled"><input id="skill-enabled" type="checkbox" disabled> enable skill hotkeys</label>
+        <label class="skill-field">enable friendly fire <select id="skill-friendly-fire" disabled></select></label>
         <p>Requires Embers in this room. Generic slash is available to everyone. Grants are saved in this GM browser.</p>
         <label class="skill-field">token <select id="skill-token" disabled><option value="">choose a token</option></select></label>
+        <label class="skill-field">team <select id="grant-team-type" disabled></select></label>
+        <label class="discord-enabled"><input id="skill-grant-team" type="checkbox" disabled> assign selected team</label>
         <label class="skill-field">spell <select id="grant-spell-type" disabled></select></label>
         <label class="discord-enabled"><input id="skill-grant-spell" type="checkbox" disabled> grant selected spell</label>
         <label id="skill-spell-parameter-row" class="skill-field" hidden>

@@ -3,6 +3,8 @@ export const SKILL_RESULT = "chat.overhead.skills/result.v1";
 export const SKILL_CHANGED = "chat.overhead.skills/changed.v1";
 export const EMBERS_EFFECTS = "eu.armindo.embers/effects";
 export const DEFAULT_WEAPON = "generic_slash";
+export const TEAMS = ["red", "blue", "green", "mob 1", "mob 2", "mob 3"];
+export const FRIENDLY_FIRE_MODES = ["enabled", "disabled", "aoe"];
 
 // These IDs match Embers' Melee Weapon Attack variants.
 export const WEAPONS = {
@@ -89,6 +91,15 @@ export function availableSpells(config, tokenId) {
   const spells = config.spellsByToken?.[tokenId];
   if (Array.isArray(spells)) return SPELLS.filter((id) => spells.includes(id));
   return Array.isArray(config.missileTokens) && config.missileTokens.includes(tokenId) ? ["missile"] : [];
+}
+
+export function tokenTeams(config, tokenId) {
+  const assigned = config.teamsByToken?.[tokenId];
+  return Array.isArray(assigned) ? TEAMS.filter((team) => assigned.includes(team)) : [];
+}
+
+export function friendlyFireMode(config) {
+  return FRIENDLY_FIRE_MODES.includes(config.friendlyFire) ? config.friendlyFire : "enabled";
 }
 
 export function validSpellParameter(skillId, value) {
