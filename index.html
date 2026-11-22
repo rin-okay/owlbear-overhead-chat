@@ -4,8 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>overhead chat</title>
-  <link rel="stylesheet" href="./chat.css?v=2.6.2">
-  <script type="module" src="./chat.js?v=2.6.6"></script>
+  <link rel="stylesheet" href="./chat.css?v=2.6.7">
+  <script type="module" src="./chat.js?v=2.6.7"></script>
 </head>
 <body>
   <main>
@@ -66,6 +66,7 @@
           <label>Font size <input name="size" type="number" min="10" max="28" step="1" required></label>
         </div>
       </form>
+      <label class="discord-enabled"><input id="follow-camera" type="checkbox" aria-keyshortcuts="F4"> camera follow mode</label>
       <div id="bubble-preview" aria-label="bubble preview"></div>
       <div class="appearance-actions">
         <button id="reset-appearance" type="button">Reset to default</button>
@@ -82,6 +83,7 @@
         <li><kbd>F1</kbd> opens chat, exits move mode, and focuses the message box.</li>
         <li><kbd>F2</kbd> opens chat in move mode for your saved avatar.</li>
         <li><kbd>F3</kbd> centers the view on your saved avatar at the current zoom.</li>
+        <li><kbd>F4</kbd> toggles camera follow mode.</li>
         <li>Use <kbd>WASD</kbd> or the arrow keys. Hold <kbd>Shift</kbd> for a half step.</li>
         <li><kbd>Q</kbd> / <kbd>E</kbd> turn 15°, or 90° with <kbd>Shift</kbd>. <kbd>R</kbd> flips, and <kbd>Esc</kbd> exits move mode.</li>
       </ul>

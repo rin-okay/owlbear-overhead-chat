@@ -15,7 +15,7 @@ import { queueDicePopup, resetDicePopups } from "./dice-popup.js";
 import { setupSkillHost } from "./skill-host.js?v=2.6.5";
 import { requestChatShortcut } from "./chat-shortcut.js?v=2.6.4";
 import { setupChatRecovery } from "./chat-recovery.js?v=2.6.6";
-import { centerAvatar } from "./avatar-viewport.js?v=2.6.6";
+import { centerAvatar, setupCameraFollow } from "./avatar-viewport.js?v=2.6.7";
 
 const HISTORY_LIMIT = 1000;
 const HISTORY_PAGE_SIZE = 100;
@@ -354,6 +354,7 @@ function queueSpeech(event) {
 }
 
 OBR.onReady(() => {
+  const cameraFollow = setupCameraFollow(OBR);
   let shortcutRevision = 0;
   async function openFromShortcut(mode) {
     const revision = ++shortcutRevision;
@@ -364,13 +365,16 @@ OBR.onReady(() => {
     ["F1", "chat", "Focus Overhead Chat (F1)", "./toolbar-chat.svg"],
     ["F2", "move", "Move chat avatar (F2)", "./icon.svg"],
     ["F3", "center", "Center chat avatar (F3)", "./icon.svg"],
+    ["F4", "follow", "Toggle camera follow mode (F4)", "./icon.svg"],
   ]) {
     OBR.tool.create({
       id: "chat.overhead.shortcut." + mode,
       shortcut: key,
       icons: [{ icon: new URL(icon, import.meta.url).href, label }],
       onClick() {
-        void (mode === "center" ? centerAvatar(OBR) : openFromShortcut(mode)).catch(report);
+        if (mode === "follow") void cameraFollow.toggle().catch(report);
+        else if (mode === "center") void centerAvatar(OBR).catch(report);
+        else void openFromShortcut(mode).catch(report);
         return false;
       },
     }).catch(report);

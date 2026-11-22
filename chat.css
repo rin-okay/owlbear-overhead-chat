@@ -65,7 +65,7 @@ nav button[aria-pressed="true"], nav button:hover { background: #c7b6f8; color: 
 #settings-panel { flex: 1; min-height: 0; overflow-y: auto; }
 #settings-panel form { display: grid; gap: 8px; }
 #settings-panel label { margin: 0; white-space: normal; }
-#settings-panel input, #settings-panel select { display: block; margin-top: 4px; min-height: 34px; width: 100%; }
+#settings-panel input:not([type="checkbox"]), #settings-panel select { display: block; margin-top: 4px; min-height: 34px; width: 100%; }
 #settings-panel input[type="color"] { padding: 3px; }
 .colors, .font-controls { display: grid; gap: 8px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .font-controls { grid-template-columns: 2fr 1fr; }

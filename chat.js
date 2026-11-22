@@ -10,11 +10,11 @@ import {
 } from "./session.js";
 
 import { drawBubble } from "./appearance.js?v=2.6.1";
-import { setupDiscordPanel } from "./discord-panel.js?v=2.6.6";
+import { setupDiscordPanel } from "./discord-panel.js?v=2.6.7";
 import { setupAvatarPanel } from "./avatar-panel.js?v=2.3.10";
 import { setupSkillGrants, setupSkillPanel } from "./skill-panel.js?v=2.6.5";
 import { listenForChatShortcut } from "./chat-shortcut.js?v=2.6.4";
-import { centerAvatar } from "./avatar-viewport.js?v=2.6.6";
+import { cameraFollowPreference, centerAvatar } from "./avatar-viewport.js?v=2.6.7";
 
 import { rollSpans, validateRollSpans } from "./dice.js";
 import { rollWithRumble } from "./rumble.js";
@@ -684,6 +684,9 @@ function setupSettings() {
   const skillsTab = document.querySelector("#skills-tab");
   const chatPanel = document.querySelector("#chat-panel");
   const settingsPanel = document.querySelector("#settings-panel");
+  const followCamera = settingsPanel.querySelector("#follow-camera");
+  const cameraFollow = cameraFollowPreference(OBR, (enabled) => { followCamera.checked = enabled; });
+  followCamera.addEventListener("change", () => cameraFollow.set(followCamera.checked));
   const avatarPanel = document.querySelector("#avatar-panel");
   const skillsPanel = document.querySelector("#skills-panel");
   const tutorialPanel = document.querySelector("#tutorial-panel");
@@ -793,12 +796,13 @@ function setupSettings() {
     void refresh();
   }
   document.addEventListener("keydown", (event) => {
-    if (!["F1", "F2", "F3"].includes(event.key) || event.ctrlKey || event.altKey ||
+    if (!["F1", "F2", "F3", "F4"].includes(event.key) || event.ctrlKey || event.altKey ||
         event.metaKey || event.shiftKey || event.isComposing) return;
     event.preventDefault();
     event.stopPropagation();
     if (event.repeat) return;
-    if (event.key === "F3") void centerAvatar(OBR).catch(console.error);
+    if (event.key === "F4") void cameraFollow.toggle().catch(console.error);
+    else if (event.key === "F3") void centerAvatar(OBR).catch(console.error);
     else openFromShortcut(event.key === "F1" ? "chat" : "move");
   }, true);
   if (!welcome) listenForChatShortcut(OBR, openFromShortcut);
