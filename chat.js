@@ -9,7 +9,7 @@ import {
 } from "./session.js";
 
 import { drawBubble } from "./appearance.js";
-import { setupDiscordPanel } from "./discord-panel.js?v=2.3.6";
+import { setupDiscordPanel } from "./discord-panel.js?v=2.3.7";
 import { setupAvatarPanel } from "./avatar-panel.js";
 
 import { rollSpans, validateRollSpans } from "./dice.js";
@@ -614,7 +614,6 @@ function setupSettings() {
   const tutorialPanel = document.querySelector("#tutorial-panel");
   const tutorialButton = document.querySelector("#open-tutorial");
   const doneButton = document.querySelector("#tutorial-done");
-  let tutorialReturn = 0;
   refreshAvatarPanel = setupAvatarPanel(avatarPanel);
   const fields = settingsPanel.querySelector("form");
   const preview = settingsPanel.querySelector("#bubble-preview");
@@ -663,20 +662,17 @@ function setupSettings() {
     if (index === 0) scrollToLatest();
   }
 
-  function showTutorial(returnView) {
-    tutorialReturn = returnView;
+  function showTutorial() {
     select(-1);
     tutorialPanel.hidden = false;
-    doneButton.textContent = returnView === 1 ? "back to settings" : "open chat";
     tutorialPanel.querySelector("h2").focus();
   }
-  tutorialButton.addEventListener("click", () => showTutorial(1));
+  tutorialButton.addEventListener("click", showTutorial);
   doneButton.addEventListener("click", () => {
-    select(tutorialReturn);
-    if (tutorialReturn === 1) tutorialButton.focus();
-    else if (!input.disabled) input.focus();
+    select(0);
+    if (!input.disabled) input.focus();
   });
-  if (new URLSearchParams(location.search).has("welcome")) showTutorial(0);
+  if (new URLSearchParams(location.search).has("welcome")) showTutorial();
 
   chatTab.addEventListener("click", () => select(0));
   settingsTab.addEventListener("click", () => select(1));

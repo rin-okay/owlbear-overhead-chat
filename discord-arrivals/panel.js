@@ -200,17 +200,18 @@ async function setupPlayer() {
       connect.disabled = true;
       el("paste-details").hidden = true;
       status(data.needsVision ? "Your token is ready. The GM can enable Smoke & Spectre vision on it." : "Your token is ready.");
+      listen("continue-to-tutorial", async () => {
+        await OBR.broadcast.sendMessage("chat.overhead.arrival-guide.v1", {
+          tokenId: token.id, closeWelcome: welcome,
+        }, { destination: "LOCAL" });
+      });
+      setVisible("continue-to-tutorial", true);
       listen("find-token", () => focusToken(token.id));
       setVisible("find-token", true);
       try {
         await focusToken(token.id);
       } catch {
         // The token stays ready if this client cannot move the camera.
-      }
-      if (data.created === true) {
-        await OBR.broadcast.sendMessage("chat.overhead.arrival-guide.v1", {
-          tokenId: token.id, closeWelcome: welcome,
-        }, { destination: "LOCAL" });
       }
     } catch (error) {
       readableError(error);
