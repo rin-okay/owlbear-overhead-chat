@@ -1,8 +1,9 @@
 import { canSpeak } from "./rules.js";
+import { clipProjectile, isProjectileToken, isProjectileWall } from "./projectile-collision.js?v=2.6.3";
 import {
   DEFAULT_WEAPON, EMBERS_EFFECTS, SKILLS, SKILL_REQUEST, SKILL_RESULT,
   availableSkills, availableWeapons, readSkills, skillConnections, skillEffect,
-} from "./skills.js?v=2.6.2";
+} from "./skills.js?v=2.6.3";
 
 export function setupSkillHost(obr) {
   const lastCast = new Map();
@@ -57,8 +58,14 @@ export function setupSkillHost(obr) {
         return;
       }
       lastCast.set(sender.id, now);
-      const [dpi, bounds, currentRole] = await Promise.all([
+      const projectile = Boolean(SKILLS[data.skill].range);
+      const geometry = projectile ? Promise.all([
+        obr.scene.items.getItems((item) => isProjectileToken(item) || isProjectileWall(item)),
+        obr.scene.local.getItems(isProjectileWall),
+      ]).catch(() => null) : [];
+      const [dpi, bounds, currentRole, obstacles] = await Promise.all([
         obr.scene.grid.getDpi(), obr.scene.items.getItemBounds([token.id]), obr.player.getRole(),
+        geometry,
       ]);
       if (version !== sceneVersion || currentRole !== "GM") return;
       const latest = readSkills(obr, "gm");
@@ -74,6 +81,15 @@ export function setupSkillHost(obr) {
       if (!instruction) {
         await answer({ ...result, error: "Couldn’t determine avatar facing. Check the scene grid and facing setting." });
         return;
+      }
+      if (projectile) {
+        if (!obstacles) {
+          await answer({ ...result, error: "Couldn’t check the scene for walls and tokens. Try again." });
+          return;
+        }
+        const { effectProperties } = instruction;
+        effectProperties.destination = clipProjectile(effectProperties.source, effectProperties.destination,
+          obstacles.flat(), token.id, dpi);
       }
       await obr.broadcast.sendMessage(EMBERS_EFFECTS, {
         instructions: [instruction], spellData: { name: SKILLS[data.skill].name, caster: sender.id },

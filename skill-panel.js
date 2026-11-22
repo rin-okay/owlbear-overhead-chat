@@ -1,8 +1,8 @@
 import { isPublicToken } from "./rules.js";
 import {
-  DEFAULT_WEAPON, FACINGS, SKILLS, SKILL_CHANGED, SKILL_REQUEST, SKILL_RESULT, WEAPONS,
-  availableWeapons, readSkills, skillConnections, writeSkills,
-} from "./skills.js?v=2.6.2";
+  DEFAULT_WEAPON, FACINGS, SKILLS, SKILL_CHANGED, SKILL_REQUEST, SKILL_RESULT, SPELLS, WEAPONS,
+  availableSpells, availableWeapons, readSkills, skillConnections, writeSkills,
+} from "./skills.js?v=2.6.3";
 
 function characterLabel(token) {
   return token.name || "unnamed character";
@@ -35,7 +35,9 @@ export function setupSkillPanel(obr, getAvatar, keyAllowed) {
 
   function binding(id) {
     const key = preferences.bindings?.[id];
-    return key === "" || keyAllowed(key) ? key : SKILLS[id].key;
+    if (key === "" || keyAllowed(key)) return key;
+    const defaultKey = SKILLS[id].key;
+    return Object.keys(SKILLS).some((other) => preferences.bindings?.[other] === defaultKey) ? "" : defaultKey;
   }
 
   function selectedWeapon(tokenId) {
@@ -206,7 +208,8 @@ export function setupSkillPanel(obr, getAvatar, keyAllowed) {
 export function setupSkillGrants(obr) {
   const enabled = document.querySelector("#skill-enabled");
   const tokens = document.querySelector("#skill-token");
-  const grant = document.querySelector("#skill-grant-missile");
+  const spell = document.querySelector("#grant-spell-type");
+  const spellGrant = document.querySelector("#skill-grant-spell");
   const weapon = document.querySelector("#grant-weapon-type");
   const weaponGrant = document.querySelector("#skill-grant-weapon");
   const status = document.querySelector("#skill-gm-status");
@@ -218,15 +221,21 @@ export function setupSkillGrants(obr) {
   for (const [id, name] of Object.entries(WEAPONS)) {
     if (id !== DEFAULT_WEAPON) weapon.add(new Option(name, id));
   }
+  for (const id of SPELLS) spell.add(new Option(SKILLS[id].name, id));
 
   function render(config) {
     enabled.disabled = !allowed || saving;
     enabled.checked = config.enabled === true;
     tokens.disabled = !allowed || saving || tokens.options.length <= 1;
-    grant.disabled = !allowed || saving || !tokens.value;
-    grant.checked = Array.isArray(config.missileTokens) && config.missileTokens.includes(tokens.value);
-    weapon.disabled = grant.disabled;
-    weaponGrant.disabled = grant.disabled || !weapon.value;
+    const disableGrants = !allowed || saving || !tokens.value;
+    spell.disabled = weapon.disabled = disableGrants;
+    spellGrant.disabled = disableGrants || !spell.value;
+    weaponGrant.disabled = disableGrants || !weapon.value;
+    const grantedSpells = availableSpells(config, tokens.value);
+    spellGrant.checked = grantedSpells.includes(spell.value);
+    for (const option of spell.options) {
+      option.text = SKILLS[option.value].name + (grantedSpells.includes(option.value) ? " (granted)" : "");
+    }
     const grantedWeapons = availableWeapons(config.weaponsByToken?.[tokens.value]);
     weaponGrant.checked = grantedWeapons.includes(weapon.value);
     for (const option of weapon.options) {
@@ -267,7 +276,7 @@ export function setupSkillGrants(obr) {
   async function save(change) {
     if (saving) return;
     saving = true;
-    enabled.disabled = tokens.disabled = grant.disabled = weapon.disabled = weaponGrant.disabled = true;
+    enabled.disabled = tokens.disabled = spell.disabled = spellGrant.disabled = weapon.disabled = weaponGrant.disabled = true;
     try {
       const { self, gm } = await skillConnections(obr);
       if (self.role !== "GM" || gm?.connectionId !== self.connectionId) throw Error("The connected skills GM must save grants.");
@@ -282,10 +291,11 @@ export function setupSkillGrants(obr) {
           else granted.delete(change.weapon);
           config.weaponsByToken = { ...config.weaponsByToken, [token.id]: [...granted] };
         } else {
-          const ids = new Set(Array.isArray(config.missileTokens) ? config.missileTokens : []);
-          if (change.grant) ids.add(token.id);
-          else ids.delete(token.id);
-          config.missileTokens = [...ids];
+          if (!SPELLS.includes(change.spell)) return;
+          const ids = new Set(availableSpells(config, token.id));
+          if (change.grant) ids.add(change.spell);
+          else ids.delete(change.spell);
+          config.spellsByToken = { ...config.spellsByToken, [token.id]: [...ids] };
         }
       } else config.enabled = change.enabled;
       writeSkills(obr, "gm", config);
@@ -300,8 +310,9 @@ export function setupSkillGrants(obr) {
   }
   enabled.addEventListener("change", () => { void save({ enabled: enabled.checked }); });
   tokens.addEventListener("change", () => render(readSkills(obr, "gm")));
-  grant.addEventListener("change", () => {
-    if (tokens.value) void save({ tokenId: tokens.value, grant: grant.checked });
+  spell.addEventListener("change", () => render(readSkills(obr, "gm")));
+  spellGrant.addEventListener("change", () => {
+    if (tokens.value && spell.value) void save({ tokenId: tokens.value, spell: spell.value, grant: spellGrant.checked });
   });
   weapon.addEventListener("change", () => render(readSkills(obr, "gm")));
   weaponGrant.addEventListener("change", () => {

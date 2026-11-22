@@ -19,7 +19,10 @@ export const SKILLS = {
   // Keep the original skill ID so existing bindings and clients still work.
   spear: { name: "melee weapon attack", key: "f" },
   missile: { name: "magic missile", key: "g", effect: "magic_missile", range: 8 },
+  "burning-hands": { name: "burning hands", key: "h", effect: "burning_hands", cone: 3 },
+  "fire-bolt": { name: "fire bolt", key: "j", effect: "fire_bolt", range: 24 },
 };
+export const SPELLS = Object.keys(SKILLS).filter((id) => id !== "spear");
 export const FACINGS = [
   [0, "right"], [45, "down-right"], [90, "down"], [135, "down-left"],
   [180, "left"], [225, "up-left"], [270, "up"], [315, "up-right"],
@@ -43,8 +46,13 @@ export function writeSkills(obr, type, settings) {
 
 export function availableSkills(config, tokenId) {
   if (config.enabled !== true) return [];
-  return Array.isArray(config.missileTokens) && config.missileTokens.includes(tokenId)
-    ? ["spear", "missile"] : ["spear"];
+  return ["spear", ...availableSpells(config, tokenId)];
+}
+
+export function availableSpells(config, tokenId) {
+  const spells = config.spellsByToken?.[tokenId];
+  if (Array.isArray(spells)) return SPELLS.filter((id) => spells.includes(id));
+  return Array.isArray(config.missileTokens) && config.missileTokens.includes(tokenId) ? ["missile"] : [];
 }
 
 export function availableWeapons(grants) {
@@ -84,7 +92,7 @@ export function skillEffect(skillId, token, center, dpi, facing, weapon = DEFAUL
     effectProperties.copies = 1;
   } else {
     effectProperties.rotation = rotation;
-    effectProperties.size = 2;
+    effectProperties.size = skill.cone ?? 2;
   }
   return { type: "effect", id: effect, layer: "ATTACHMENT", effectProperties };
 }
