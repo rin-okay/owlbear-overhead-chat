@@ -3,8 +3,8 @@ import { coneHits, isProjectileToken, isProjectileWall, openMeleeDoor, projectil
 import { HIT_MARKERS, MELEE_HIT_CUE } from "./hit-markers.js?v=2.6.16";
 import {
   DEFAULT_WEAPON, EMBERS_EFFECTS, MELEE_DURATION_MS, SKILLS, SKILL_REQUEST, SKILL_RESULT,
-  availableSkills, availableWeapons, readSkills, skillConnections, skillEffect,
-} from "./skills.js?v=2.7.1";
+  availableSkills, availableWeapons, readSkills, skillConnections, skillEffect, spellParameter,
+} from "./skills.js?v=2.7.2";
 
 export function setupSkillHost(obr) {
   const lastCast = new Map();
@@ -80,7 +80,8 @@ export function setupSkillHost(obr) {
         await answer({ ...result, weapons: availableWeapons(latest.weaponsByToken?.[token.id]), error: "This avatar no longer has that weapon." });
         return;
       }
-      const instruction = skillEffect(data.skill, token, bounds.center, dpi, data.facing, weapon);
+      const parameter = spellParameter(latest, token.id, data.skill);
+      const instruction = skillEffect(data.skill, token, bounds.center, dpi, data.facing, weapon, parameter);
       if (!instruction) {
         await answer({ ...result, error: "Couldn’t determine avatar facing. Check the scene grid and facing setting." });
         return;
@@ -94,19 +95,20 @@ export function setupSkillHost(obr) {
           return;
         }
         const items = obstacles.flat();
-        const { source, rotation, destination } = instruction.effectProperties;
+        const { source, rotation, destination, size } = instruction.effectProperties;
         if (skill.cone) {
-          hitTokenIds = coneHits(source, rotation, skill.cone * dpi, items, token.id, dpi);
+          hitTokenIds = coneHits(source, rotation, size * dpi, items, token.id, dpi);
         } else if (projectile) {
-          const blastRadius = skill.impact ? skill.impact.size * dpi / 2 : 0;
+          const blastRadius = skill.impact ? parameter * dpi : 0;
           const impact = projectileImpact(source, destination, items, token.id, dpi, blastRadius);
           instruction.effectProperties.destination = impact.destination;
           hitTokenIds = impact.hitTokenIds;
           if (skill.impact) {
-            const { effect, size, delay } = skill.impact;
+            const { effect, delay } = skill.impact;
             instructions.push({
               type: "effect", id: effect, delay, layer: instruction.layer,
-              effectProperties: { source: impact.destination, size, disableHit: true },
+              // Embers takes the explosion width, while the GM assigns its radius.
+              effectProperties: { source: impact.destination, size: parameter * 2, disableHit: true },
             });
           }
         } else {

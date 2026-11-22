@@ -47,11 +47,15 @@ export const SKILLS = {
   // Keep the original skill ID so existing bindings and clients still work.
   spear: { name: "melee weapon attack", key: "f", meleeReach: 1 },
   missile: { name: "magic missile", key: "g", effect: "magic_missile", range: 8, hitDelay: 1000 },
-  "burning-hands": { name: "burning hands", key: "h", effect: "burning_hands", cone: 3, hitDelay: 1000 },
+  "burning-hands": {
+    name: "burning hands", key: "h", effect: "burning_hands", cone: true, hitDelay: 1000,
+    parameter: { label: "length (in cells)", min: 1, defaultValue: 3 },
+  },
   "fire-bolt": { name: "fire bolt", key: "j", effect: "fire_bolt", range: 24, hitDelay: 800 },
   fireball: {
     name: "fireball", key: "k", effect: "fireball.beam", range: 30,
-    impact: { effect: "fireball.explosion", size: 8, delay: 3000 },
+    impact: { effect: "fireball.explosion", delay: 3000 },
+    parameter: { label: "radius (in cells)", min: 1, defaultValue: 4 },
   },
 };
 export const SPELLS = Object.keys(SKILLS).filter((id) => id !== "spear");
@@ -87,6 +91,16 @@ export function availableSpells(config, tokenId) {
   return Array.isArray(config.missileTokens) && config.missileTokens.includes(tokenId) ? ["missile"] : [];
 }
 
+export function validSpellParameter(skillId, value) {
+  const parameter = SKILLS[skillId]?.parameter;
+  return Boolean(parameter && Number.isFinite(value) && value >= parameter.min && Number.isFinite(value * 2));
+}
+
+export function spellParameter(config, tokenId, skillId) {
+  const value = config.spellParametersByToken?.[tokenId]?.[skillId];
+  return validSpellParameter(skillId, value) ? value : SKILLS[skillId]?.parameter?.defaultValue;
+}
+
 export function availableWeapons(grants) {
   return Object.keys(WEAPONS).filter((id) => id === DEFAULT_WEAPON || (Array.isArray(grants) && grants.includes(id)));
 }
@@ -103,7 +117,8 @@ export async function skillConnections(obr) {
   return { self, players, gm };
 }
 
-export function skillEffect(skillId, token, center, dpi, facing, weapon = DEFAULT_WEAPON) {
+export function skillEffect(skillId, token, center, dpi, facing, weapon = DEFAULT_WEAPON,
+  parameter = SKILLS[skillId]?.parameter?.defaultValue) {
   if (!Object.hasOwn(SKILLS, skillId) || !FACINGS.some(([angle]) => angle === facing) ||
       ![center?.x, center?.y, token.rotation, dpi].every(Number.isFinite) || dpi <= 0) return;
   const skill = SKILLS[skillId];
@@ -124,7 +139,7 @@ export function skillEffect(skillId, token, center, dpi, facing, weapon = DEFAUL
     effectProperties.copies = 1;
   } else {
     effectProperties.rotation = rotation;
-    effectProperties.size = skill.cone ?? 2;
+    effectProperties.size = skill.cone ? parameter : 2;
   }
   return { type: "effect", id: effect, layer: "ATTACHMENT", effectProperties };
 }

@@ -4,8 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>overhead chat</title>
-  <link rel="stylesheet" href="./chat.css?v=2.6.16">
-  <script type="module" src="./chat.js?v=2.7.1"></script>
+  <link rel="stylesheet" href="./chat.css?v=2.7.2">
+  <script type="module" src="./chat.js?v=2.7.2"></script>
 </head>
 <body>
   <main>
@@ -140,6 +140,10 @@
         <label class="skill-field">token <select id="skill-token" disabled><option value="">choose a token</option></select></label>
         <label class="skill-field">spell <select id="grant-spell-type" disabled></select></label>
         <label class="discord-enabled"><input id="skill-grant-spell" type="checkbox" disabled> grant selected spell</label>
+        <label id="skill-spell-parameter-row" class="skill-field" hidden>
+          <span id="skill-spell-parameter-label"></span>
+          <input id="skill-spell-parameter" type="number" step="any" title="clear to restore the default" disabled>
+        </label>
         <label class="skill-field">weapon type <select id="grant-weapon-type" disabled></select></label>
         <label class="discord-enabled"><input id="skill-grant-weapon" type="checkbox" disabled> grant selected weapon</label>
         <p id="skill-gm-status" role="status"></p>
