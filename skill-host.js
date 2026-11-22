@@ -1,9 +1,10 @@
 import { canSpeak } from "./rules.js";
-import { clipProjectile, isProjectileToken, isProjectileWall } from "./projectile-collision.js?v=2.6.3";
+import { isProjectileToken, isProjectileWall, projectileImpact } from "./projectile-collision.js?v=2.6.10";
+import { HIT_MARKERS } from "./hit-markers.js?v=2.6.10";
 import {
   DEFAULT_WEAPON, EMBERS_EFFECTS, SKILLS, SKILL_REQUEST, SKILL_RESULT,
   availableSkills, availableWeapons, readSkills, skillConnections, skillEffect,
-} from "./skills.js?v=2.6.5";
+} from "./skills.js?v=2.6.10";
 
 export function setupSkillHost(obr) {
   const lastCast = new Map();
@@ -84,14 +85,18 @@ export function setupSkillHost(obr) {
         return;
       }
       const instructions = [instruction];
+      let hitTokenIds = [];
       if (projectile) {
         if (!obstacles) {
           await answer({ ...result, error: "Couldn’t check the scene for walls and tokens. Try again." });
           return;
         }
         const { effectProperties } = instruction;
-        effectProperties.destination = clipProjectile(effectProperties.source, effectProperties.destination,
-          obstacles.flat(), token.id, dpi);
+        const blastRadius = skill.impact ? skill.impact.size * dpi / 2 : 0;
+        const impact = projectileImpact(effectProperties.source, effectProperties.destination,
+          obstacles.flat(), token.id, dpi, blastRadius);
+        effectProperties.destination = impact.destination;
+        hitTokenIds = impact.hitTokenIds;
         if (skill.impact) {
           const { effect, size, delay } = skill.impact;
           instructions.push({
@@ -103,6 +108,11 @@ export function setupSkillHost(obr) {
       await obr.broadcast.sendMessage(EMBERS_EFFECTS, {
         instructions, spellData: { name: skill.name, caster: sender.id },
       }, { destination: "ALL" });
+      if (version === sceneVersion && hitTokenIds.length) {
+        await obr.broadcast.sendMessage(HIT_MARKERS, {
+          requestId: data.requestId, tokenIds: hitTokenIds, delay: skill.impact?.delay ?? skill.hitDelay,
+        }, { destination: "ALL" }).catch((error) => console.error("Overhead Chat hit markers", error));
+      }
       await answer(result);
     } catch (error) {
       console.error("Overhead Chat skills", error);

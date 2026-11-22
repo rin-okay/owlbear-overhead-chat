@@ -78,29 +78,77 @@ function circleDistance(origin, direction, circle) {
   return Math.max(0, ahead - halfChord);
 }
 
-export function clipProjectile(source, destination, items, casterId, dpi) {
-  const delta = subtract(destination, source);
-  const range = Math.hypot(delta.x, delta.y);
-  if (!Number.isFinite(range) || range <= EPSILON) return destination;
-  const direction = { x: delta.x / range, y: delta.y / range };
-  let distance = range;
+function collectWalls(items) {
+  const walls = [];
   for (const item of items) {
-    if (item.id !== casterId && isProjectileToken(item)) {
-      const circle = tokenCircle(item, dpi);
-      if (circle) distance = Math.min(distance, circleDistance(source, direction, circle));
-    } else if (isProjectileWall(item) && validPoint(item.position)) {
-      const points = item.type === "LINE" ? [item.startPosition, item.endPosition] : item.points;
-      if (!Array.isArray(points) || points.length < 2) continue;
-      const world = points.map((point) => validPoint(point) ? project(point, item) : undefined);
-      if (item.style?.closed) world.push(world[0]);
-      for (let i = 1; i < world.length; i++) {
-        if (!validPoint(world[i - 1]) || !validPoint(world[i])) continue;
-        distance = Math.min(distance, wallDistance(source, direction, world[i - 1], world[i]));
-      }
+    if (!isProjectileWall(item) || !validPoint(item.position)) continue;
+    const points = item.type === "LINE" ? [item.startPosition, item.endPosition] : item.points;
+    if (!Array.isArray(points) || points.length < 2) continue;
+    const world = points.map((point) => validPoint(point) ? project(point, item) : undefined);
+    if (item.style?.closed) world.push(world[0]);
+    for (let i = 1; i < world.length; i++) {
+      if (validPoint(world[i - 1]) && validPoint(world[i])) walls.push([world[i - 1], world[i]]);
     }
   }
-  if (distance === range) return destination;
-  // Embers scales its video from the travel distance and needs a nonzero endpoint.
-  const end = Math.max(distance, Math.min(range, dpi / 100));
-  return { x: source.x + direction.x * end, y: source.y + direction.y * end };
+  return walls;
+}
+
+function closestWall(source, direction, walls) {
+  let distance = Infinity;
+  for (const [a, b] of walls) distance = Math.min(distance, wallDistance(source, direction, a, b));
+  return distance;
+}
+
+const advance = (point, direction, distance) => ({
+  x: point.x + direction.x * distance,
+  y: point.y + direction.y * distance,
+});
+
+export function projectileImpact(source, destination, items, casterId, dpi, blastRadius = 0) {
+  const delta = subtract(destination, source);
+  const range = Math.hypot(delta.x, delta.y);
+  if (!Number.isFinite(range) || range <= EPSILON) return { destination, hitTokenIds: [] };
+  const direction = { x: delta.x / range, y: delta.y / range };
+  const walls = collectWalls(items);
+  const wall = closestWall(source, direction, walls);
+  const targets = [];
+  let closestToken;
+  let tokenDistance = Infinity;
+  for (const item of items) {
+    if (item.id === casterId || !isProjectileToken(item)) continue;
+    const circle = tokenCircle(item, dpi);
+    if (!circle) continue;
+    targets.push({ id: item.id, ...circle });
+    const distance = circleDistance(source, direction, circle);
+    if (distance < tokenDistance) {
+      tokenDistance = distance;
+      closestToken = item.id;
+    }
+  }
+
+  const hitWall = wall <= range && wall <= tokenDistance + EPSILON;
+  const hitToken = !hitWall && tokenDistance <= range;
+  const distance = hitWall ? wall : hitToken ? tokenDistance : range;
+  // Embers needs a nonzero travel length, even when the caster overlaps a target.
+  const end = distance === range ? destination
+    : advance(source, direction, Math.max(distance, Math.min(range, dpi / 100)));
+  if (blastRadius <= 0) return { destination: end, hitTokenIds: hitToken ? [closestToken] : [] };
+
+  const impact = advance(source, direction, distance);
+  // Start the cover ray just on the caster's side of the impact wall.
+  const coverOrigin = hitWall ? advance(impact, direction, -dpi / 1000) : impact;
+  const hitTokenIds = targets.filter((target) => {
+    const offset = subtract(target.center, impact);
+    if (Math.hypot(offset.x, offset.y) > blastRadius + target.radius) return false;
+    const cover = subtract(target.center, coverOrigin);
+    const length = Math.hypot(cover.x, cover.y);
+    if (length <= EPSILON) return true;
+    const ray = { x: cover.x / length, y: cover.y / length };
+    return closestWall(coverOrigin, ray, walls) > length + EPSILON;
+  }).map(({ id }) => id);
+  return { destination: end, hitTokenIds };
+}
+
+export function clipProjectile(source, destination, items, casterId, dpi) {
+  return projectileImpact(source, destination, items, casterId, dpi).destination;
 }

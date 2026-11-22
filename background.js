@@ -12,7 +12,8 @@ import { chatParts, isRollCommand, rollSpans } from "./dice.js";
 import { queueDiscord } from "./discord.js?v=2.3.9";
 import { parseTray } from "./dice-replay.js";
 import { queueDicePopup, resetDicePopups } from "./dice-popup.js";
-import { setupSkillHost } from "./skill-host.js?v=2.6.5";
+import { setupSkillHost } from "./skill-host.js?v=2.6.10";
+import { setupHitMarkers } from "./hit-markers.js?v=2.6.10";
 import { requestChatShortcut } from "./chat-shortcut.js?v=2.6.4";
 import { setupChatRecovery } from "./chat-recovery.js?v=2.6.6";
 import { centerAvatar, setupCameraFollow } from "./avatar-viewport.js?v=2.6.9";
@@ -354,6 +355,7 @@ function queueSpeech(event) {
 }
 
 OBR.onReady(() => {
+  setupHitMarkers(OBR, buildLabel);
   const cameraFollow = setupCameraFollow(OBR);
   let shortcutRevision = 0;
   async function openFromShortcut(mode) {
