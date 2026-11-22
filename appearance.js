@@ -83,7 +83,10 @@ export function drawBubble(text, style) {
   const lines = text.split("\n").flatMap((paragraph) =>
     wrapParagraph(paragraph, (line) => ctx.measureText(line).width));
 
-  const width = Math.max(32, Math.ceil(Math.max(...lines.map((part) => ctx.measureText(part).width))) + 18);
+  const characterWidth = ctx.measureText("0").width;
+  const contentWidth = Math.ceil(Math.max(characterWidth * 5, ...lines.map((part) => ctx.measureText(part).width)));
+  const extraPadding = Math.ceil(characterWidth);
+  const width = Math.max(32, contentWidth + 18 + extraPadding * 2);
   const lineHeight = Math.ceil(style.size * BUBBLE_LINE_HEIGHT);
   const body = 16 + lineHeight * lines.length;
   const height = body + 9;
@@ -113,7 +116,7 @@ export function drawBubble(text, style) {
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   lines.forEach((part, index) => ctx.fillText(part, middle, 8 + (index + 0.5) * lineHeight));
-  return { canvas, lines };
+  return { canvas, lines, width };
 }
 
 export function drawFloatingBubble(text, style) {

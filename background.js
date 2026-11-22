@@ -4,7 +4,7 @@ import {
   canSpeak, isChatRoom, isPublicToken, normalizeHabboScale, parseSpeech,
 } from "./rules.js?v=2.5.1";
 
-import { BUBBLE_LINE_HEIGHT, drawBubble, drawFloatingBubble, fonts, normalizeAppearance } from "./appearance.js?v=2.5.1";
+import { BUBBLE_LINE_HEIGHT, drawBubble, drawFloatingBubble, fonts, normalizeAppearance } from "./appearance.js?v=2.5.2";
 import { canvasPaths } from "./bubble-paths.js?v=2.5.1";
 import { FLOAT_LINE, placeFloatingBubbles } from "./floating-layout.js?v=2.5.1";
 import { openSessionChannel, saveAvatar } from "./session.js";
@@ -136,12 +136,13 @@ async function addBubbleDrawing(drawing, appearance, position, layer, tokenId, s
   }
   if (!current()) return [];
   const labelScale = tokenId ? 1 : scale;
-  const nativeLabel = () => buildLabel()
-    .plainText(drawing.lines.join("\n")).width("AUTO").fontFamily(fonts[appearance.font].face)
+  const nativeLabel = (borderWidth = 0) => buildLabel()
+    .plainText(drawing.lines.join("\n")).width(tokenId ? drawing.width + borderWidth : "AUTO")
+    .fontFamily(fonts[appearance.font].face)
     .fontSize(appearance.size * labelScale)
     .lineHeight(BUBBLE_LINE_HEIGHT).textAlign("CENTER").pointerDirection("DOWN");
   const labels = [
-    attach(nativeLabel().padding(10 * labelScale).fillColor(colors[0]).backgroundColor(colors[0])
+    attach(nativeLabel(4).padding(10 * labelScale).fillColor(colors[0]).backgroundColor(colors[0])
       .cornerRadius(tokenId ? 10 : 2).pointerWidth(16 * labelScale).pointerHeight(7 * labelScale)),
     attach(nativeLabel().padding(8 * labelScale).fillColor(colors.at(-1)).backgroundColor(colors[1])
       .cornerRadius(tokenId ? 8 : 0).pointerWidth(12 * labelScale).pointerHeight(9 * labelScale)),

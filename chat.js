@@ -9,8 +9,8 @@ import {
   savedAppearance, saveAppearance,
 } from "./session.js";
 
-import { drawBubble } from "./appearance.js?v=2.5.1";
-import { setupDiscordPanel } from "./discord-panel.js?v=2.5.1";
+import { drawBubble } from "./appearance.js?v=2.5.2";
+import { setupDiscordPanel } from "./discord-panel.js?v=2.5.2";
 import { setupAvatarPanel } from "./avatar-panel.js?v=2.3.10";
 
 import { rollSpans, validateRollSpans } from "./dice.js";
