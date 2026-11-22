@@ -8,8 +8,8 @@ import {
   savedAppearance, saveAppearance,
 } from "./session.js";
 
-import { drawBubble } from "./appearance.js";
-import { setupDiscordPanel } from "./discord-panel.js?v=2.3.11";
+import { drawBubble } from "./appearance.js?v=2.3.12";
+import { setupDiscordPanel } from "./discord-panel.js?v=2.3.12";
 import { setupAvatarPanel } from "./avatar-panel.js?v=2.3.10";
 
 import { rollSpans, validateRollSpans } from "./dice.js";

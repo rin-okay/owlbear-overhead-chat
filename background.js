@@ -3,7 +3,7 @@ import {
   ABOVE_FOG, AVATAR, HABBO_MODE, SPEECH, BUBBLE_MS, GENERAL_CHAT_ROOM, canSpeak, isChatRoom, isPublicToken, parseSpeech,
 } from "./rules.js";
 
-import { BUBBLE_LINE_HEIGHT, drawBubble, drawFloatingBubble, fonts, normalizeAppearance } from "./appearance.js";
+import { BUBBLE_LINE_HEIGHT, drawBubble, drawFloatingBubble, fonts, normalizeAppearance } from "./appearance.js?v=2.3.12";
 import { FLOAT_LINE, placeFloatingBubbles } from "./floating-layout.js";
 import { openSessionChannel, saveAvatar } from "./session.js";
 import { chatParts, isRollCommand, rollSpans } from "./dice.js";
@@ -83,10 +83,10 @@ async function updateFloating(next, version) {
   if (version === sceneVersion) floating = next;
 }
 
-async function showFloating(text, accent, tokenId, position, layer, version, current) {
+async function showFloating(text, appearance, tokenId, position, layer, version, current) {
   const dpi = await OBR.scene.grid.getDpi();
   if (!current() || !Number.isFinite(dpi) || dpi <= 0) return;
-  const { canvas, width, height } = drawFloatingBubble(text, accent);
+  const { canvas, width, height } = drawFloatingBubble(text, appearance);
   const item = buildImage({
     url: canvas.toDataURL("image/png"), mime: "image/png", width: canvas.width, height: canvas.height,
   }, { dpi: dpi * 2, offset: { x: canvas.width / 2, y: canvas.height } })
@@ -230,7 +230,7 @@ async function showBubble({ tokenId, text, appearance, itemsAtValidation }, vers
   const position = { x: bounds.center.x, y: bounds.min.y - gap };
   if (floatingMode) {
     if (active.size) await Promise.all([...active].map(([id, bubble]) => removeBubble(id, bubble)));
-    if (current()) await showFloating(text, appearance.border, tokenId, position, layer, version, current);
+    if (current()) await showFloating(text, appearance, tokenId, position, layer, version, current);
     return;
   }
   if (floating.length) await updateFloating([], version);

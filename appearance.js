@@ -70,11 +70,15 @@ function wrapParagraph(paragraph, measure) {
   return lines;
 }
 
+function bubbleFont(style) {
+  const { face, fallback } = fonts[style.font];
+  return `${style.size}px "${face}", ${fallback}`;
+}
+
 export function drawBubble(text, style) {
   const canvas = document.createElement("canvas");
   const ctx = canvas.getContext("2d");
-  const { face, fallback } = fonts[style.font];
-  const font = `${style.size}px "${face}", ${fallback}`;
+  const font = bubbleFont(style);
   ctx.font = font;
   const lines = text.split("\n").flatMap((paragraph) =>
     wrapParagraph(paragraph, (line) => ctx.measureText(line).width));
@@ -112,15 +116,16 @@ export function drawBubble(text, style) {
   return { canvas, lines };
 }
 
-export function drawFloatingBubble(text, accent) {
+export function drawFloatingBubble(text, style) {
   const canvas = document.createElement("canvas");
   const ctx = canvas.getContext("2d");
-  const font = 'bold 12px "Courier New", monospace';
+  const font = `bold ${bubbleFont(style)}`;
   ctx.font = font;
   const lines = text.split("\n").flatMap((paragraph) =>
     wrapParagraph(paragraph, (line) => ctx.measureText(line).width));
   const width = Math.max(32, Math.ceil(Math.max(...lines.map((line) => ctx.measureText(line).width))) + 23);
-  const body = lines.length * 14 + 10;
+  const lineHeight = Math.ceil(style.size * BUBBLE_LINE_HEIGHT);
+  const body = lines.length * lineHeight + 10;
   const height = body + 7;
   const tail = Math.floor(width / 2);
   canvas.width = width * 2;
@@ -137,11 +142,11 @@ export function drawFloatingBubble(text, accent) {
   ctx.fillRect(3, 2, width - 6, body - 2);
   ctx.fillRect(2, 4, width - 4, body - 6);
   ctx.fillRect(tail - 2, body, 4, 3);
-  ctx.fillStyle = accent;
+  ctx.fillStyle = style.border;
   ctx.fillRect(5, 5, 3, body - 10);
   ctx.fillStyle = "#271f29";
   ctx.font = font;
   ctx.textBaseline = "middle";
-  lines.forEach((line, index) => ctx.fillText(line, 13, 12 + index * 14));
+  lines.forEach((line, index) => ctx.fillText(line, 13, 5 + (index + 0.5) * lineHeight));
   return { canvas, width, height };
 }
