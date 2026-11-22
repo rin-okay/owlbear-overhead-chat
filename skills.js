@@ -46,6 +46,11 @@ export const MELEE_DURATION_MS = {
 };
 
 export const SKILLS = {
+  bless: {
+    name: "bless", key: "b",
+    parameter: { label: "range (in cells)", min: 1, defaultValue: 6 },
+    targetLimit: { label: "maximum targets", min: 1, defaultValue: 3, integer: true },
+  },
   // Keep the original skill ID so existing bindings and clients still work.
   spear: { name: "melee weapon attack", key: "f", meleeReach: 1 },
   missile: { name: "magic missile", key: "g", effect: "magic_missile", range: 8, hitDelay: 1000 },
@@ -102,14 +107,16 @@ export function friendlyFireMode(config) {
   return FRIENDLY_FIRE_MODES.includes(config.friendlyFire) ? config.friendlyFire : "enabled";
 }
 
-export function validSpellParameter(skillId, value) {
-  const parameter = SKILLS[skillId]?.parameter;
-  return Boolean(parameter && Number.isFinite(value) && value >= parameter.min && Number.isFinite(value * 2));
+export function validSpellParameter(skillId, value, field = "parameter") {
+  const parameter = SKILLS[skillId]?.[field];
+  return Boolean(parameter && Number.isFinite(value) && value >= parameter.min &&
+    Number.isFinite(value * 2) && (!parameter.integer || Number.isSafeInteger(value)));
 }
 
-export function spellParameter(config, tokenId, skillId) {
-  const value = config.spellParametersByToken?.[tokenId]?.[skillId];
-  return validSpellParameter(skillId, value) ? value : SKILLS[skillId]?.parameter?.defaultValue;
+export function spellParameter(config, tokenId, skillId, field = "parameter") {
+  const saved = config.spellParametersByToken?.[tokenId]?.[skillId];
+  const value = typeof saved === "number" && field === "parameter" ? saved : saved?.[field];
+  return validSpellParameter(skillId, value, field) ? value : SKILLS[skillId]?.[field]?.defaultValue;
 }
 
 export function availableWeapons(grants) {

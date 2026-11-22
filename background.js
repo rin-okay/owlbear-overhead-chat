@@ -1,4 +1,4 @@
-import OBR, { buildLabel, buildPath, Command } from "./obr.js?v=2.5.1";
+import OBR, { buildImage, buildLabel, buildPath, Command } from "./obr.js?v=2.5.1";
 import {
   ABOVE_FOG, AVATAR, HABBO_MODE, HABBO_SCALE, SPEECH, BUBBLE_MS, GENERAL_CHAT_ROOM,
   canSpeak, isChatRoom, isPublicToken, normalizeHabboScale, parseSpeech,
@@ -12,7 +12,7 @@ import { chatParts, isRollCommand, rollSpans } from "./dice.js";
 import { queueDiscord } from "./discord.js?v=2.3.9";
 import { parseTray } from "./dice-replay.js";
 import { queueDicePopup, resetDicePopups } from "./dice-popup.js";
-import { setupSkillHost } from "./skill-host.js?v=2.7.6";
+import { setupSkillHost } from "./skill-host.js?v=2.7.7";
 import { setupHitMarkers } from "./hit-markers.js?v=2.6.16";
 import { requestChatShortcut } from "./chat-shortcut.js?v=2.6.4";
 import { setupChatRecovery } from "./chat-recovery.js?v=2.6.6";
@@ -381,7 +381,7 @@ OBR.onReady(() => {
       },
     }).catch(report);
   }
-  setupSkillHost(OBR);
+  setupSkillHost(OBR, buildImage);
   setupChatRecovery(OBR, () => transcript.values(), mergeRecoveredEntries);
   openSessionChannel().then((channel) => {
     transcriptChannel = channel;

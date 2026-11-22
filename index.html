@@ -4,8 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>overhead chat</title>
-  <link rel="stylesheet" href="./chat.css?v=2.7.2">
-  <script type="module" src="./chat.js?v=2.7.6"></script>
+  <link rel="stylesheet" href="./chat.css?v=2.7.7">
+  <script type="module" src="./chat.js?v=2.7.7"></script>
 </head>
 <body>
   <main>
@@ -133,6 +133,7 @@
         <label class="skill-field" hidden>burning hands <select id="skill-bind-burning-hands" aria-label="burning hands key"></select></label>
         <label class="skill-field" hidden>fire bolt <select id="skill-bind-fire-bolt" aria-label="fire bolt key"></select></label>
         <label class="skill-field" hidden>fireball <select id="skill-bind-fireball" aria-label="fireball key"></select></label>
+        <label class="skill-field" hidden>bless <select id="skill-bind-bless" aria-label="bless key"></select></label>
         <p id="skill-settings-status" class="skill-feedback" role="status"></p>
       </section>
       <section id="gm-skills" aria-label="skill grants" hidden>
@@ -147,6 +148,10 @@
         <label id="skill-spell-parameter-row" class="skill-field" hidden>
           <span id="skill-spell-parameter-label"></span>
           <input id="skill-spell-parameter" type="number" step="any" title="clear to restore the default" disabled>
+        </label>
+        <label id="skill-spell-target-limit-row" class="skill-field" hidden>
+          <span id="skill-spell-target-limit-label"></span>
+          <input id="skill-spell-target-limit" type="number" step="1" title="clear to restore the default" disabled>
         </label>
         <label class="skill-field">weapon type <select id="grant-weapon-type" disabled></select></label>
         <label class="discord-enabled"><input id="skill-grant-weapon" type="checkbox" disabled> grant selected weapon</label>

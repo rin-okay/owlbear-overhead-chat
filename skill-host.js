@@ -1,10 +1,11 @@
+import { setupBless } from "./bless.js?v=2.7.7";
 import { canSpeak, MELEE_HIT_TIMING, normalizeMeleeHitTiming } from "./rules.js?v=2.6.16";
 import { coneHits, isProjectileToken, isProjectileWall, openMeleeDoor, projectileImpact } from "./projectile-collision.js?v=2.7.3";
 import { HIT_MARKERS, MELEE_HIT_CUE } from "./hit-markers.js?v=2.6.16";
 import {
   DEFAULT_WEAPON, EMBERS_EFFECTS, MELEE_DURATION_MS, SKILLS, SKILL_REQUEST, SKILL_RESULT,
   artworkFacingAngle, availableSkills, availableWeapons, friendlyFireMode, readSkills, skillConnections, skillEffect, spellParameter, tokenTeams,
-} from "./skills.js?v=2.7.4";
+} from "./skills.js?v=2.7.7";
 
 function aimAtTarget(source, target, range, passThrough) {
   if (![target?.center?.x, target?.center?.y].every(Number.isFinite)) return;
@@ -22,7 +23,8 @@ function aimAtTarget(source, target, range, passThrough) {
   };
 }
 
-export function setupSkillHost(obr) {
+export function setupSkillHost(obr, buildImage) {
+  const castBless = setupBless(obr, buildImage);
   const lastCast = new Map();
   let sceneVersion = 0;
   obr.scene.onReadyChange(() => { sceneVersion++; lastCast.clear(); });
@@ -75,6 +77,21 @@ export function setupSkillHost(obr) {
         return;
       }
       lastCast.set(sender.id, now);
+      if (data.skill === "bless") {
+        const targets = data.targetIds ?? [];
+        if (!Array.isArray(targets) || targets.length > 100 ||
+            !targets.every((id) => typeof id === "string" && id.length > 0 && id.length <= 128)) {
+          await answer({ ...result, error: "Couldn’t read the selection for Bless." });
+          return;
+        }
+        const current = () => version === sceneVersion;
+        const error = await castBless(token, targets, config, current).catch((cause) => {
+          console.error("Overhead Chat could not update Bless", cause);
+          return "Couldn’t update Bless.";
+        });
+        if (current()) await answer({ ...result, error });
+        return;
+      }
       const skill = SKILLS[data.skill];
       const projectile = Boolean(skill.range);
       const checksHit = projectile || Boolean(skill.meleeReach || skill.cone);

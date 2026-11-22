@@ -10,9 +10,9 @@ import {
 } from "./session.js";
 
 import { drawBubble } from "./appearance.js?v=2.6.1";
-import { setupDiscordPanel } from "./discord-panel.js?v=2.7.6";
+import { setupDiscordPanel } from "./discord-panel.js?v=2.7.7";
 import { setupAvatarPanel } from "./avatar-panel.js?v=2.6.11";
-import { setupSkillGrants, setupSkillPanel } from "./skill-panel.js?v=2.7.6";
+import { setupSkillGrants, setupSkillPanel } from "./skill-panel.js?v=2.7.7";
 import { listenForChatShortcut } from "./chat-shortcut.js?v=2.6.4";
 import { cameraFollowPreference, centerAvatar, prepareKeyboardPan } from "./avatar-viewport.js?v=2.6.9";
 

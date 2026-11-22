@@ -2,7 +2,7 @@ import { isPublicToken } from "./rules.js";
 import {
   DEFAULT_WEAPON, FACINGS, FRIENDLY_FIRE_MODES, SKILLS, SKILL_CHANGED, SKILL_REQUEST, SKILL_RESULT, SPELLS, TEAMS, WEAPONS,
   availableSpells, availableWeapons, friendlyFireMode, readSkills, skillConnections, spellParameter, tokenTeams, validSpellParameter, writeSkills,
-} from "./skills.js?v=2.7.4";
+} from "./skills.js?v=2.7.7";
 
 function characterLabel(token) {
   return token.name || "unnamed character";
@@ -115,6 +115,7 @@ export function setupSkillPanel(obr, getAvatar, keyAllowed) {
     const [{ gm, self }, selection] = await Promise.all([
       skillConnections(obr), type === "cast" ? obr.player.getSelection().catch(() => undefined) : undefined,
     ]);
+    const targetIds = id === "bless" ? selection?.slice(0, 100) : undefined;
     const candidates = selection?.filter((itemId) => itemId !== token.id);
     const targetId = candidates?.length === 1 ? candidates[0] : undefined;
     if (type === "list" && revision !== listRevision) return;
@@ -139,7 +140,7 @@ export function setupSkillPanel(obr, getAvatar, keyAllowed) {
         requestId, tokenId: token.id, type,
         ...(type === "cast" ? { skill: id, facing: facingFor(preferences, token) } : {}),
         ...(id === "spear" ? { weapon: selectedWeapon(token.id) } : {}),
-        ...(targetId ? { targetId } : {}),
+        ...(targetIds ? { targetIds } : targetId ? { targetId } : {}),
       }, { destination: "ALL" });
     } catch (error) {
       if (pending.get(type) === expected) clearPending(type);
@@ -218,9 +219,15 @@ export function setupSkillGrants(obr) {
   const tokens = document.querySelector("#skill-token");
   const spell = document.querySelector("#grant-spell-type");
   const spellGrant = document.querySelector("#skill-grant-spell");
-  const parameterRow = document.querySelector("#skill-spell-parameter-row");
-  const parameterLabel = document.querySelector("#skill-spell-parameter-label");
-  const parameterField = document.querySelector("#skill-spell-parameter");
+  const parameterControls = [
+    { field: "parameter", id: "skill-spell-parameter" },
+    { field: "targetLimit", id: "skill-spell-target-limit" },
+  ].map(({ field, id }) => ({
+    field,
+    row: document.querySelector("#" + id + "-row"),
+    label: document.querySelector("#" + id + "-label"),
+    input: document.querySelector("#" + id),
+  }));
   const weapon = document.querySelector("#grant-weapon-type");
   const weaponGrant = document.querySelector("#skill-grant-weapon");
   const status = document.querySelector("#skill-gm-status");
@@ -254,14 +261,15 @@ export function setupSkillGrants(obr) {
     weaponGrant.disabled = disableGrants || !weapon.value;
     const grantedSpells = availableSpells(config, tokens.value);
     spellGrant.checked = grantedSpells.includes(spell.value);
-    const parameter = SKILLS[spell.value]?.parameter;
-    parameterRow.hidden = !tokens.value || !parameter;
-    parameterField.disabled = disableGrants || !parameter || !spellGrant.checked;
-    if (parameter && tokens.value) {
-      parameterLabel.textContent = parameter.label;
-      parameterField.min = parameter.min;
-      parameterField.placeholder = String(parameter.defaultValue);
-      parameterField.valueAsNumber = spellParameter(config, tokens.value, spell.value);
+    for (const { field, row, label, input } of parameterControls) {
+      const parameter = SKILLS[spell.value]?.[field];
+      row.hidden = !tokens.value || !parameter;
+      input.disabled = disableGrants || !parameter || !spellGrant.checked;
+      if (!parameter || !tokens.value) continue;
+      label.textContent = parameter.label;
+      input.min = parameter.min;
+      input.placeholder = String(parameter.defaultValue);
+      input.valueAsNumber = spellParameter(config, tokens.value, spell.value, field);
     }
     for (const option of spell.options) {
       option.text = SKILLS[option.value].name + (grantedSpells.includes(option.value) ? " (granted)" : "");
@@ -307,8 +315,9 @@ export function setupSkillGrants(obr) {
     if (saving) return;
     saving = true;
     enabled.disabled = tokens.disabled = spell.disabled = spellGrant.disabled =
-      parameterField.disabled = weapon.disabled = weaponGrant.disabled =
+      weapon.disabled = weaponGrant.disabled =
       friendlyFire.disabled = team.disabled = teamGrant.disabled = true;
+    for (const { input } of parameterControls) input.disabled = true;
     try {
       const { self, gm } = await skillConnections(obr);
       if (self.role !== "GM" || gm?.connectionId !== self.connectionId) throw Error("The connected skills GM must save grants.");
@@ -332,15 +341,19 @@ export function setupSkillGrants(obr) {
           if (!SPELLS.includes(change.spell)) return;
           const ids = new Set(availableSpells(config, token.id));
           if (Object.hasOwn(change, "parameter")) {
-            if (!ids.has(change.spell) || !SKILLS[change.spell].parameter) return;
+            const definition = SKILLS[change.spell][change.field];
+            if (!ids.has(change.spell) || !definition) return;
             const tokenParameters = { ...config.spellParametersByToken?.[token.id] };
-            if (change.parameter === null) delete tokenParameters[change.spell];
+            const saved = tokenParameters[change.spell];
+            const values = typeof saved === "number" ? { parameter: saved } : { ...saved };
+            if (change.parameter === null) delete values[change.field];
             else {
-              if (!validSpellParameter(change.spell, change.parameter)) {
-                throw Error("Enter a number of cells of at least " + SKILLS[change.spell].parameter.min + ".");
+              if (!validSpellParameter(change.spell, change.parameter, change.field)) {
+                throw Error(definition.integer ? "Enter a whole number of at least 1." : "Enter a number of cells of at least 1.");
               }
-              tokenParameters[change.spell] = change.parameter;
+              values[change.field] = change.parameter;
             }
+            tokenParameters[change.spell] = values;
             config.spellParametersByToken = { ...config.spellParametersByToken, [token.id]: tokenParameters };
           } else {
             if (change.grant) ids.add(change.spell);
@@ -373,14 +386,16 @@ export function setupSkillGrants(obr) {
   spellGrant.addEventListener("change", () => {
     if (tokens.value && spell.value) void save({ tokenId: tokens.value, spell: spell.value, grant: spellGrant.checked });
   });
-  parameterField.addEventListener("keydown", (event) => {
-    if (event.key === "Enter") parameterField.blur();
-  });
-  parameterField.addEventListener("change", () => {
-    if (parameterField.disabled) return;
-    const parameter = !parameterField.value && !parameterField.validity.badInput ? null : parameterField.valueAsNumber;
-    void save({ tokenId: tokens.value, spell: spell.value, parameter });
-  });
+  for (const { field, input } of parameterControls) {
+    input.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") input.blur();
+    });
+    input.addEventListener("change", () => {
+      if (input.disabled) return;
+      const parameter = !input.value && !input.validity.badInput ? null : input.valueAsNumber;
+      void save({ tokenId: tokens.value, spell: spell.value, field, parameter });
+    });
+  }
   weapon.addEventListener("change", () => render(readSkills(obr, "gm")));
   weaponGrant.addEventListener("change", () => {
     if (tokens.value && weapon.value) void save({ tokenId: tokens.value, weapon: weapon.value, grant: weaponGrant.checked });
