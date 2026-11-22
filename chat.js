@@ -10,10 +10,11 @@ import {
 } from "./session.js";
 
 import { drawBubble } from "./appearance.js?v=2.6.1";
-import { setupDiscordPanel } from "./discord-panel.js?v=2.6.5";
+import { setupDiscordPanel } from "./discord-panel.js?v=2.6.6";
 import { setupAvatarPanel } from "./avatar-panel.js?v=2.3.10";
 import { setupSkillGrants, setupSkillPanel } from "./skill-panel.js?v=2.6.5";
 import { listenForChatShortcut } from "./chat-shortcut.js?v=2.6.4";
+import { centerAvatar } from "./avatar-viewport.js?v=2.6.6";
 
 import { rollSpans, validateRollSpans } from "./dice.js";
 import { rollWithRumble } from "./rumble.js";
@@ -149,6 +150,7 @@ function connectTranscript() {
 
     channel.onmessage = ({ data }) => {
       if (data?.type === "ready" && request) sendRequest();
+      if (data?.type === "resync") requestHistory();
       if (data?.type === "discord-status") document.querySelector("#discord-status").textContent = data.message;
       if (data?.type === "history" && request && data.requestId === request.requestId) {
         const initial = request.before === undefined;
@@ -539,7 +541,7 @@ form.addEventListener("submit", async (event) => {
       return;
     }
 
-    const message = { ...speech, appearance: savedAppearance() };
+    const message = { ...speech, appearance: savedAppearance(), messageId: crypto.randomUUID() };
     if (spans.length) {
       message.rollId = crypto.randomUUID();
       await OBR.broadcast.sendMessage(SPEECH, { ...message, rollPhase: "pending" }, { destination: "ALL" });
@@ -791,11 +793,13 @@ function setupSettings() {
     void refresh();
   }
   document.addEventListener("keydown", (event) => {
-    if ((event.key !== "F1" && event.key !== "F2") || event.ctrlKey || event.altKey ||
+    if (!["F1", "F2", "F3"].includes(event.key) || event.ctrlKey || event.altKey ||
         event.metaKey || event.shiftKey || event.isComposing) return;
     event.preventDefault();
     event.stopPropagation();
-    if (!event.repeat) openFromShortcut(event.key === "F1" ? "chat" : "move");
+    if (event.repeat) return;
+    if (event.key === "F3") void centerAvatar(OBR).catch(console.error);
+    else openFromShortcut(event.key === "F1" ? "chat" : "move");
   }, true);
   if (!welcome) listenForChatShortcut(OBR, openFromShortcut);
   setupDiscordPanel(() => select(0), () => select(2));

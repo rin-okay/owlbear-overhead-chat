@@ -14,6 +14,8 @@ import { parseTray } from "./dice-replay.js";
 import { queueDicePopup, resetDicePopups } from "./dice-popup.js";
 import { setupSkillHost } from "./skill-host.js?v=2.6.5";
 import { requestChatShortcut } from "./chat-shortcut.js?v=2.6.4";
+import { setupChatRecovery } from "./chat-recovery.js?v=2.6.6";
+import { centerAvatar } from "./avatar-viewport.js?v=2.6.6";
 
 const HISTORY_LIMIT = 1000;
 const HISTORY_PAGE_SIZE = 100;
@@ -183,6 +185,35 @@ function publishHistory({ requestId, roomId = GENERAL_CHAT_ROOM, before = Infini
   });
 }
 
+function mergeRecoveredEntries(entries) {
+  let changed = false;
+  for (const entry of entries) {
+    const previous = transcript.get(entry.id);
+    if (previous && !previous.rolling) continue;
+    clearTimeout(rollingEntries.get(entry.id));
+    rollingEntries.delete(entry.id);
+    transcript.set(entry.id, previous ? { ...entry, receivedAt: previous.receivedAt } : entry);
+    if (entry.rollPhase) settledRolls.set(entry.id, Date.now() + ROLL_TIMEOUT_MS);
+    changed = true;
+  }
+  if (!changed) return;
+
+  const ordered = [...transcript.values()].sort((a, b) => a.receivedAt - b.receivedAt).slice(-HISTORY_LIMIT);
+  transcript.clear();
+  for (const entry of ordered) {
+    // Keep the stored object so an existing pending-roll timer can still recognize it.
+    entry.sequence = ++sequence;
+    transcript.set(entry.id, entry);
+  }
+  for (const [id, timer] of rollingEntries) {
+    if (transcript.has(id)) continue;
+    clearTimeout(timer);
+    rollingEntries.delete(id);
+  }
+  while (settledRolls.size > HISTORY_LIMIT) settledRolls.delete(settledRolls.keys().next().value);
+  transcriptChannel?.postMessage({ type: "resync" });
+}
+
 async function acceptSpeech(event, speech, version, receivedAt) {
   await initialState;
   if (version !== sceneVersion || !sceneReady) return;
@@ -200,7 +231,11 @@ async function acceptSpeech(event, speech, version, receivedAt) {
   const rollId = event.data.rollId;
   if (phase && (typeof rollId !== "string" || !/^[a-f0-9-]{36}$/i.test(rollId) ||
       !["pending", "resolved", "failed"].includes(phase) || !rollSpans(speech.text).length)) return;
-  const id = phase ? `${event.connectionId}:${rollId}` : `message:${sequence + 1}`;
+  const messageId = typeof event.data.messageId === "string" && /^[a-f0-9-]{36}$/i.test(event.data.messageId)
+    ? event.data.messageId : undefined;
+  const id = phase ? `${event.connectionId}:${rollId}`
+    : messageId ? `${event.connectionId}:message:${messageId}` : `message:${sequence + 1}`;
+  if (!phase && transcript.has(id)) return;
   const previousRoll = phase ? transcript.get(id) : undefined;
   while (settledRolls.size && settledRolls.values().next().value <= receivedAt) {
     settledRolls.delete(settledRolls.keys().next().value);
@@ -216,6 +251,7 @@ async function acceptSpeech(event, speech, version, receivedAt) {
     text,
     parts,
     id,
+    senderId: (phase || messageId) ? sender.id : undefined,
     tokenId,
     roomId,
     rollPhase: phase,
@@ -327,18 +363,20 @@ OBR.onReady(() => {
   for (const [key, mode, label, icon] of [
     ["F1", "chat", "Focus Overhead Chat (F1)", "./toolbar-chat.svg"],
     ["F2", "move", "Move chat avatar (F2)", "./icon.svg"],
+    ["F3", "center", "Center chat avatar (F3)", "./icon.svg"],
   ]) {
     OBR.tool.create({
       id: "chat.overhead.shortcut." + mode,
       shortcut: key,
       icons: [{ icon: new URL(icon, import.meta.url).href, label }],
       onClick() {
-        void openFromShortcut(mode).catch(report);
+        void (mode === "center" ? centerAvatar(OBR) : openFromShortcut(mode)).catch(report);
         return false;
       },
     }).catch(report);
   }
   setupSkillHost(OBR);
+  setupChatRecovery(OBR, () => transcript.values(), mergeRecoveredEntries);
   openSessionChannel().then((channel) => {
     transcriptChannel = channel;
     channel.onmessage = ({ data }) => {
