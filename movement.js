@@ -18,15 +18,17 @@ export function stepAvatar(position, offset, grid) {
     const value = position[axis];
     if (!amount) return value;
     const delta = amount * dpi;
-    return origin ? advanceOnGrid(value, delta, dpi / 2, origin[axis]) : value + delta;
+    if (!origin || Math.abs(amount) !== 1) return value + delta;
+    const next = advanceOnGrid(value, delta, dpi, origin[axis]);
+    return Math.abs(next - value) < dpi / 8 ? next + delta : next;
   };
   return { x: step("x", x), y: step("y", y) };
 }
 
 export async function readMovementGrid(grid) {
-  const [dpi, type, corner] = await Promise.all([
-    grid.getDpi(), grid.getType(), grid.snapPosition({ x: 0, y: 0 }, 1, true, false).catch(() => null),
+  const [dpi, type, center] = await Promise.all([
+    grid.getDpi(), grid.getType(), grid.snapPosition({ x: 0, y: 0 }, 1, false, true).catch(() => null),
   ]);
-  const origin = type === "SQUARE" && Number.isFinite(corner?.x) && Number.isFinite(corner?.y) ? corner : undefined;
+  const origin = type === "SQUARE" && Number.isFinite(center?.x) && Number.isFinite(center?.y) ? center : undefined;
   return { dpi, origin };
 }

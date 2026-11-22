@@ -10,13 +10,13 @@ import {
 } from "./session.js";
 
 import { drawBubble } from "./appearance.js?v=2.6.1";
-import { setupDiscordPanel } from "./discord-panel.js?v=2.7.4";
+import { setupDiscordPanel } from "./discord-panel.js?v=2.7.5";
 import { setupAvatarPanel } from "./avatar-panel.js?v=2.6.11";
 import { setupSkillGrants, setupSkillPanel } from "./skill-panel.js?v=2.7.4";
 import { listenForChatShortcut } from "./chat-shortcut.js?v=2.6.4";
 import { cameraFollowPreference, centerAvatar, prepareKeyboardPan } from "./avatar-viewport.js?v=2.6.9";
 
-import { readMovementGrid, stepAvatar, turnAvatar } from "./movement.js?v=2.7.4";
+import { readMovementGrid, stepAvatar, turnAvatar } from "./movement.js?v=2.7.5";
 import { rollSpans, validateRollSpans } from "./dice.js";
 import { rollWithRumble } from "./rumble.js";
 import { rollWithNativeDice } from "./native-dice.js";
