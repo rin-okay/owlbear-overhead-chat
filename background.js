@@ -3,7 +3,7 @@ import {
   ABOVE_FOG, AVATAR, HABBO_MODE, SPEECH, BUBBLE_MS, GENERAL_CHAT_ROOM, canSpeak, isChatRoom, isPublicToken, parseSpeech,
 } from "./rules.js";
 
-import { BUBBLE_LINE_HEIGHT, drawBubble, drawFloatingBubble, fonts, normalizeAppearance } from "./appearance.js?v=2.3.12";
+import { BUBBLE_LINE_HEIGHT, drawBubble, drawFloatingBubble, fonts, normalizeAppearance } from "./appearance.js?v=2.4.0";
 import { FLOAT_LINE, placeFloatingBubbles } from "./floating-layout.js";
 import { openSessionChannel, saveAvatar } from "./session.js";
 import { chatParts, isRollCommand, rollSpans } from "./dice.js";
