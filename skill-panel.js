@@ -113,7 +113,7 @@ export function setupSkillPanel(obr, getAvatar, keyAllowed) {
 
   async function request(type, token, id, revision) {
     const [{ gm, self }, selection] = await Promise.all([
-      skillConnections(obr), type === "cast" && id === "missile" ? obr.player.getSelection() : undefined,
+      skillConnections(obr), type === "cast" ? obr.player.getSelection().catch(() => undefined) : undefined,
     ]);
     const candidates = selection?.filter((itemId) => itemId !== token.id);
     const targetId = candidates?.length === 1 ? candidates[0] : undefined;

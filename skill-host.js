@@ -6,7 +6,7 @@ import {
   artworkFacingAngle, availableSkills, availableWeapons, friendlyFireMode, readSkills, skillConnections, skillEffect, spellParameter, tokenTeams,
 } from "./skills.js?v=2.7.4";
 
-function aimMissile(source, target, range, passThrough) {
+function aimAtTarget(source, target, range, passThrough) {
   if (![target?.center?.x, target?.center?.y].every(Number.isFinite)) return;
   const dx = target.center.x - source.x;
   const dy = target.center.y - source.y;
@@ -117,14 +117,14 @@ export function setupSkillHost(obr) {
         const items = obstacles.flat();
         const hitsAllies = mode === "enabled" || (mode === "aoe" && (skill.impact || skill.cone));
         const targets = hitsAllies ? items : items.filter((item) => !isAlly(item));
-        const { source, rotation, size } = instruction.effectProperties;
-        let { destination } = instruction.effectProperties;
-        const targetId = data.skill === "missile" && data.targetId !== token.id ? data.targetId : undefined;
+        const { source, size } = instruction.effectProperties;
+        let { destination, rotation } = instruction.effectProperties;
+        const targetId = typeof data.targetId === "string" && data.targetId !== token.id ? data.targetId : undefined;
         const selected = targetId && items.find((item) => item.id === targetId && isProjectileToken(item));
         if (selected) {
           const target = await obr.scene.items.getItemBounds([selected.id]).catch(() => null);
           if (version !== sceneVersion) return;
-          const aimed = aimMissile(source, target, skill.range * dpi, mode !== "enabled" && isAlly(selected));
+          const aimed = aimAtTarget(source, target, (skill.range ?? 0) * dpi, mode !== "enabled" && isAlly(selected));
           if (aimed) {
             let applied = false;
             await obr.scene.items.updateItems([token.id], ([item]) => {
@@ -137,7 +137,11 @@ export function setupSkillHost(obr) {
               if (version === sceneVersion) await answer({ ...result, error: "Couldn’t turn the avatar toward the target." });
               return;
             }
-            destination = aimed.destination;
+            if (projectile) destination = aimed.destination;
+            else {
+              rotation = aimed.heading;
+              instruction.effectProperties.rotation = rotation;
+            }
           }
         }
         if (skill.cone) {
