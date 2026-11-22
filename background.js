@@ -1,11 +1,12 @@
-import OBR, { buildLabel, buildPath, Command } from "./obr.js?v=2.5.0";
+import OBR, { buildLabel, buildPath, Command } from "./obr.js?v=2.5.1";
 import {
-  ABOVE_FOG, AVATAR, HABBO_MODE, SPEECH, BUBBLE_MS, GENERAL_CHAT_ROOM, canSpeak, isChatRoom, isPublicToken, parseSpeech,
-} from "./rules.js";
+  ABOVE_FOG, AVATAR, HABBO_MODE, HABBO_SCALE, SPEECH, BUBBLE_MS, GENERAL_CHAT_ROOM,
+  canSpeak, isChatRoom, isPublicToken, normalizeHabboScale, parseSpeech,
+} from "./rules.js?v=2.5.1";
 
-import { BUBBLE_LINE_HEIGHT, drawBubble, drawFloatingBubble, fonts, normalizeAppearance } from "./appearance.js?v=2.5.0";
-import { canvasPaths } from "./bubble-paths.js?v=2.5.0";
-import { FLOAT_LINE, placeFloatingBubbles } from "./floating-layout.js";
+import { BUBBLE_LINE_HEIGHT, drawBubble, drawFloatingBubble, fonts, normalizeAppearance } from "./appearance.js?v=2.5.1";
+import { canvasPaths } from "./bubble-paths.js?v=2.5.1";
+import { FLOAT_LINE, placeFloatingBubbles } from "./floating-layout.js?v=2.5.1";
 import { openSessionChannel, saveAvatar } from "./session.js";
 import { chatParts, isRollCommand, rollSpans } from "./dice.js";
 import { queueDiscord } from "./discord.js?v=2.3.9";
@@ -90,11 +91,14 @@ async function updateFloating(next, version) {
 }
 
 async function showFloating(text, appearance, tokenId, position, layer, version, current) {
+  const scale = normalizeHabboScale(roomMetadata?.[HABBO_SCALE]);
   const drawing = drawFloatingBubble(text, appearance);
-  const ids = await addBubbleDrawing(drawing, appearance, position, layer, undefined, 1, current);
+  const ids = await addBubbleDrawing(drawing, appearance, position, layer, undefined, scale, current);
   if (!ids.length) return;
-  const { width, height } = drawing;
-  const bubble = { id: ids[0], ids, tokenId, width, height, x: position.x, y: position.y, originY: position.y };
+  const bubble = {
+    id: ids[0], ids, tokenId, scale, width: drawing.width * scale, height: drawing.height * scale,
+    x: position.x, y: position.y, originY: position.y,
+  };
   const placed = placeFloatingBubbles([bubble, ...floating]);
   try {
     await updateFloating(placed.slice(1), version);
@@ -131,14 +135,16 @@ async function addBubbleDrawing(drawing, appearance, position, layer, tokenId, s
     console.warn("Overhead Chat could not draw the bubble paths", error);
   }
   if (!current()) return [];
+  const labelScale = tokenId ? 1 : scale;
   const nativeLabel = () => buildLabel()
-    .plainText(drawing.lines.join("\n")).width("AUTO").fontFamily(fonts[appearance.font].face).fontSize(appearance.size)
+    .plainText(drawing.lines.join("\n")).width("AUTO").fontFamily(fonts[appearance.font].face)
+    .fontSize(appearance.size * labelScale)
     .lineHeight(BUBBLE_LINE_HEIGHT).textAlign("CENTER").pointerDirection("DOWN");
   const labels = [
-    attach(nativeLabel().padding(10).fillColor(colors[0]).backgroundColor(colors[0])
-      .cornerRadius(tokenId ? 10 : 2).pointerWidth(16).pointerHeight(7)),
-    attach(nativeLabel().padding(8).fillColor(colors.at(-1)).backgroundColor(colors[1])
-      .cornerRadius(tokenId ? 8 : 0).pointerWidth(12).pointerHeight(9)),
+    attach(nativeLabel().padding(10 * labelScale).fillColor(colors[0]).backgroundColor(colors[0])
+      .cornerRadius(tokenId ? 10 : 2).pointerWidth(16 * labelScale).pointerHeight(7 * labelScale)),
+    attach(nativeLabel().padding(8 * labelScale).fillColor(colors.at(-1)).backgroundColor(colors[1])
+      .cornerRadius(tokenId ? 8 : 0).pointerWidth(12 * labelScale).pointerHeight(9 * labelScale)),
   ];
   labels.forEach((item, index) => {
     item.zIndex = index;

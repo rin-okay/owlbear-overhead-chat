@@ -31,7 +31,7 @@ Click **move**, press Tab then Space from the message box, or use F2 to control 
 
 The **avatar** tab saves nine artwork slots for this room in your browser. In **change to**, choose artwork from Owlbear’s Characters assets and press **1–9** in move mode to apply it. The GM also has nine **talk as** slots for switching to visible, unlocked character tokens. Tap the same number twice quickly to apply the slot and return to typing.
 
-The GM can turn on **habbo hotel mode** in the **gm** tab for pixel-style bubbles. They rise from the spot where each message was spoken, stack above newer bubbles, and disappear after roughly six lines of travel.
+The GM can turn on **habbo hotel mode** in the **gm** tab for pixel-style bubbles. They rise from the spot where each message was spoken, stack above newer bubbles, and disappear after roughly six lines of travel. Set **bubble scale** to resize new bubbles and scale the distance they rise per step. The room default is 2×.
 
 [Owlbear Rodeo's extension installation guide](https://docs.owlbear.rodeo/extensions/tutorial-hello-world/install-your-extension/) · [Owlbear Rodeo's player permissions guide](https://docs.owlbear.rodeo/docs/permissions/)
 

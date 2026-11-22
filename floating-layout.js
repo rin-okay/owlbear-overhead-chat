@@ -7,15 +7,19 @@ const GAP = 3;
 export function placeFloatingBubbles(bubbles, rise = 0) {
   const placed = [];
   for (const bubble of bubbles) {
-    let y = bubble.y - rise;
-    while (bubble.originY - y < FLOAT_LIMIT) {
-      const blocker = placed.find((other) =>
-        Math.abs(bubble.x - other.x) < (bubble.width + other.width) / 2 + GAP &&
-        y > other.y - other.height - GAP && other.y > y - bubble.height - GAP);
+    const scale = bubble.scale ?? 1;
+    const minY = bubble.originY - FLOAT_LIMIT * scale + 1e-6;
+    let y = bubble.y - rise * scale;
+    while (y > minY) {
+      const blocker = placed.find((other) => {
+        const gap = GAP * Math.max(scale, other.scale ?? 1);
+        return Math.abs(bubble.x - other.x) < (bubble.width + other.width) / 2 + gap &&
+          y > other.y - other.height - gap && other.y > y - bubble.height - gap;
+      });
       if (!blocker) break;
-      y = blocker.y - blocker.height - GAP;
+      y = blocker.y - blocker.height - GAP * Math.max(scale, blocker.scale ?? 1);
     }
-    if (bubble.originY - y < FLOAT_LIMIT) placed.push({ ...bubble, y });
+    if (y > minY) placed.push({ ...bubble, y });
   }
   return placed;
 }

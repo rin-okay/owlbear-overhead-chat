@@ -2,11 +2,17 @@ export const RUMBLE_DICE = "chat.overhead.rumble-dice.v1";
 export const AVATAR = "chat.overhead.avatar.v1";
 export const ABOVE_FOG = "chat.overhead.above-fog.v1";
 export const HABBO_MODE = "chat.overhead.habbo-mode.v1";
+export const HABBO_SCALE = "chat.overhead.habbo-scale.v1";
+export const DEFAULT_HABBO_SCALE = 2;
 export const SPEECH = "chat.overhead.speech.v1";
 export const MAX_LENGTH = 180;
 export const BUBBLE_MS = 6000;
 export const GENERAL_CHAT_ROOM = "general";
 const CHAT_ROOMS = new Set([GENERAL_CHAT_ROOM, "rin", "kim"]);
+
+export function normalizeHabboScale(value) {
+  return Number.isFinite(value) ? Math.min(5, Math.max(0.5, value)) : DEFAULT_HABBO_SCALE;
+}
 
 export function isChatRoom(roomId) {
   return CHAT_ROOMS.has(roomId);

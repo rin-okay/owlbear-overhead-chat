@@ -4,8 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>overhead chat</title>
-  <link rel="stylesheet" href="./chat.css?v=2.3.10">
-  <script type="module" src="./chat.js?v=2.5.0"></script>
+  <link rel="stylesheet" href="./chat.css?v=2.5.1">
+  <script type="module" src="./chat.js?v=2.5.1"></script>
 </head>
 <body>
   <main>
@@ -123,8 +123,12 @@
         <label class="discord-enabled">
           <input type="checkbox" aria-describedby="habbo-help" disabled> habbo hotel mode
         </label>
+        <label class="habbo-scale">
+          bubble scale <input id="habbo-scale" type="number" min="0.5" max="5" step="0.1" required disabled> ×
+        </label>
         <p id="habbo-help">Use pixel-style chat bubbles that rise and stack above tokens.</p>
         <p role="status"></p>
+        <p id="habbo-scale-status" role="status"></p>
       </section>
       <section id="discord-settings" aria-labelledby="discord-heading">
         <h2 id="discord-heading">discord mirroring</h2>

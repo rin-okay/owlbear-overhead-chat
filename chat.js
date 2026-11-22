@@ -1,15 +1,16 @@
 import OBR from "./obr.js";
 import {
-  ABOVE_FOG, AVATAR, GENERAL_CHAT_ROOM, HABBO_MODE, RUMBLE_DICE, SPEECH, canSpeak, isPublicToken, parseSpeech,
-} from "./rules.js";
+  ABOVE_FOG, AVATAR, GENERAL_CHAT_ROOM, HABBO_MODE, HABBO_SCALE, RUMBLE_DICE, SPEECH,
+  canSpeak, isPublicToken, normalizeHabboScale, parseSpeech,
+} from "./rules.js?v=2.5.1";
 
 import {
   openSessionChannel, savedAvatar, saveAvatar, savedAvatarSlots, savedAvatarMode, savedAvatarArtSlots,
   savedAppearance, saveAppearance,
 } from "./session.js";
 
-import { drawBubble } from "./appearance.js?v=2.5.0";
-import { setupDiscordPanel } from "./discord-panel.js?v=2.5.0";
+import { drawBubble } from "./appearance.js?v=2.5.1";
+import { setupDiscordPanel } from "./discord-panel.js?v=2.5.1";
 import { setupAvatarPanel } from "./avatar-panel.js?v=2.3.10";
 
 import { rollSpans, validateRollSpans } from "./dice.js";
@@ -564,7 +565,7 @@ async function finishRoll(message, spans) {
 
 function setupRoomToggle(id, key) {
   const setting = document.getElementById(id);
-  const checkbox = setting.querySelector("input");
+  const checkbox = setting.querySelector('input[type="checkbox"]');
   const feedback = setting.querySelector("[role=status]");
   let saved = false;
   let revision = 0;
@@ -604,6 +605,51 @@ function setupRoomToggle(id, key) {
     } finally {
       checkbox.checked = saved;
       checkbox.disabled = false;
+    }
+  });
+}
+
+function setupHabboScale() {
+  const input = document.querySelector("#habbo-scale");
+  const feedback = document.querySelector("#habbo-scale-status");
+  let saved = normalizeHabboScale();
+  input.valueAsNumber = saved;
+  let revision = 0;
+  function sync(metadata) {
+    revision++;
+    saved = normalizeHabboScale(metadata[HABBO_SCALE]);
+    if (document.activeElement !== input) input.valueAsNumber = saved;
+  }
+  OBR.room.onMetadataChange(sync);
+  OBR.room.getMetadata().then((metadata) => {
+    if (!revision) sync(metadata);
+    input.disabled = false;
+  }).catch(() => {
+    if (!revision) feedback.textContent = "Couldn’t load bubble scale.";
+    input.disabled = false;
+  });
+
+  input.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") input.blur();
+  });
+  input.addEventListener("change", async () => {
+    if (!input.validity.valid) {
+      feedback.textContent = "Enter a scale from 0.5 to 5 in steps of 0.1.";
+      input.valueAsNumber = saved;
+      return;
+    }
+    const requested = input.valueAsNumber;
+    input.disabled = true;
+    try {
+      if (await OBR.player.getRole() !== "GM") return;
+      await OBR.room.setMetadata({ [HABBO_SCALE]: requested });
+      saved = requested;
+      feedback.textContent = "";
+    } catch {
+      feedback.textContent = "Couldn’t save bubble scale.";
+    } finally {
+      input.valueAsNumber = saved;
+      input.disabled = false;
     }
   });
 }
@@ -699,6 +745,7 @@ OBR.onReady(() => {
   setupRoomToggle("gm-fog-settings", ABOVE_FOG);
   setupRoomToggle("gm-rumble-settings", RUMBLE_DICE);
   setupRoomToggle("gm-habbo-settings", HABBO_MODE);
+  setupHabboScale();
   connectTranscript();
   OBR.player.onChange(({ metadata, role }) => {
     playerRole = role;
