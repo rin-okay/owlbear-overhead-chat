@@ -5,15 +5,21 @@ function avatarId(metadata) {
   return metadata[AVATAR]?.tokenId ?? savedAvatar();
 }
 
-async function centerViewport(obr, center, active = () => true) {
-  const viewport = obr.viewport;
+async function readViewport(viewport) {
   const [width, height, scale, position] = await Promise.all([
     viewport.getWidth(), viewport.getHeight(), viewport.getScale(), viewport.getPosition(),
   ]);
+  return { width, height, scale, position };
+}
+
+async function centerViewport(viewport, center, view, active = () => true) {
+  const { width, height, scale, position } = view;
   if (!active() || ![center?.x, center?.y, width, height, scale].every(Number.isFinite) || scale <= 0) return;
   const x = width / 2 - center.x * scale;
   const y = height / 2 - center.y * scale;
-  if (Math.abs(position.x - x) > 0.5 || Math.abs(position.y - y) > 0.5) await viewport.setPosition({ x, y });
+  if (Math.abs(position.x - x) <= 0.5 && Math.abs(position.y - y) <= 0.5) return;
+  await viewport.setPosition({ x, y });
+  view.position = { x, y };
 }
 
 export async function centerAvatar(obr) {
@@ -23,7 +29,7 @@ export async function centerAvatar(obr) {
   const [token] = await obr.scene.items.getItems([id]);
   if (!isPublicToken(token)) return;
   const { center } = await obr.scene.items.getItemBounds([id]);
-  await centerViewport(obr, center);
+  await centerViewport(obr.viewport, center, await readViewport(obr.viewport));
 }
 
 export function cameraFollowPreference(obr, onChange) {
@@ -55,27 +61,32 @@ export function cameraFollowPreference(obr, onChange) {
 
 function tokenPose(token) {
   if (!isPublicToken(token)) return null;
-  return JSON.stringify([token.position, token.rotation, token.scale, token.grid, token.image?.width, token.image?.height]);
+  return JSON.stringify([token.rotation, token.scale, token.grid, token.image?.width, token.image?.height, token.attachedTo]);
 }
 
 export function setupCameraFollow(obr) {
   let enabled = false;
   let ready;
   let id;
+  let token;
   let pose;
   let center;
+  let view;
+  let viewReadAt = 0;
   let revision = 0;
   let timer;
   let running = false;
 
   function schedule(delay = 0) {
     clearTimeout(timer);
-    if (enabled && ready && id && center !== null && !running) timer = setTimeout(update, delay);
+    if (!enabled || !ready || !id || center === null || running) return;
+    if (delay) timer = setTimeout(update, delay);
+    else void update();
   }
 
   function invalidate() {
     revision++;
-    center = undefined;
+    token = pose = center = view = undefined;
     schedule();
   }
 
@@ -85,14 +96,24 @@ export function setupCameraFollow(obr) {
     const active = () => enabled && ready && started === revision;
     try {
       if (!center) {
-        const [token] = await obr.scene.items.getItems([id]);
-        if (!active()) return;
-        pose = tokenPose(token);
+        if (token === undefined) {
+          const [next] = await obr.scene.items.getItems([id]);
+          if (!active()) return;
+          token = next ?? null;
+          pose = tokenPose(token);
+        }
         const bounds = pose ? await obr.scene.items.getItemBounds([id]) : null;
         if (!active()) return;
         center = bounds?.center ?? null;
       }
-      if (center) await centerViewport(obr, center, active);
+      if (!center) return;
+      if (!view || Date.now() - viewReadAt >= 200) {
+        const nextView = await readViewport(obr.viewport);
+        if (!active()) return;
+        view = nextView;
+        viewReadAt = Date.now();
+      }
+      await centerViewport(obr.viewport, center, view, active);
     } catch (error) {
       if (active()) {
         center = null;
@@ -100,7 +121,7 @@ export function setupCameraFollow(obr) {
       }
     } finally {
       running = false;
-      // The viewport API has no change listener. Check for pan or zoom while following.
+      // Keep pan and zoom in sync between token moves.
       schedule(started === revision ? 200 : 0);
     }
   }
@@ -109,20 +130,30 @@ export function setupCameraFollow(obr) {
     const next = avatarId(metadata);
     if (next === id) return;
     id = next;
-    pose = undefined;
     invalidate();
   }
 
   obr.scene.items.onChange((items) => {
     if (!enabled || !id) return;
-    const next = tokenPose(items.find((item) => item.id === id));
-    if (next === pose) return;
-    pose = next;
-    invalidate();
+    const next = items.find((item) => item.id === id) ?? null;
+    const nextPose = tokenPose(next);
+    const oldPosition = token?.position;
+    const position = next?.position;
+    const translated = oldPosition?.x !== position?.x || oldPosition?.y !== position?.y;
+    if (nextPose === pose && !translated) return;
+    if (center && nextPose && nextPose === pose && oldPosition && position) {
+      // With the same shape and rotation, the bounds center moves by the token's exact delta.
+      center = { x: center.x + position.x - oldPosition.x, y: center.y + position.y - oldPosition.y };
+    } else {
+      center = nextPose ? undefined : null;
+    }
+    token = next;
+    pose = nextPose;
+    revision++;
+    schedule();
   });
   obr.scene.onReadyChange((value) => {
     ready = value;
-    pose = undefined;
     invalidate();
   });
   let avatarChanged = false;
