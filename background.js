@@ -7,7 +7,7 @@ import { BUBBLE_LINE_HEIGHT, drawBubble, drawFloatingBubble, fonts, normalizeApp
 import { FLOAT_LINE, placeFloatingBubbles } from "./floating-layout.js";
 import { openSessionChannel, saveAvatar } from "./session.js";
 import { chatParts, isRollCommand, rollSpans } from "./dice.js";
-import { queueDiscord } from "./discord.js";
+import { queueDiscord } from "./discord.js?v=2.3.4";
 import { parseTray } from "./dice-replay.js";
 import { queueDicePopup, resetDicePopups } from "./dice-popup.js";
 

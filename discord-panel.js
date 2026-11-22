@@ -1,5 +1,5 @@
 import OBR from "./obr.js";
-import { discordSettings, normalizeWebhook, saveDiscordSettings, sendDiscord } from "./discord.js";
+import { discordSettings, normalizeWebhook, saveDiscordSettings, sendDiscord } from "./discord.js?v=2.3.4";
 
 export function setupDiscordPanel(openChat, openGm) {
   const tab = document.querySelector("#gm-tab");
@@ -12,18 +12,12 @@ export function setupDiscordPanel(openChat, openGm) {
   const test = discord.querySelector("#discord-test");
   const versionLabel = panel.querySelector("#extension-version");
 
-  async function showVersion() {
+  function showVersion() {
     if (!versionLabel.hidden) return;
-    try {
-      const response = await fetch(new URL("./manifest.json", import.meta.url), { cache: "no-cache" });
-      if (!response.ok) return;
-      const { version } = await response.json();
-      if (typeof version !== "string" || !version.trim()) return;
-      versionLabel.textContent = `version ${version}`;
-      versionLabel.hidden = false;
-    } catch {
-      // A failed manifest request can be retried by reopening the tab.
-    }
+    const version = new URL(import.meta.url).searchParams.get("v");
+    if (!version) return;
+    versionLabel.textContent = `version ${version}`;
+    versionLabel.hidden = false;
   }
 
   function load() {
@@ -55,7 +49,7 @@ export function setupDiscordPanel(openChat, openGm) {
     load();
     status.textContent = "";
     openGm();
-    void showVersion();
+    showVersion();
   });
 
   form.addEventListener("submit", async (event) => {
