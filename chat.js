@@ -9,7 +9,7 @@ import {
 } from "./session.js";
 
 import { drawBubble } from "./appearance.js";
-import { setupDiscordPanel } from "./discord-panel.js?v=2.3.4";
+import { setupDiscordPanel } from "./discord-panel.js?v=2.3.5";
 import { setupAvatarPanel } from "./avatar-panel.js";
 
 import { rollSpans, validateRollSpans } from "./dice.js";

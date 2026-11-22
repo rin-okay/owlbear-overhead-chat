@@ -1,5 +1,5 @@
 import OBR from "./obr.js";
-import { discordSettings, normalizeWebhook, saveDiscordSettings, sendDiscord } from "./discord.js?v=2.3.4";
+import { discordSettings, normalizeWebhook, saveDiscordSettings, sendDiscord } from "./discord.js?v=2.3.5";
 
 export function setupDiscordPanel(openChat, openGm) {
   const tab = document.querySelector("#gm-tab");
@@ -50,6 +50,16 @@ export function setupDiscordPanel(openChat, openGm) {
     status.textContent = "";
     openGm();
     showVersion();
+  });
+
+  field.addEventListener("input", () => {
+    if (!field.value.trim()) {
+      status.textContent = "";
+      return;
+    }
+    status.textContent = normalizeWebhook(field.value)
+      ? "Webhook URL accepted. Save to use it."
+      : "This doesn’t look like an incoming Discord webhook URL. Use Copy Webhook URL in the channel’s Integrations.";
   });
 
   form.addEventListener("submit", async (event) => {
