@@ -15,7 +15,7 @@ import { queueDicePopup, resetDicePopups } from "./dice-popup.js";
 import { setupSkillHost } from "./skill-host.js?v=2.6.5";
 import { requestChatShortcut } from "./chat-shortcut.js?v=2.6.4";
 import { setupChatRecovery } from "./chat-recovery.js?v=2.6.6";
-import { centerAvatar, setupCameraFollow } from "./avatar-viewport.js?v=2.6.8";
+import { centerAvatar, setupCameraFollow } from "./avatar-viewport.js?v=2.6.9";
 
 const HISTORY_LIMIT = 1000;
 const HISTORY_PAGE_SIZE = 100;

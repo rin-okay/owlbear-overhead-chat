@@ -10,11 +10,11 @@ import {
 } from "./session.js";
 
 import { drawBubble } from "./appearance.js?v=2.6.1";
-import { setupDiscordPanel } from "./discord-panel.js?v=2.6.8";
+import { setupDiscordPanel } from "./discord-panel.js?v=2.6.9";
 import { setupAvatarPanel } from "./avatar-panel.js?v=2.3.10";
 import { setupSkillGrants, setupSkillPanel } from "./skill-panel.js?v=2.6.5";
 import { listenForChatShortcut } from "./chat-shortcut.js?v=2.6.4";
-import { cameraFollowPreference, centerAvatar } from "./avatar-viewport.js?v=2.6.8";
+import { cameraFollowPreference, centerAvatar, prepareKeyboardPan } from "./avatar-viewport.js?v=2.6.9";
 
 import { rollSpans, validateRollSpans } from "./dice.js";
 import { rollWithRumble } from "./rumble.js";
@@ -338,7 +338,11 @@ async function moveAvatar(mode) {
     while (mode === tokenControl && !mode.switching && mode.actions.length) {
       const tokenId = mode.tokenId;
       const { offset, rotation, mirror, artwork, onApplied, skill } = mode.actions.shift();
-      const [{ token }, step] = await Promise.all([getAvatar(), offset ? OBR.scene.grid.getDpi() : 0]);
+      const [{ token }, step, pan] = await Promise.all([
+        getAvatar(),
+        offset ? OBR.scene.grid.getDpi() : 0,
+        offset ? prepareKeyboardPan(OBR, tokenId).catch(() => undefined) : undefined,
+      ]);
       if (mode !== tokenControl || mode.switching || tokenId !== mode.tokenId) return;
       if (token?.id !== tokenId || token.locked) throw new Error("Avatar is unavailable or locked.");
       if (offset && (!Number.isFinite(step) || step <= 0)) throw new Error("Scene grid size unavailable.");
@@ -348,7 +352,7 @@ async function moveAvatar(mode) {
       }
 
       let applied = false;
-      await OBR.scene.items.updateItems([tokenId], ([item]) => {
+      const changeToken = ([item]) => {
         if (mode !== tokenControl || mode.switching || tokenId !== mode.tokenId || !isPublicToken(item) || item.locked) return;
         if (artwork) {
           item.image = artwork.image;
@@ -363,7 +367,13 @@ async function moveAvatar(mode) {
           item.rotation = ((item.rotation + rotation) % 360 + 360) % 360;
         }
         applied = true;
-      });
+      };
+      if (pan) {
+        await pan({ x: offset[0] * step, y: offset[1] * step },
+          () => OBR.scene.items.updateItems([token], changeToken));
+      } else {
+        await OBR.scene.items.updateItems([tokenId], changeToken);
+      }
       if (mode !== tokenControl || mode.switching || tokenId !== mode.tokenId) return;
       if (!applied) throw new Error("Avatar changed before the update.");
       onApplied?.();

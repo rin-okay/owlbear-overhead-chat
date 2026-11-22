@@ -32,15 +32,62 @@ export async function centerAvatar(obr) {
   await centerViewport(obr.viewport, center, await readViewport(obr.viewport));
 }
 
-export function cameraFollowPreference(obr, onChange) {
-  const key = JSON.stringify(["chat.overhead.camera-follow.v1", obr.room.id, obr.player.id]);
-  function get() {
-    try {
-      return localStorage.getItem(key) === "true";
-    } catch {
-      return false;
-    }
+function cameraFollowKey(obr) {
+  return JSON.stringify(["chat.overhead.camera-follow.v1", obr.room.id, obr.player.id]);
+}
+
+function cameraFollowEnabled(obr) {
+  try {
+    return localStorage.getItem(cameraFollowKey(obr)) === "true";
+  } catch {
+    return false;
   }
+}
+
+function keyboardPanKey(obr) {
+  return JSON.stringify(["chat.overhead.keyboard-pan.v1", obr.room.id, obr.player.id]);
+}
+
+function keyboardPanPending(obr, tokenId) {
+  try {
+    const pan = JSON.parse(sessionStorage.getItem(keyboardPanKey(obr)));
+    return pan?.tokenId === tokenId && pan.until > Date.now();
+  } catch {
+    return false;
+  }
+}
+
+export async function prepareKeyboardPan(obr, tokenId) {
+  if (!cameraFollowEnabled(obr)) return;
+  const [{ center }, view] = await Promise.all([
+    obr.scene.items.getItemBounds([tokenId]), readViewport(obr.viewport),
+  ]);
+  if (![center?.x, center?.y, view.scale].every(Number.isFinite) || view.scale <= 0) return;
+
+  return async (delta, moveToken) => {
+    if (!cameraFollowEnabled(obr)) return moveToken();
+    const key = keyboardPanKey(obr);
+    const lease = JSON.stringify({ tokenId, until: Date.now() + 350 });
+    try {
+      sessionStorage.setItem(key, lease);
+    } catch {
+      return moveToken();
+    }
+    function release() {
+      if (sessionStorage.getItem(key) === lease) sessionStorage.removeItem(key);
+    }
+    const move = moveToken();
+    const pan = centerViewport(obr.viewport, { x: center.x + delta.x, y: center.y + delta.y }, view);
+    const [movement, camera] = await Promise.allSettled([move, pan]);
+    if (camera.status === "rejected" || movement.status === "rejected") release();
+    if (camera.status === "rejected") console.error("Overhead Chat keyboard camera pan", camera.reason);
+    if (movement.status === "rejected") throw movement.reason;
+  };
+}
+
+export function cameraFollowPreference(obr, onChange) {
+  const key = cameraFollowKey(obr);
+  const get = () => cameraFollowEnabled(obr);
   function set(enabled) {
     localStorage.setItem(key, String(enabled));
     onChange(enabled);
@@ -107,13 +154,17 @@ export function setupCameraFollow(obr) {
         center = bounds?.center ?? null;
       }
       if (!center) return;
+      if (keyboardPanPending(obr, id)) {
+        view = undefined;
+        return;
+      }
       if (!view || Date.now() - viewReadAt >= 200) {
         const nextView = await readViewport(obr.viewport);
         if (!active()) return;
         view = nextView;
         viewReadAt = Date.now();
       }
-      await centerViewport(obr.viewport, center, view, active);
+      await centerViewport(obr.viewport, center, view, () => active() && !keyboardPanPending(obr, id));
     } catch (error) {
       if (active()) {
         center = null;
