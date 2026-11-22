@@ -9,7 +9,7 @@ import {
 } from "./session.js";
 
 import { drawBubble } from "./appearance.js";
-import { setupDiscordPanel } from "./discord-panel.js?v=2.3.10";
+import { setupDiscordPanel } from "./discord-panel.js?v=2.3.11";
 import { setupAvatarPanel } from "./avatar-panel.js?v=2.3.10";
 
 import { rollSpans, validateRollSpans } from "./dice.js";
@@ -471,12 +471,15 @@ form.addEventListener("keydown", (event) => {
     } else if (Object.hasOwn(movementKeys, key) && !event.ctrlKey && !event.altKey && !event.metaKey) {
       event.preventDefault();
       if (tokenControl.switching) return;
-      const action = movementKeys[key];
-      if (event.repeat && (action.rotation || action.mirror || tokenControl.actions.length >= 4)) return;
-      const { offset } = action;
-      queueAvatarAction(tokenControl, event.shiftKey && offset
-        ? { offset: [offset[0] / 2, offset[1] / 2] }
-        : action);
+      let action = movementKeys[key];
+      const { offset, rotation, mirror } = action;
+      if (event.repeat && (rotation || mirror || tokenControl.actions.length >= 4)) return;
+      if (event.shiftKey && offset) {
+        action = { offset: [offset[0] / 2, offset[1] / 2] };
+      } else if (event.shiftKey && (key === "q" || key === "e")) {
+        action = { rotation: Math.sign(rotation) * 90 };
+      }
+      queueAvatarAction(tokenControl, action);
       if (action.rotation) holdRotation(tokenControl, physicalKey, action);
     }
     return;
