@@ -1,5 +1,5 @@
 import OBR, { buildImage, buildLight } from "./obr.js";
-import { ARRIVAL, AVATAR, CLAIM, CONFIG, MODAL, RESULT, character, dismissKey, linkKey, workerOrigin } from "./model.mjs";
+import { ARRIVAL, CLAIM, CONFIG, MODAL, RESULT, character, dismissKey, linkKey, workerOrigin } from "./model.mjs";
 import { planToken } from "./provision.mjs";
 
 let offered = false;
@@ -15,10 +15,16 @@ const sameScene = (epoch) => epoch === sceneEpoch;
 async function offer() {
   const epoch = sceneEpoch;
   if (offered || !await OBR.scene.isReady() || await OBR.player.getRole() !== "PLAYER") return;
+  const player = OBR.player.id;
   const [scene, room] = await Promise.all([OBR.scene.getMetadata(), OBR.room.getMetadata()]);
-  if (!sameScene(epoch) || !scene[CONFIG]?.enabled || room[linkKey(OBR.player.id)]) return;
-  try { if (localStorage.getItem(dismissKey(OBR.room.id, OBR.player.id))) return; } catch {}
-  if (offered) return;
+  if (!sameScene(epoch) || !scene[CONFIG]?.enabled) return;
+  try { if (localStorage.getItem(dismissKey(OBR.room.id, player)) === "skipped") return; } catch {}
+  const link = room[linkKey(player)];
+  if (link?.tokenId) {
+    const [token] = await OBR.scene.items.getItems([link.tokenId]);
+    if (character(token) && token.createdUserId === player) return;
+  }
+  if (offered || !sameScene(epoch)) return;
   offered = true;
   try {
     await OBR.modal.open({id:MODAL, url:new URL("./panel.html?welcome=1", import.meta.url).href, width:350, height:370});
@@ -26,7 +32,6 @@ async function offer() {
     offered = false;
     throw error;
   }
-  try { localStorage.setItem(dismissKey(OBR.room.id, OBR.player.id), "shown"); } catch {}
 }
 
 async function answer(connection, request, response) {

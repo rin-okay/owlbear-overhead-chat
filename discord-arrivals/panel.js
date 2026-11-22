@@ -110,8 +110,12 @@ async function setupGM() {
   await loadScene();
 }
 
+async function focusToken(tokenId) {
+  const bounds = await OBR.scene.items.getItemBounds([tokenId]);
+  await OBR.viewport.animateToBounds(bounds);
+}
+
 async function setupPlayer() {
-  if (!await OBR.scene.isReady()) { status("Ask the GM to open a scene."); return; }
   const [metadata, room, connection] = await Promise.all([
     OBR.scene.getMetadata(), OBR.room.getMetadata(), OBR.player.getConnectionId(),
   ]);
@@ -122,6 +126,8 @@ async function setupPlayer() {
   const [existing] = linked ? await OBR.scene.items.getItems([linked.tokenId]) : [];
   if (existing?.createdUserId === player && character(existing)) {
     if (!(await OBR.player.getMetadata())[AVATAR]?.tokenId) await OBR.player.setMetadata({[AVATAR]:{tokenId:existing.id}});
+    listen("find-token", () => focusToken(existing.id));
+    setVisible("find-token", true);
     status("Discord is linked and your token is in this scene.");
     return;
   }
@@ -177,10 +183,16 @@ async function setupPlayer() {
       if (!character(token) || token.createdUserId !== player) return;
       clearClaim();
       await OBR.player.setMetadata({[AVATAR]:{tokenId:token.id}});
-      try { localStorage.setItem(key, "linked"); } catch {}
       connect.disabled = true;
       el("paste-details").hidden = true;
       status(data.needsVision ? "Your token is ready. The GM can enable Smoke & Spectre vision on it." : "Your token is ready.");
+      listen("find-token", () => focusToken(token.id));
+      setVisible("find-token", true);
+      try {
+        await focusToken(token.id);
+      } catch {
+        // The token stays ready if this client cannot move the camera.
+      }
     } catch (error) {
       readableError(error);
     }
@@ -220,13 +232,28 @@ async function setupPlayer() {
   window.addEventListener("pagehide", () => { clearClaim(); unsubscribe(); }, {once:true});
   connect.disabled = false;
   setVisible("player", true);
-  status("");
+  status(linked ? "Your linked token isn’t available in this scene. Connect Discord to recover it." : "");
+}
+
+async function waitForPlayerScene() {
+  let started = false;
+  const start = async () => {
+    if (started) return;
+    started = true;
+    unsubscribe();
+    await setupPlayer();
+  };
+  const unsubscribe = OBR.scene.onReadyChange((ready) => {
+    if (ready) void start().catch(readableError);
+  });
+  if (await OBR.scene.isReady()) await start();
+  else if (!started) status("Waiting for the GM to open a scene…");
 }
 
 OBR.onReady(async () => {
   try {
     if (await OBR.player.getRole() === "GM") await setupGM();
-    else await setupPlayer();
+    else await waitForPlayerScene();
   } catch (error) {
     readableError(error);
   }
