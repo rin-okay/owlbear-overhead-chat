@@ -1,10 +1,10 @@
 import { canSpeak, MELEE_HIT_TIMING, normalizeMeleeHitTiming } from "./rules.js?v=2.6.16";
-import { isProjectileToken, isProjectileWall, openMeleeDoor, projectileImpact } from "./projectile-collision.js?v=2.6.13";
+import { coneHits, isProjectileToken, isProjectileWall, openMeleeDoor, projectileImpact } from "./projectile-collision.js?v=2.7.1";
 import { HIT_MARKERS, MELEE_HIT_CUE } from "./hit-markers.js?v=2.6.16";
 import {
   DEFAULT_WEAPON, EMBERS_EFFECTS, MELEE_DURATION_MS, SKILLS, SKILL_REQUEST, SKILL_RESULT,
   availableSkills, availableWeapons, readSkills, skillConnections, skillEffect,
-} from "./skills.js?v=2.6.15";
+} from "./skills.js?v=2.7.1";
 
 export function setupSkillHost(obr) {
   const lastCast = new Map();
@@ -61,7 +61,7 @@ export function setupSkillHost(obr) {
       lastCast.set(sender.id, now);
       const skill = SKILLS[data.skill];
       const projectile = Boolean(skill.range);
-      const checksHit = projectile || Boolean(skill.meleeReach);
+      const checksHit = projectile || Boolean(skill.meleeReach || skill.cone);
       const geometry = checksHit ? Promise.all([
         obr.scene.items.getItems((item) => isProjectileToken(item) || isProjectileWall(item)),
         obr.scene.local.getItems(isProjectileWall),
@@ -93,24 +93,29 @@ export function setupSkillHost(obr) {
           await answer({ ...result, error: "Couldn’t check the scene for walls and tokens. Try again." });
           return;
         }
+        const items = obstacles.flat();
         const { source, rotation, destination } = instruction.effectProperties;
-        let end = destination;
-        if (!projectile) {
+        if (skill.cone) {
+          hitTokenIds = coneHits(source, rotation, skill.cone * dpi, items, token.id, dpi);
+        } else if (projectile) {
+          const blastRadius = skill.impact ? skill.impact.size * dpi / 2 : 0;
+          const impact = projectileImpact(source, destination, items, token.id, dpi, blastRadius);
+          instruction.effectProperties.destination = impact.destination;
+          hitTokenIds = impact.hitTokenIds;
+          if (skill.impact) {
+            const { effect, size, delay } = skill.impact;
+            instructions.push({
+              type: "effect", id: effect, delay, layer: instruction.layer,
+              effectProperties: { source: impact.destination, size, disableHit: true },
+            });
+          }
+        } else {
           const angle = rotation * Math.PI / 180;
           const reach = skill.meleeReach * dpi;
-          end = { x: source.x + reach * Math.cos(angle), y: source.y + reach * Math.sin(angle) };
-        }
-        const blastRadius = skill.impact ? skill.impact.size * dpi / 2 : 0;
-        const impact = projectileImpact(source, end, obstacles.flat(), token.id, dpi, blastRadius);
-        hitTokenIds = impact.hitTokenIds;
-        if (projectile) instruction.effectProperties.destination = impact.destination;
-        else doorId = impact.doorId;
-        if (skill.impact) {
-          const { effect, size, delay } = skill.impact;
-          instructions.push({
-            type: "effect", id: effect, delay, layer: instruction.layer,
-            effectProperties: { source: impact.destination, size, disableHit: true },
-          });
+          const end = { x: source.x + reach * Math.cos(angle), y: source.y + reach * Math.sin(angle) };
+          const impact = projectileImpact(source, end, items, token.id, dpi);
+          hitTokenIds = impact.hitTokenIds;
+          doorId = impact.doorId;
         }
       }
       const meleeHit = Boolean(skill.meleeReach && hitTokenIds.length);

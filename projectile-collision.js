@@ -135,6 +135,45 @@ const advance = (point, direction, distance) => ({
   y: point.y + direction.y * distance,
 });
 
+function hasClearPath(source, target, walls) {
+  const delta = subtract(target, source);
+  const range = Math.hypot(delta.x, delta.y);
+  if (range <= EPSILON) return true;
+  const direction = { x: delta.x / range, y: delta.y / range };
+  return closestWall(source, direction, walls).distance > range + EPSILON;
+}
+
+function distanceToSegment(point, start, end) {
+  const edge = subtract(end, start);
+  const fraction = Math.max(0, Math.min(1, dot(subtract(point, start), edge) / dot(edge, edge)));
+  return Math.hypot(point.x - start.x - edge.x * fraction, point.y - start.y - edge.y * fraction);
+}
+
+export function coneHits(source, rotation, length, items, casterId, dpi) {
+  const angle = rotation * Math.PI / 180;
+  const direction = { x: Math.cos(angle), y: Math.sin(angle) };
+  const tip = { x: 0, y: 0 };
+  const left = { x: length, y: -length / 2 };
+  const right = { x: length, y: length / 2 };
+  const walls = collectWalls(items);
+  return items.filter((item) => {
+    if (item.id === casterId || !isProjectileToken(item)) return false;
+    const circle = tokenCircle(item, dpi);
+    if (!circle) return false;
+    const offset = subtract(circle.center, source);
+    const center = { x: dot(direction, offset), y: cross(direction, offset) };
+    if (center.x <= EPSILON || center.x > length + circle.radius) return false;
+    // The cone is as wide as it is long. Test the token circle against its triangle.
+    const inside = center.x <= length && Math.abs(center.y) <= center.x / 2;
+    const overlaps = inside || Math.min(
+      distanceToSegment(center, tip, left),
+      distanceToSegment(center, left, right),
+      distanceToSegment(center, right, tip),
+    ) <= circle.radius + EPSILON;
+    return overlaps && hasClearPath(source, circle.center, walls);
+  }).map(({ id }) => id);
+}
+
 export function projectileImpact(source, destination, items, casterId, dpi, blastRadius = 0) {
   const delta = subtract(destination, source);
   const range = Math.hypot(delta.x, delta.y);
@@ -175,11 +214,7 @@ export function projectileImpact(source, destination, items, casterId, dpi, blas
   const hitTokenIds = targets.filter((target) => {
     const offset = subtract(target.center, impact);
     if (Math.hypot(offset.x, offset.y) > blastRadius + target.radius) return false;
-    const cover = subtract(target.center, coverOrigin);
-    const length = Math.hypot(cover.x, cover.y);
-    if (length <= EPSILON) return true;
-    const ray = { x: cover.x / length, y: cover.y / length };
-    return closestWall(coverOrigin, ray, walls).distance > length + EPSILON;
+    return hasClearPath(coverOrigin, target.center, walls);
   }).map(({ id }) => id);
   return { destination: end, hitTokenIds };
 }

@@ -47,7 +47,7 @@ export const SKILLS = {
   // Keep the original skill ID so existing bindings and clients still work.
   spear: { name: "melee weapon attack", key: "f", meleeReach: 1 },
   missile: { name: "magic missile", key: "g", effect: "magic_missile", range: 8, hitDelay: 1000 },
-  "burning-hands": { name: "burning hands", key: "h", effect: "burning_hands", cone: 3 },
+  "burning-hands": { name: "burning hands", key: "h", effect: "burning_hands", cone: 3, hitDelay: 1000 },
   "fire-bolt": { name: "fire bolt", key: "j", effect: "fire_bolt", range: 24, hitDelay: 800 },
   fireball: {
     name: "fireball", key: "k", effect: "fireball.beam", range: 30,
