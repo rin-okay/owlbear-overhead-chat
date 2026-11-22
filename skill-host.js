@@ -4,7 +4,7 @@ import { HIT_MARKERS } from "./hit-markers.js?v=2.6.10";
 import {
   DEFAULT_WEAPON, EMBERS_EFFECTS, SKILLS, SKILL_REQUEST, SKILL_RESULT,
   availableSkills, availableWeapons, readSkills, skillConnections, skillEffect,
-} from "./skills.js?v=2.6.10";
+} from "./skills.js?v=2.6.12";
 
 export function setupSkillHost(obr) {
   const lastCast = new Map();
@@ -61,7 +61,8 @@ export function setupSkillHost(obr) {
       lastCast.set(sender.id, now);
       const skill = SKILLS[data.skill];
       const projectile = Boolean(skill.range);
-      const geometry = projectile ? Promise.all([
+      const checksHit = projectile || Boolean(skill.meleeReach);
+      const geometry = checksHit ? Promise.all([
         obr.scene.items.getItems((item) => isProjectileToken(item) || isProjectileWall(item)),
         obr.scene.local.getItems(isProjectileWall),
       ]).catch(() => null) : [];
@@ -86,22 +87,27 @@ export function setupSkillHost(obr) {
       }
       const instructions = [instruction];
       let hitTokenIds = [];
-      if (projectile) {
+      if (checksHit) {
         if (!obstacles) {
           await answer({ ...result, error: "Couldn’t check the scene for walls and tokens. Try again." });
           return;
         }
-        const { effectProperties } = instruction;
+        const { source, rotation, destination } = instruction.effectProperties;
+        let end = destination;
+        if (!projectile) {
+          const angle = rotation * Math.PI / 180;
+          const reach = skill.meleeReach * dpi;
+          end = { x: source.x + reach * Math.cos(angle), y: source.y + reach * Math.sin(angle) };
+        }
         const blastRadius = skill.impact ? skill.impact.size * dpi / 2 : 0;
-        const impact = projectileImpact(effectProperties.source, effectProperties.destination,
-          obstacles.flat(), token.id, dpi, blastRadius);
-        effectProperties.destination = impact.destination;
+        const impact = projectileImpact(source, end, obstacles.flat(), token.id, dpi, blastRadius);
         hitTokenIds = impact.hitTokenIds;
+        if (projectile) instruction.effectProperties.destination = impact.destination;
         if (skill.impact) {
           const { effect, size, delay } = skill.impact;
           instructions.push({
             type: "effect", id: effect, delay, layer: instruction.layer,
-            effectProperties: { source: effectProperties.destination, size, disableHit: true },
+            effectProperties: { source: impact.destination, size, disableHit: true },
           });
         }
       }
