@@ -84,7 +84,7 @@ export function drawBubble(text, style) {
     wrapParagraph(paragraph, (line) => ctx.measureText(line).width));
 
   const characterWidth = ctx.measureText("0").width;
-  const contentWidth = Math.ceil(Math.max(characterWidth * 5, ...lines.map((part) => ctx.measureText(part).width)));
+  const contentWidth = Math.ceil(Math.max(characterWidth * 3, ...lines.map((part) => ctx.measureText(part).width)));
   const extraPadding = Math.ceil(characterWidth);
   const width = Math.max(32, contentWidth + 18 + extraPadding * 2);
   const lineHeight = Math.ceil(style.size * BUBBLE_LINE_HEIGHT);

@@ -4,7 +4,7 @@ import {
   canSpeak, isChatRoom, isPublicToken, normalizeHabboScale, parseSpeech,
 } from "./rules.js?v=2.5.1";
 
-import { BUBBLE_LINE_HEIGHT, drawBubble, drawFloatingBubble, fonts, normalizeAppearance } from "./appearance.js?v=2.5.2";
+import { BUBBLE_LINE_HEIGHT, drawBubble, drawFloatingBubble, fonts, normalizeAppearance } from "./appearance.js?v=2.6.1";
 import { canvasPaths } from "./bubble-paths.js?v=2.5.1";
 import { FLOAT_LINE, placeFloatingBubbles } from "./floating-layout.js?v=2.5.1";
 import { openSessionChannel, saveAvatar } from "./session.js";
