@@ -2,7 +2,7 @@ import { isPublicToken } from "./rules.js";
 import {
   DEFAULT_WEAPON, FACINGS, SKILLS, SKILL_CHANGED, SKILL_REQUEST, SKILL_RESULT, SPELLS, WEAPONS,
   availableSpells, availableWeapons, readSkills, skillConnections, writeSkills,
-} from "./skills.js?v=2.6.3";
+} from "./skills.js?v=2.6.5";
 
 function characterLabel(token) {
   return token.name || "unnamed character";

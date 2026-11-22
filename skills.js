@@ -21,6 +21,10 @@ export const SKILLS = {
   missile: { name: "magic missile", key: "g", effect: "magic_missile", range: 8 },
   "burning-hands": { name: "burning hands", key: "h", effect: "burning_hands", cone: 3 },
   "fire-bolt": { name: "fire bolt", key: "j", effect: "fire_bolt", range: 24 },
+  fireball: {
+    name: "fireball", key: "k", effect: "fireball.beam", range: 30,
+    impact: { effect: "fireball.explosion", size: 8, delay: 3000 },
+  },
 };
 export const SPELLS = Object.keys(SKILLS).filter((id) => id !== "spear");
 export const FACINGS = [

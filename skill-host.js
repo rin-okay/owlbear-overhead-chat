@@ -3,7 +3,7 @@ import { clipProjectile, isProjectileToken, isProjectileWall } from "./projectil
 import {
   DEFAULT_WEAPON, EMBERS_EFFECTS, SKILLS, SKILL_REQUEST, SKILL_RESULT,
   availableSkills, availableWeapons, readSkills, skillConnections, skillEffect,
-} from "./skills.js?v=2.6.3";
+} from "./skills.js?v=2.6.5";
 
 export function setupSkillHost(obr) {
   const lastCast = new Map();
@@ -58,7 +58,8 @@ export function setupSkillHost(obr) {
         return;
       }
       lastCast.set(sender.id, now);
-      const projectile = Boolean(SKILLS[data.skill].range);
+      const skill = SKILLS[data.skill];
+      const projectile = Boolean(skill.range);
       const geometry = projectile ? Promise.all([
         obr.scene.items.getItems((item) => isProjectileToken(item) || isProjectileWall(item)),
         obr.scene.local.getItems(isProjectileWall),
@@ -82,6 +83,7 @@ export function setupSkillHost(obr) {
         await answer({ ...result, error: "Couldn’t determine avatar facing. Check the scene grid and facing setting." });
         return;
       }
+      const instructions = [instruction];
       if (projectile) {
         if (!obstacles) {
           await answer({ ...result, error: "Couldn’t check the scene for walls and tokens. Try again." });
@@ -90,9 +92,16 @@ export function setupSkillHost(obr) {
         const { effectProperties } = instruction;
         effectProperties.destination = clipProjectile(effectProperties.source, effectProperties.destination,
           obstacles.flat(), token.id, dpi);
+        if (skill.impact) {
+          const { effect, size, delay } = skill.impact;
+          instructions.push({
+            type: "effect", id: effect, delay, layer: instruction.layer,
+            effectProperties: { source: effectProperties.destination, size, disableHit: true },
+          });
+        }
       }
       await obr.broadcast.sendMessage(EMBERS_EFFECTS, {
-        instructions: [instruction], spellData: { name: SKILLS[data.skill].name, caster: sender.id },
+        instructions, spellData: { name: skill.name, caster: sender.id },
       }, { destination: "ALL" });
       await answer(result);
     } catch (error) {

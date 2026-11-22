@@ -39,9 +39,9 @@ The GM can turn on **habbo hotel mode** in the **gm** tab for pixel-style bubble
 
 Enable [Embers](https://extensions.owlbear.rodeo/embers) in the room, then turn on **enable skill hotkeys** in **skills → grants** as GM. Choose a token, select a spell or weapon variant, then check the corresponding grant box. Everyone starts with generic slash. The enable switch and grants are saved in the GM’s browser for the room. A GM running this release must be connected to approve casts.
 
-Open **skills** to set your avatar’s facing at zero rotation, pick a granted weapon, and rebind available skills. Facing is saved per artwork, and weapon choice is saved per token. The default move-mode keys are **F** for melee weapon attack, **G** for Magic Missile, **H** for Burning Hands, and **J** for Fire Bolt. The GM grants the spells independently.
+Open **skills** to set your avatar’s facing at zero rotation, pick a granted weapon, and rebind available skills. Facing is saved per artwork, and weapon choice is saved per token. The default move-mode keys are **F** for melee weapon attack, **G** for Magic Missile, **H** for Burning Hands, **J** for Fire Bolt, and **K** for Fireball. The GM grants the spells independently.
 
-Magic Missile travels up to eight grid widths and Fire Bolt up to 24. They stop at the first eligible character token, blocking native wall, or active Smoke & Spectre obstruction. Open doors and nonblocking windows let projectiles through. Explicitly hidden tokens, Spectres, and audience-restricted Smoke walls are omitted from shared collision effects. Burning Hands plays a three-grid-width cone. Skill effects are visual. Resolve damage, saves, and elevation at the table.
+Magic Missile travels up to eight grid widths, Fire Bolt up to 24, and Fireball up to 30. They stop at the first eligible character token, blocking native wall, or active Smoke & Spectre obstruction. Open doors and nonblocking windows let projectiles through. Explicitly hidden tokens, Spectres, and audience-restricted Smoke walls are omitted from shared collision effects. Fireball plays an eight-grid-wide explosion at its endpoint. Burning Hands plays a three-grid-width cone. Skill effects are visual. Resolve damage, saves, and elevation at the table.
 
 ## Discord relay
 
