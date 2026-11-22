@@ -4,6 +4,8 @@ export const ABOVE_FOG = "chat.overhead.above-fog.v1";
 export const HABBO_MODE = "chat.overhead.habbo-mode.v1";
 export const HABBO_SCALE = "chat.overhead.habbo-scale.v1";
 export const DEFAULT_HABBO_SCALE = 2;
+export const MELEE_HIT_TIMING = "chat.overhead.melee-hit-timing.v1";
+export const DEFAULT_MELEE_HIT_TIMING = 75;
 export const SPEECH = "chat.overhead.speech.v1";
 export const MAX_LENGTH = 180;
 export const BUBBLE_MS = 6000;
@@ -12,6 +14,10 @@ const CHAT_ROOMS = new Set([GENERAL_CHAT_ROOM, "rin", "kim"]);
 
 export function normalizeHabboScale(value) {
   return Number.isFinite(value) ? Math.min(5, Math.max(0.5, value)) : DEFAULT_HABBO_SCALE;
+}
+
+export function normalizeMeleeHitTiming(value) {
+  return Number.isFinite(value) ? Math.min(100, Math.max(0, Math.round(value))) : DEFAULT_MELEE_HIT_TIMING;
 }
 
 export function isChatRoom(roomId) {

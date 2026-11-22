@@ -127,6 +127,9 @@ select { font: inherit; background: #181321; color: inherit; border: 1px solid #
 .avatar-art-slot { display: grid; grid-template-columns: 1em minmax(0, 1fr) auto; gap: 8px; align-items: center; }
 .avatar-art-slot button:first-of-type { overflow: hidden; text-align: left; text-overflow: ellipsis; white-space: nowrap; }
 #gm-panel label { white-space: normal; }
+#gm-melee-settings label { display: flex; justify-content: space-between; margin-bottom: 3px; }
+#melee-hit-timing-value { font-variant-numeric: tabular-nums; }
+#gm-panel #melee-hit-timing { min-height: 28px; padding: 0; border: 0; background: transparent; accent-color: #c7b6f8; }
 #extension-version { margin-top: 12px; padding-top: 10px; border-top: 1px solid #544762; color: #ab9dbb; font-size: 11px; }
 #discord-settings h2 { margin: 0 0 6px; font-size: 1em; }
 #discord-settings p { margin: 0 0 12px; color: #c5b8d6; }

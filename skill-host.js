@@ -1,6 +1,6 @@
-import { canSpeak } from "./rules.js";
+import { canSpeak, MELEE_HIT_TIMING, normalizeMeleeHitTiming } from "./rules.js?v=2.6.16";
 import { isProjectileToken, isProjectileWall, openMeleeDoor, projectileImpact } from "./projectile-collision.js?v=2.6.13";
-import { HIT_MARKERS, MELEE_HIT_CUE } from "./hit-markers.js?v=2.6.15";
+import { HIT_MARKERS, MELEE_HIT_CUE } from "./hit-markers.js?v=2.6.16";
 import {
   DEFAULT_WEAPON, EMBERS_EFFECTS, MELEE_DURATION_MS, SKILLS, SKILL_REQUEST, SKILL_RESULT,
   availableSkills, availableWeapons, readSkills, skillConnections, skillEffect,
@@ -118,12 +118,17 @@ export function setupSkillHost(obr) {
         requestId: data.requestId, tokenIds: hitTokenIds, delay, useAnimationCue,
       }, { destination: "ALL" }).catch((error) => console.error("Overhead Chat hit markers", error));
       if (meleeHit) {
-        const cueDelay = Math.round(MELEE_DURATION_MS[weapon] * 0.75);
-        // Embers starts sibling instructions together on each viewer’s client.
-        instructions.push({
-          type: "action", id: "message", delay: cueDelay,
-          arguments: [MELEE_HIT_CUE, data.requestId, "LOCAL"],
-        });
+        const metadata = await obr.room.getMetadata().catch(() => ({}));
+        if (version !== sceneVersion) return;
+        const timing = normalizeMeleeHitTiming(metadata[MELEE_HIT_TIMING]);
+        const cueDelay = Math.round(MELEE_DURATION_MS[weapon] * timing / 100);
+        const cue = { type: "action", id: "message", arguments: [MELEE_HIT_CUE, data.requestId, "LOCAL"] };
+        if (timing === 100) {
+          // Embers runs nested actions after it removes the finished effect.
+          instruction.instructions = [cue];
+        } else {
+          instructions.push({ ...cue, delay: cueDelay });
+        }
         await sendMarkers(cueDelay + 750, true);
         if (version !== sceneVersion) return;
       }

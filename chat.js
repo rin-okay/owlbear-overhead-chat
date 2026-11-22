@@ -1,8 +1,8 @@
 import OBR from "./obr.js";
 import {
-  ABOVE_FOG, AVATAR, GENERAL_CHAT_ROOM, HABBO_MODE, HABBO_SCALE, RUMBLE_DICE, SPEECH,
-  canSpeak, isPublicToken, normalizeHabboScale, parseSpeech,
-} from "./rules.js?v=2.5.1";
+  ABOVE_FOG, AVATAR, GENERAL_CHAT_ROOM, HABBO_MODE, HABBO_SCALE, MELEE_HIT_TIMING, RUMBLE_DICE, SPEECH,
+  canSpeak, isPublicToken, normalizeHabboScale, normalizeMeleeHitTiming, parseSpeech,
+} from "./rules.js?v=2.6.16";
 
 import {
   openSessionChannel, savedAvatar, saveAvatar, savedAvatarSlots, savedAvatarMode, savedAvatarArtSlots,
@@ -10,7 +10,7 @@ import {
 } from "./session.js";
 
 import { drawBubble } from "./appearance.js?v=2.6.1";
-import { setupDiscordPanel } from "./discord-panel.js?v=2.6.15";
+import { setupDiscordPanel } from "./discord-panel.js?v=2.6.16";
 import { setupAvatarPanel } from "./avatar-panel.js?v=2.6.11";
 import { setupSkillGrants, setupSkillPanel } from "./skill-panel.js?v=2.6.5";
 import { listenForChatShortcut } from "./chat-shortcut.js?v=2.6.4";
@@ -687,6 +687,54 @@ function setupHabboScale() {
   });
 }
 
+function setupMeleeHitTiming() {
+  const timing = document.querySelector("#melee-hit-timing");
+  const value = document.querySelector("#melee-hit-timing-value");
+  const status = document.querySelector("#melee-hit-timing-status");
+  let saved = normalizeMeleeHitTiming();
+  let receivedMetadata = false;
+
+  function render(percent) {
+    timing.valueAsNumber = percent;
+    value.textContent = percent + "%";
+  }
+
+  function sync(metadata) {
+    const previous = saved;
+    saved = normalizeMeleeHitTiming(metadata[MELEE_HIT_TIMING]);
+    if (!receivedMetadata || saved !== previous) render(saved);
+    receivedMetadata = true;
+  }
+  OBR.room.onMetadataChange(sync);
+  OBR.room.getMetadata().then((metadata) => {
+    if (!receivedMetadata) sync(metadata);
+    timing.disabled = false;
+  }).catch(() => {
+    if (!receivedMetadata) status.textContent = "couldn’t load melee hit timing.";
+    render(saved);
+    timing.disabled = false;
+  });
+
+  timing.addEventListener("input", () => {
+    value.textContent = timing.value + "%";
+  });
+  timing.addEventListener("change", async () => {
+    const requested = normalizeMeleeHitTiming(timing.valueAsNumber);
+    timing.disabled = true;
+    try {
+      if (await OBR.player.getRole() !== "GM") return;
+      await OBR.room.setMetadata({ [MELEE_HIT_TIMING]: requested });
+      saved = requested;
+      status.textContent = "";
+    } catch {
+      status.textContent = "couldn’t save melee hit timing.";
+    } finally {
+      render(saved);
+      timing.disabled = false;
+    }
+  });
+}
+
 function setupSettings() {
   const chatTab = document.querySelector("#chat-tab");
   const settingsTab = document.querySelector("#settings-tab");
@@ -827,6 +875,7 @@ function setupSettings() {
 
 OBR.onReady(() => {
   setupSettings();
+  setupMeleeHitTiming();
   setupRoomToggle("gm-fog-settings", ABOVE_FOG);
   setupRoomToggle("gm-rumble-settings", RUMBLE_DICE);
   setupRoomToggle("gm-habbo-settings", HABBO_MODE);

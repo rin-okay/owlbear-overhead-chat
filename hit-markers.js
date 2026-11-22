@@ -10,18 +10,32 @@ export function setupHitMarkers(obr, buildLabel) {
   let sceneVersion = 0;
   const recent = new Map();
   const animationCues = new Map();
+  const earlyCues = new Map();
   obr.scene.onReadyChange(() => {
     sceneVersion++;
     recent.clear();
+    earlyCues.clear();
     for (const { finish } of animationCues.values()) finish();
   });
 
   obr.broadcast.onMessage(MELEE_HIT_CUE, ({ connectionId, data }) => {
     const pending = animationCues.get(data);
-    if (pending && pending.connectionId === connectionId) pending.finish();
+    if (pending) {
+      if (pending.connectionId === connectionId) pending.finish();
+      return;
+    }
+    // At the start of a swing the cue can beat the GM authorization lookup.
+    if (typeof data !== "string" || !/^[a-f0-9-]{36}$/i.test(data) || recent.has(data)) return;
+    if (earlyCues.size >= 64) earlyCues.delete(earlyCues.keys().next().value);
+    earlyCues.set(JSON.stringify([connectionId, data]), Date.now() + 5000);
   });
 
   function waitForAnimationCue(requestId, connectionId, fallbackDelay) {
+    const key = JSON.stringify([connectionId, requestId]);
+    const expires = earlyCues.get(key);
+    earlyCues.delete(key);
+    if (expires > Date.now()) return Promise.resolve();
+
     return new Promise((resolve) => {
       const timeout = setTimeout(finish, fallbackDelay);
       animationCues.set(requestId, { connectionId, finish });
