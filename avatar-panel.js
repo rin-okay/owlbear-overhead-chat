@@ -91,6 +91,58 @@ function setupArtSlots(panel) {
   const list = panel.querySelector("#avatar-art-slots");
   const status = panel.querySelector("[role=status]");
   const slots = savedAvatarArtSlots();
+  const picker = panel.querySelector("#avatar-scene-art");
+  const source = panel.querySelector("#avatar-art-source");
+  const use = panel.querySelector("#avatar-art-use");
+  const cancel = panel.querySelector("#avatar-art-cancel");
+  let pending;
+  let opening = false;
+
+  function closeScenePicker(restoreFocus = false) {
+    const previous = pending;
+    pending = undefined;
+    picker.hidden = true;
+    source.replaceChildren();
+    if (restoreFocus) previous?.button.focus();
+  }
+
+  async function openScenePicker(index, button, render) {
+    if (!await OBR.scene.isReady()) {
+      status.textContent = "open a scene to choose artwork from one of your tokens.";
+      return;
+    }
+    const tokens = await OBR.scene.items.getItems((item) =>
+      isPublicToken(item) && item.createdUserId === OBR.player.id);
+    if (panel.closest("[hidden]")) return;
+    if (!tokens.length) {
+      status.textContent = "the characters picker is unavailable. add your artwork as a token from the characters dock, or ask the gm to place it and assign you as its owner.";
+      return;
+    }
+    tokens.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+    source.replaceChildren(...tokens.map((token) => new Option(token.name || "unnamed token", token.id)));
+    pending = { index, button, render, tokens };
+    picker.hidden = false;
+    status.textContent = "choose scene artwork for slot " + (index + 1) + ".";
+    source.focus();
+  }
+
+  use.addEventListener("click", () => {
+    if (!pending) return;
+    const token = pending.tokens.find(({ id }) => id === source.value);
+    if (!token || !saveAvatarArtSlot(pending.index, token)) {
+      status.textContent = "this token’s artwork couldn’t be saved. choose another token.";
+      return;
+    }
+    pending.render();
+    closeScenePicker(true);
+    status.textContent = "";
+  });
+
+  cancel.addEventListener("click", () => {
+    closeScenePicker(true);
+    status.textContent = "";
+  });
+
   slots.forEach((_, index) => {
     const slot = index + 1;
     const row = document.createElement("div");
@@ -116,23 +168,35 @@ function setupArtSlots(panel) {
     list.append(row);
 
     choose.addEventListener("click", async () => {
+      if (opening) return;
+      opening = true;
+      closeScenePicker();
       choose.disabled = true;
       clear.disabled = true;
       status.textContent = "";
       try {
-        const [asset] = await OBR.assets.downloadImages(false, undefined, "CHARACTER");
+        let assets;
+        try {
+          assets = await OBR.assets.downloadImages(false, undefined, "CHARACTER");
+        } catch {
+          await openScenePicker(index, choose, render);
+          return;
+        }
+        const [asset] = assets;
         if (!asset) return;
-        if (asset.type !== "CHARACTER") throw new Error("Choose an image from Characters.");
-        if (!saveAvatarArtSlot(index, asset)) throw new Error("This artwork couldn’t be saved.");
+        if (asset.type !== "CHARACTER") throw new Error("choose an image from characters.");
+        if (!saveAvatarArtSlot(index, asset)) throw new Error("this artwork couldn’t be saved.");
       } catch (error) {
-        status.textContent = error?.message || "Couldn’t open the character artwork picker.";
+        status.textContent = error?.message || "couldn’t load character artwork.";
       } finally {
+        opening = false;
         choose.disabled = false;
         render();
       }
     });
 
     clear.addEventListener("click", () => {
+      if (pending?.index === index) closeScenePicker();
       saveAvatarArtSlot(index, null);
       status.textContent = "";
       render();

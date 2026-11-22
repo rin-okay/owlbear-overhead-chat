@@ -117,6 +117,10 @@ select { font: inherit; background: #181321; color: inherit; border: 1px solid #
 .avatar-modes { display: flex; gap: 6px; margin-bottom: 8px; }
 .avatar-modes button, .avatar-art-slot button { min-height: 28px; background: #312940; color: #e2d4f6; padding-inline: 8px; }
 .avatar-modes button[aria-pressed="true"] { background: #c7b6f8; color: #271c3a; }
+#avatar-scene-art { margin-bottom: 10px; }
+#avatar-scene-art label { white-space: normal; }
+#avatar-scene-art select { display: block; width: 100%; min-height: 28px; margin-bottom: 6px; text-transform: none; }
+#avatar-scene-art button { min-height: 28px; padding-inline: 8px; }
 #avatar-slots, #avatar-art-slots { display: grid; gap: 5px; }
 #avatar-slots label { display: grid; grid-template-columns: 1em minmax(0, 1fr); gap: 8px; align-items: center; margin: 0; }
 #avatar-slots select { min-height: 28px; text-transform: none; }

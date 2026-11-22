@@ -4,8 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>overhead chat</title>
-  <link rel="stylesheet" href="./chat.css?v=2.6.7">
-  <script type="module" src="./chat.js?v=2.6.10"></script>
+  <link rel="stylesheet" href="./chat.css?v=2.6.11">
+  <script type="module" src="./chat.js?v=2.6.11"></script>
 </head>
 <body>
   <main>
@@ -106,8 +106,14 @@
       </div>
       <div id="avatar-change-panel">
         <p>Choose artwork from Characters. Press 1–9 in move mode to apply it to your current avatar.</p>
-        <div id="avatar-art-slots"></div>
+        <div id="avatar-scene-art" hidden>
+          <label for="avatar-art-source">choose artwork from one of your scene tokens</label>
+          <select id="avatar-art-source"></select>
+          <button id="avatar-art-use" type="button">use art</button>
+          <button id="avatar-art-cancel" type="button">cancel</button>
+        </div>
         <p role="status"></p>
+        <div id="avatar-art-slots"></div>
       </div>
     </section>
     <section id="skills-panel" aria-label="skills" hidden>
