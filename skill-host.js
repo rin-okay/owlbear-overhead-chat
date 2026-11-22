@@ -3,8 +3,24 @@ import { coneHits, isProjectileToken, isProjectileWall, openMeleeDoor, projectil
 import { HIT_MARKERS, MELEE_HIT_CUE } from "./hit-markers.js?v=2.6.16";
 import {
   DEFAULT_WEAPON, EMBERS_EFFECTS, MELEE_DURATION_MS, SKILLS, SKILL_REQUEST, SKILL_RESULT,
-  availableSkills, availableWeapons, friendlyFireMode, readSkills, skillConnections, skillEffect, spellParameter, tokenTeams,
-} from "./skills.js?v=2.7.3";
+  artworkFacingAngle, availableSkills, availableWeapons, friendlyFireMode, readSkills, skillConnections, skillEffect, spellParameter, tokenTeams,
+} from "./skills.js?v=2.7.4";
+
+function aimMissile(source, target, range, passThrough) {
+  if (![target?.center?.x, target?.center?.y].every(Number.isFinite)) return;
+  const dx = target.center.x - source.x;
+  const dy = target.center.y - source.y;
+  const distance = Math.hypot(dx, dy);
+  if (!Number.isFinite(distance) || distance <= 1e-7) return;
+  const width = target.max?.x - target.min?.x;
+  const height = target.max?.y - target.min?.y;
+  const radius = passThrough && Number.isFinite(width) && Number.isFinite(height) ? Math.hypot(width, height) / 2 : 0;
+  const reach = Math.max(distance + radius, range);
+  return {
+    heading: Math.atan2(dy, dx) * 180 / Math.PI,
+    destination: { x: source.x + dx / distance * reach, y: source.y + dy / distance * reach },
+  };
+}
 
 export function setupSkillHost(obr) {
   const lastCast = new Map();
@@ -101,7 +117,29 @@ export function setupSkillHost(obr) {
         const items = obstacles.flat();
         const hitsAllies = mode === "enabled" || (mode === "aoe" && (skill.impact || skill.cone));
         const targets = hitsAllies ? items : items.filter((item) => !isAlly(item));
-        const { source, rotation, destination, size } = instruction.effectProperties;
+        const { source, rotation, size } = instruction.effectProperties;
+        let { destination } = instruction.effectProperties;
+        const targetId = data.skill === "missile" && data.targetId !== token.id ? data.targetId : undefined;
+        const selected = targetId && items.find((item) => item.id === targetId && isProjectileToken(item));
+        if (selected) {
+          const target = await obr.scene.items.getItemBounds([selected.id]).catch(() => null);
+          if (version !== sceneVersion) return;
+          const aimed = aimMissile(source, target, skill.range * dpi, mode !== "enabled" && isAlly(selected));
+          if (aimed) {
+            let applied = false;
+            await obr.scene.items.updateItems([token.id], ([item]) => {
+              if (version !== sceneVersion || !canSpeak(sender, item, permissions) || item.locked) return;
+              const angle = aimed.heading - artworkFacingAngle(item, data.facing);
+              item.rotation = ((angle % 360) + 360) % 360;
+              applied = true;
+            });
+            if (version !== sceneVersion || !applied) {
+              if (version === sceneVersion) await answer({ ...result, error: "Couldn’t turn the avatar toward the target." });
+              return;
+            }
+            destination = aimed.destination;
+          }
+        }
         if (skill.cone) {
           hitTokenIds = coneHits(source, rotation, size * dpi, targets, token.id, dpi);
         } else if (projectile) {

@@ -128,6 +128,13 @@ export async function skillConnections(obr) {
   return { self, players, gm };
 }
 
+export function artworkFacingAngle(token, facing) {
+  const base = facing * Math.PI / 180;
+  const x = Math.cos(base) * (token.scale?.x < 0 ? -1 : 1);
+  const y = Math.sin(base) * (token.scale?.y < 0 ? -1 : 1);
+  return Math.atan2(y, x) * 180 / Math.PI;
+}
+
 export function skillEffect(skillId, token, center, dpi, facing, weapon = DEFAULT_WEAPON,
   parameter = SKILLS[skillId]?.parameter?.defaultValue) {
   if (!Object.hasOwn(SKILLS, skillId) || !FACINGS.some(([angle]) => angle === facing) ||
@@ -135,10 +142,7 @@ export function skillEffect(skillId, token, center, dpi, facing, weapon = DEFAUL
   const skill = SKILLS[skillId];
   const effect = skill.effect ?? (Object.hasOwn(WEAPONS, weapon) && "generic.weapon_attacks.melee.single." + weapon);
   if (!effect) return;
-  const base = facing * Math.PI / 180;
-  const x = Math.cos(base) * (token.scale?.x < 0 ? -1 : 1);
-  const y = Math.sin(base) * (token.scale?.y < 0 ? -1 : 1);
-  const rotation = token.rotation + Math.atan2(y, x) * 180 / Math.PI;
+  const rotation = token.rotation + artworkFacingAngle(token, facing);
   const radians = rotation * Math.PI / 180;
   const source = { x: center.x, y: center.y };
   const effectProperties = { source, disableHit: true };

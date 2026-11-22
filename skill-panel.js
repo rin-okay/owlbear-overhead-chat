@@ -2,7 +2,7 @@ import { isPublicToken } from "./rules.js";
 import {
   DEFAULT_WEAPON, FACINGS, FRIENDLY_FIRE_MODES, SKILLS, SKILL_CHANGED, SKILL_REQUEST, SKILL_RESULT, SPELLS, TEAMS, WEAPONS,
   availableSpells, availableWeapons, friendlyFireMode, readSkills, skillConnections, spellParameter, tokenTeams, validSpellParameter, writeSkills,
-} from "./skills.js?v=2.7.3";
+} from "./skills.js?v=2.7.4";
 
 function characterLabel(token) {
   return token.name || "unnamed character";
@@ -112,7 +112,11 @@ export function setupSkillPanel(obr, getAvatar, keyAllowed) {
   }
 
   async function request(type, token, id, revision) {
-    const { gm, self } = await skillConnections(obr);
+    const [{ gm, self }, selection] = await Promise.all([
+      skillConnections(obr), type === "cast" && id === "missile" ? obr.player.getSelection() : undefined,
+    ]);
+    const candidates = selection?.filter((itemId) => itemId !== token.id);
+    const targetId = candidates?.length === 1 ? candidates[0] : undefined;
     if (type === "list" && revision !== listRevision) return;
     const showStatus = type === "cast" ? setCastStatus : (text) => { playerStatus.textContent = text; };
     if (!gm) {
@@ -135,6 +139,7 @@ export function setupSkillPanel(obr, getAvatar, keyAllowed) {
         requestId, tokenId: token.id, type,
         ...(type === "cast" ? { skill: id, facing: facingFor(preferences, token) } : {}),
         ...(id === "spear" ? { weapon: selectedWeapon(token.id) } : {}),
+        ...(targetId ? { targetId } : {}),
       }, { destination: "ALL" });
     } catch (error) {
       if (pending.get(type) === expected) clearPending(type);

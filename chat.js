@@ -10,12 +10,13 @@ import {
 } from "./session.js";
 
 import { drawBubble } from "./appearance.js?v=2.6.1";
-import { setupDiscordPanel } from "./discord-panel.js?v=2.7.3";
+import { setupDiscordPanel } from "./discord-panel.js?v=2.7.4";
 import { setupAvatarPanel } from "./avatar-panel.js?v=2.6.11";
-import { setupSkillGrants, setupSkillPanel } from "./skill-panel.js?v=2.7.3";
+import { setupSkillGrants, setupSkillPanel } from "./skill-panel.js?v=2.7.4";
 import { listenForChatShortcut } from "./chat-shortcut.js?v=2.6.4";
 import { cameraFollowPreference, centerAvatar, prepareKeyboardPan } from "./avatar-viewport.js?v=2.6.9";
 
+import { readMovementGrid, stepAvatar, turnAvatar } from "./movement.js?v=2.7.4";
 import { rollSpans, validateRollSpans } from "./dice.js";
 import { rollWithRumble } from "./rumble.js";
 import { rollWithNativeDice } from "./native-dice.js";
@@ -338,14 +339,14 @@ async function moveAvatar(mode) {
     while (mode === tokenControl && !mode.switching && mode.actions.length) {
       const tokenId = mode.tokenId;
       const { offset, rotation, mirror, artwork, onApplied, skill } = mode.actions.shift();
-      const [{ token }, step, pan] = await Promise.all([
+      const [{ token }, grid, pan] = await Promise.all([
         getAvatar(),
-        offset ? OBR.scene.grid.getDpi() : 0,
+        offset ? (mode.movementGrid ??= readMovementGrid(OBR.scene.grid)) : undefined,
         offset ? prepareKeyboardPan(OBR, tokenId).catch(() => undefined) : undefined,
       ]);
       if (mode !== tokenControl || mode.switching || tokenId !== mode.tokenId) return;
       if (token?.id !== tokenId || token.locked) throw new Error("Avatar is unavailable or locked.");
-      if (offset && (!Number.isFinite(step) || step <= 0)) throw new Error("Scene grid size unavailable.");
+      if (offset && (!Number.isFinite(grid.dpi) || grid.dpi <= 0)) throw new Error("Scene grid size unavailable.");
       if (skill) {
         await skillPanel.cast(skill, token);
         continue;
@@ -358,18 +359,17 @@ async function moveAvatar(mode) {
           item.image = artwork.image;
           item.grid = artwork.grid;
         } else if (offset) {
-          const [x, y] = offset;
-          item.position.x += x * step;
-          item.position.y += y * step;
+          item.position = stepAvatar(item.position, offset, grid);
         } else if (mirror) {
           item.scale.x = -item.scale.x;
         } else {
-          item.rotation = ((item.rotation + rotation) % 360 + 360) % 360;
+          item.rotation = turnAvatar(item.rotation, rotation);
         }
         applied = true;
       };
       if (pan) {
-        await pan({ x: offset[0] * step, y: offset[1] * step },
+        const next = stepAvatar(token.position, offset, grid);
+        await pan({ x: next.x - token.position.x, y: next.y - token.position.y },
           () => OBR.scene.items.updateItems([token], changeToken));
       } else {
         await OBR.scene.items.updateItems([tokenId], changeToken);
@@ -382,6 +382,7 @@ async function moveAvatar(mode) {
     if (mode !== tokenControl) return;
     console.error("Overhead Chat token movement failed", error);
     mode.actions.length = 0;
+    mode.movementGrid = undefined;
     stopRotation(mode);
     warnMoveFailed();
   } finally {
@@ -456,8 +457,11 @@ function useAvatarSlot(mode, key) {
   queueAvatarAction(mode, { artwork, onApplied });
 }
 
-moveButton.addEventListener("blur", stopTokenControl);
-window.addEventListener("blur", stopTokenControl);
+moveButton.addEventListener("blur", (event) => {
+  stopRotation(tokenControl);
+  if (event.relatedTarget) stopTokenControl();
+});
+window.addEventListener("blur", () => stopRotation(tokenControl));
 document.addEventListener("pointerdown", (event) => {
   if (event.target !== input && !moveButton.contains(event.target)) stopTokenControl();
 });
@@ -881,7 +885,15 @@ OBR.onReady(() => {
   setupRoomToggle("gm-habbo-settings", HABBO_MODE);
   setupHabboScale();
   connectTranscript();
-  OBR.player.onChange(({ metadata, role }) => {
+  let mapSelection;
+  OBR.player.onChange(({ metadata, role, selection }) => {
+    const nextSelection = JSON.stringify(selection ?? []);
+    if (nextSelection !== mapSelection) {
+      mapSelection = nextSelection;
+      if (tokenControl && selection?.some((id) => id !== tokenControl.tokenId)) {
+        moveButton.focus({ preventScroll: true });
+      }
+    }
     playerRole = role;
     showSkillsForRole(role);
     const state = JSON.stringify([metadata[AVATAR]?.tokenId, role]);
@@ -896,6 +908,9 @@ OBR.onReady(() => {
     showSkillsForRole(role);
     return refreshAvatarPanel();
   }).catch(console.error);
+  OBR.scene.grid.onChange(() => {
+    if (tokenControl) tokenControl.movementGrid = undefined;
+  });
   OBR.scene.onReadyChange((ready) => {
     if (!ready) stopTokenControl();
     void refresh();
