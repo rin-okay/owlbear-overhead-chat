@@ -1,9 +1,10 @@
-import OBR, { buildBillboard, buildImage, buildLabel } from "./obr.js";
+import OBR, { buildLabel, buildPath, Command } from "./obr.js?v=2.4.1";
 import {
   ABOVE_FOG, AVATAR, HABBO_MODE, SPEECH, BUBBLE_MS, GENERAL_CHAT_ROOM, canSpeak, isChatRoom, isPublicToken, parseSpeech,
 } from "./rules.js";
 
-import { BUBBLE_LINE_HEIGHT, drawBubble, drawFloatingBubble, fonts, normalizeAppearance } from "./appearance.js?v=2.4.0";
+import { BUBBLE_LINE_HEIGHT, drawBubble, drawFloatingBubble, fonts, normalizeAppearance } from "./appearance.js?v=2.4.1";
+import { canvasPaths } from "./bubble-paths.js?v=2.4.1";
 import { FLOAT_LINE, placeFloatingBubbles } from "./floating-layout.js";
 import { openSessionChannel, saveAvatar } from "./session.js";
 import { chatParts, isRollCommand, rollSpans } from "./dice.js";
@@ -71,38 +72,80 @@ function scheduleFloatingStep() {
 
 async function updateFloating(next, version) {
   const targets = new Map(next.map((bubble) => [bubble.id, bubble]));
-  const removed = floating.filter(({ id }) => !targets.has(id)).map(({ id }) => id);
-  const moved = floating.filter(({ id, y }) => targets.has(id) && targets.get(id).y !== y).map(({ id }) => id);
+  const removed = floating.filter(({ id }) => !targets.has(id)).flatMap(({ ids }) => ids);
+  const moved = new Map();
+  for (const { id, ids, y } of floating) {
+    const newY = targets.get(id)?.y;
+    if (newY === undefined || newY === y) continue;
+    for (const itemId of ids) moved.set(itemId, newY);
+  }
   if (removed.length) await OBR.scene.local.deleteItems(removed);
   if (version !== sceneVersion) return;
-  if (moved.length) {
-    await OBR.scene.local.updateItems(moved, (items) => {
-      for (const item of items) item.position.y = targets.get(item.id).y;
+  if (moved.size) {
+    await OBR.scene.local.updateItems([...moved.keys()], (items) => {
+      for (const item of items) item.position.y = moved.get(item.id);
     });
   }
   if (version === sceneVersion) floating = next;
 }
 
 async function showFloating(text, appearance, tokenId, position, layer, version, current) {
-  const dpi = await OBR.scene.grid.getDpi();
-  if (!current() || !Number.isFinite(dpi) || dpi <= 0) return;
-  const { canvas, width, height } = drawFloatingBubble(text, appearance);
-  const item = buildImage({
-    url: canvas.toDataURL("image/png"), mime: "image/png", width: canvas.width, height: canvas.height,
-  }, { dpi: dpi * 2, offset: { x: canvas.width / 2, y: canvas.height } })
-    .position(position).layer(layer).locked(true).build();
-  item.disableHit = true;
-  const bubble = { id: item.id, tokenId, width, height, x: position.x, y: position.y, originY: position.y };
+  const drawing = drawFloatingBubble(text, appearance);
+  const ids = await addBubbleDrawing(drawing, appearance, position, layer, undefined, 1, current);
+  if (!ids.length) return;
+  const { width, height } = drawing;
+  const bubble = { id: ids[0], ids, tokenId, width, height, x: position.x, y: position.y, originY: position.y };
   const placed = placeFloatingBubbles([bubble, ...floating]);
-  await updateFloating(placed.slice(1), version);
-  if (!current()) return;
-  await OBR.scene.local.addItems([item]);
+  try {
+    await updateFloating(placed.slice(1), version);
+  } catch (error) {
+    if (await OBR.scene.isReady()) await OBR.scene.local.deleteItems(ids);
+    throw error;
+  }
   if (!current()) {
-    if (await OBR.scene.isReady()) await OBR.scene.local.deleteItems([item.id]);
+    if (await OBR.scene.isReady()) await OBR.scene.local.deleteItems(ids);
     return;
   }
   floating.unshift(bubble);
   scheduleFloatingStep();
+}
+
+async function addBubbleDrawing(drawing, appearance, position, layer, tokenId, scale, current) {
+  const attach = (builder) => {
+    builder.position(position).layer(layer).locked(true);
+    if (tokenId) builder.attachedTo(tokenId);
+    const item = builder.build();
+    item.disableHit = true;
+    if (tokenId) item.disableAttachmentBehavior = ["COPY", "ROTATION", "SCALE", "LOCKED"];
+    return item;
+  };
+  const colors = drawing.colors ?? [appearance.border, appearance.fill, appearance.color];
+  try {
+    const paths = canvasPaths(drawing.canvas, colors, Command).map(({ color, commands }) =>
+      attach(buildPath().commands(commands).fillColor(color).strokeOpacity(0).scale({ x: scale, y: scale })));
+    if (paths.length) {
+      await OBR.scene.local.addItems(paths);
+      return paths.map(({ id }) => id);
+    }
+  } catch (error) {
+    console.warn("Overhead Chat could not draw the bubble paths", error);
+  }
+  if (!current()) return [];
+  const nativeLabel = () => buildLabel()
+    .plainText(drawing.lines.join("\n")).width("AUTO").fontFamily(fonts[appearance.font].face).fontSize(appearance.size)
+    .lineHeight(BUBBLE_LINE_HEIGHT).textAlign("CENTER").pointerDirection("DOWN");
+  const labels = [
+    attach(nativeLabel().padding(10).fillColor(colors[0]).backgroundColor(colors[0])
+      .cornerRadius(tokenId ? 10 : 2).pointerWidth(16).pointerHeight(7)),
+    attach(nativeLabel().padding(8).fillColor(colors.at(-1)).backgroundColor(colors[1])
+      .cornerRadius(tokenId ? 8 : 0).pointerWidth(12).pointerHeight(9)),
+  ];
+  labels.forEach((item, index) => {
+    item.zIndex = index;
+    item.disableAutoZIndex = true;
+  });
+  await OBR.scene.local.addItems(labels);
+  return labels.map(({ id }) => id);
 }
 
 function storeEntry(entry, type) {
@@ -238,46 +281,11 @@ async function showBubble({ tokenId, text, appearance, itemsAtValidation }, vers
   if (previous) await removeBubble(tokenId, previous);
   if (!current()) return;
 
-  const { canvas, lines } = drawBubble(text, appearance);
-  const bubbleBuilder = buildBillboard({
-    url: canvas.toDataURL("image/png"), mime: "image/png", width: canvas.width, height: canvas.height,
-  }, { dpi: 300, offset: { x: canvas.width / 2, y: canvas.height } });
-
-  const attach = (builder) => {
-    const item = builder.position(position).attachedTo(tokenId).layer(layer).locked(true).build();
-    item.disableHit = true;
-    item.disableAttachmentBehavior = ["COPY", "ROTATION", "SCALE", "LOCKED"];
-    return item;
-  };
-
-  let labels = [attach(bubbleBuilder)];
-  try {
-    await OBR.scene.local.addItems(labels);
-  } catch {
-    if (!current()) return;
-
-    const nativeLabel = () => buildLabel()
-      .plainText(lines.join("\n")).width("AUTO").fontFamily(fonts[appearance.font].face).fontSize(appearance.size)
-      .lineHeight(BUBBLE_LINE_HEIGHT).textAlign("CENTER").pointerDirection("DOWN");
-    // Owlbear's native label has no border style. Stack two matching labels
-    // with extra padding on the back layer to draw the rim. Both pointer
-    // tips share an anchor. Extend the inner pointer to inset its body.
-    labels = [
-      attach(nativeLabel().padding(10).fillColor(appearance.border)
-        .backgroundColor(appearance.border).cornerRadius(10)
-        .pointerWidth(16).pointerHeight(7)),
-      attach(nativeLabel().padding(8).fillColor(appearance.color)
-        .backgroundColor(appearance.fill).cornerRadius(8)
-        .pointerWidth(12).pointerHeight(9)),
-    ];
-    labels.forEach((item, index) => {
-      item.zIndex = index;
-      item.disableAutoZIndex = true;
-    });
-    await OBR.scene.local.addItems(labels);
-  }
-
-  const ids = labels.map((item) => item.id);
+  const zoom = await OBR.viewport.getScale().catch(() => 1);
+  if (!current()) return;
+  const scale = Number.isFinite(zoom) && zoom > 0 ? 1 / zoom : 1;
+  const ids = await addBubbleDrawing(drawBubble(text, appearance), appearance, position, layer, tokenId, scale, current);
+  if (!ids.length) return;
   if (!current()) {
     if (await OBR.scene.isReady()) await OBR.scene.local.deleteItems(ids);
     return;

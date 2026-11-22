@@ -4,8 +4,8 @@ export const fonts = {
   sans: { face: "Arial", fallback: "sans-serif" },
   serif: { face: "Georgia", fallback: "serif" },
   mono: { face: "Courier New", fallback: "monospace" },
-  comic: { face: "Comic Sans MS", fallback: '"Comic Sans", cursive' },
-  rounded: { face: "Trebuchet MS", fallback: "sans-serif" },
+  comic: { face: "Comic Sans MS", fallback: '"Comic Sans", "Chalkboard SE", Chalkboard, cursive' },
+  rounded: { face: "Trebuchet MS", fallback: '"Avenir Next", Verdana, sans-serif' },
 };
 
 const defaults = {
@@ -132,21 +132,22 @@ export function drawFloatingBubble(text, style) {
   canvas.height = height * 2;
   ctx.scale(2, 2);
 
-  ctx.fillStyle = "#2c222d";
+  const [outline, fill, accent, ink] = ["#2c222d", "#fef8e9", style.border, "#271f29"];
+  ctx.fillStyle = outline;
   ctx.fillRect(3, 0, width - 6, body + 3);
   ctx.fillRect(0, 3, width, body - 3);
   ctx.fillRect(tail - 5, body, 10, 3);
   ctx.fillRect(tail - 3, body + 3, 6, 2);
   ctx.fillRect(tail - 1, body + 5, 2, 2);
-  ctx.fillStyle = "#fef8e9";
+  ctx.fillStyle = fill;
   ctx.fillRect(3, 2, width - 6, body - 2);
   ctx.fillRect(2, 4, width - 4, body - 6);
   ctx.fillRect(tail - 2, body, 4, 3);
-  ctx.fillStyle = style.border;
+  ctx.fillStyle = accent;
   ctx.fillRect(5, 5, 3, body - 10);
-  ctx.fillStyle = "#271f29";
+  ctx.fillStyle = ink;
   ctx.font = font;
   ctx.textBaseline = "middle";
   lines.forEach((line, index) => ctx.fillText(line, 13, 5 + (index + 0.5) * lineHeight));
-  return { canvas, width, height };
+  return { canvas, width, height, lines, colors: [outline, fill, accent, ink] };
 }
