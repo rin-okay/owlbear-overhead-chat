@@ -1,10 +1,10 @@
 import { canSpeak } from "./rules.js";
 import { isProjectileToken, isProjectileWall, openMeleeDoor, projectileImpact } from "./projectile-collision.js?v=2.6.13";
-import { HIT_MARKERS, MELEE_ANIMATION_END } from "./hit-markers.js?v=2.6.14";
+import { HIT_MARKERS, MELEE_HIT_CUE } from "./hit-markers.js?v=2.6.15";
 import {
-  DEFAULT_WEAPON, EMBERS_EFFECTS, SKILLS, SKILL_REQUEST, SKILL_RESULT,
+  DEFAULT_WEAPON, EMBERS_EFFECTS, MELEE_DURATION_MS, SKILLS, SKILL_REQUEST, SKILL_RESULT,
   availableSkills, availableWeapons, readSkills, skillConnections, skillEffect,
-} from "./skills.js?v=2.6.14";
+} from "./skills.js?v=2.6.15";
 
 export function setupSkillHost(obr) {
   const lastCast = new Map();
@@ -114,16 +114,17 @@ export function setupSkillHost(obr) {
         }
       }
       const meleeHit = Boolean(skill.meleeReach && hitTokenIds.length);
-      const sendMarkers = (delay, afterAnimation = false) => obr.broadcast.sendMessage(HIT_MARKERS, {
-        requestId: data.requestId, tokenIds: hitTokenIds, delay, afterAnimation,
+      const sendMarkers = (delay, useAnimationCue = false) => obr.broadcast.sendMessage(HIT_MARKERS, {
+        requestId: data.requestId, tokenIds: hitTokenIds, delay, useAnimationCue,
       }, { destination: "ALL" }).catch((error) => console.error("Overhead Chat hit markers", error));
       if (meleeHit) {
-        // Embers runs nested actions after removing the finished effect on each client.
-        instruction.instructions = [{
-          type: "action", id: "message", arguments: [MELEE_ANIMATION_END, data.requestId, "LOCAL"],
-        }];
-        // Keep a fallback for clients without the Embers completion signal.
-        await sendMarkers(4500, true);
+        const cueDelay = Math.round(MELEE_DURATION_MS[weapon] * 0.75);
+        // Embers starts sibling instructions together on each viewer’s client.
+        instructions.push({
+          type: "action", id: "message", delay: cueDelay,
+          arguments: [MELEE_HIT_CUE, data.requestId, "LOCAL"],
+        });
+        await sendMarkers(cueDelay + 750, true);
         if (version !== sceneVersion) return;
       }
       await obr.broadcast.sendMessage(EMBERS_EFFECTS, {

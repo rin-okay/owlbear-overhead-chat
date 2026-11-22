@@ -15,6 +15,34 @@ export const WEAPONS = {
   warhammer: "warhammer", wrench: "wrench",
 };
 
+// Embers effect_record.json, generic.weapon_attacks.melee.single.
+// Melee uses the first clip of each weapon at the 600px resolution.
+export const MELEE_DURATION_MS = {
+  club: 2200,
+  dagger: 1600,
+  falchion: 2200,
+  generic_slash: 900,
+  generic_whirlwind: 900,
+  glaive: 2200,
+  great_axe: 2400,
+  great_club: 2400,
+  great_sword: 2400,
+  halberd: 2200,
+  hammer: 2200,
+  hand_axe: 1870,
+  laser_sword: 2330,
+  mace: 2200,
+  maul: 2830,
+  quarterstaff: 2200,
+  rapier: 2200,
+  scimitar: 2200,
+  shortsword: 2200,
+  spear: 2200,
+  sword: 2200,
+  warhammer: 2200,
+  wrench: 2200,
+};
+
 export const SKILLS = {
   // Keep the original skill ID so existing bindings and clients still work.
   spear: { name: "melee weapon attack", key: "f", meleeReach: 1 },

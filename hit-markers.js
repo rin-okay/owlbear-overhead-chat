@@ -1,34 +1,34 @@
 import { isProjectileToken } from "./projectile-collision.js?v=2.6.13";
-import { skillConnections } from "./skills.js?v=2.6.14";
+import { skillConnections } from "./skills.js?v=2.6.15";
 
 export const HIT_MARKERS = "chat.overhead.skills/hits.v1";
-export const MELEE_ANIMATION_END = "chat.overhead.skills/melee-animation-end.v1";
+export const MELEE_HIT_CUE = "chat.overhead.skills/melee-hit-cue.v1";
 
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export function setupHitMarkers(obr, buildLabel) {
   let sceneVersion = 0;
   const recent = new Map();
-  const animationEnds = new Map();
+  const animationCues = new Map();
   obr.scene.onReadyChange(() => {
     sceneVersion++;
     recent.clear();
-    for (const { finish } of animationEnds.values()) finish();
+    for (const { finish } of animationCues.values()) finish();
   });
 
-  obr.broadcast.onMessage(MELEE_ANIMATION_END, ({ connectionId, data }) => {
-    const pending = animationEnds.get(data);
+  obr.broadcast.onMessage(MELEE_HIT_CUE, ({ connectionId, data }) => {
+    const pending = animationCues.get(data);
     if (pending && pending.connectionId === connectionId) pending.finish();
   });
 
-  function waitForAnimation(requestId, connectionId, fallbackDelay) {
+  function waitForAnimationCue(requestId, connectionId, fallbackDelay) {
     return new Promise((resolve) => {
       const timeout = setTimeout(finish, fallbackDelay);
-      animationEnds.set(requestId, { connectionId, finish });
+      animationCues.set(requestId, { connectionId, finish });
 
       function finish() {
         clearTimeout(timeout);
-        animationEnds.delete(requestId);
+        animationCues.delete(requestId);
         resolve();
       }
     });
@@ -89,8 +89,8 @@ export function setupHitMarkers(obr, buildLabel) {
       for (const [id, expiry] of recent) if (expiry <= now) recent.delete(id);
       if (recent.has(data.requestId)) return;
       recent.set(data.requestId, now + 10000);
-      if (data.afterAnimation === true) {
-        await waitForAnimation(data.requestId, self.connectionId, data.delay);
+      if (data.useAnimationCue === true) {
+        await waitForAnimationCue(data.requestId, self.connectionId, data.delay);
       } else {
         await wait(data.delay);
       }
