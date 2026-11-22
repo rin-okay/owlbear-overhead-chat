@@ -1,14 +1,38 @@
-import { isProjectileToken } from "./projectile-collision.js?v=2.6.10";
-import { skillConnections } from "./skills.js?v=2.6.10";
+import { isProjectileToken } from "./projectile-collision.js?v=2.6.13";
+import { skillConnections } from "./skills.js?v=2.6.14";
 
 export const HIT_MARKERS = "chat.overhead.skills/hits.v1";
+export const MELEE_ANIMATION_END = "chat.overhead.skills/melee-animation-end.v1";
 
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export function setupHitMarkers(obr, buildLabel) {
   let sceneVersion = 0;
   const recent = new Map();
-  obr.scene.onReadyChange(() => { sceneVersion++; recent.clear(); });
+  const animationEnds = new Map();
+  obr.scene.onReadyChange(() => {
+    sceneVersion++;
+    recent.clear();
+    for (const { finish } of animationEnds.values()) finish();
+  });
+
+  obr.broadcast.onMessage(MELEE_ANIMATION_END, ({ connectionId, data }) => {
+    const pending = animationEnds.get(data);
+    if (pending && pending.connectionId === connectionId) pending.finish();
+  });
+
+  function waitForAnimation(requestId, connectionId, fallbackDelay) {
+    return new Promise((resolve) => {
+      const timeout = setTimeout(finish, fallbackDelay);
+      animationEnds.set(requestId, { connectionId, finish });
+
+      function finish() {
+        clearTimeout(timeout);
+        animationEnds.delete(requestId);
+        resolve();
+      }
+    });
+  }
 
   async function show(tokenIds, current) {
     const [targets, scale] = await Promise.all([
@@ -59,13 +83,17 @@ export function setupHitMarkers(obr, buildLabel) {
     const version = sceneVersion;
     const current = () => version === sceneVersion;
     try {
-      const [{ gm }, ready] = await Promise.all([skillConnections(obr), obr.scene.isReady()]);
+      const [{ gm, self }, ready] = await Promise.all([skillConnections(obr), obr.scene.isReady()]);
       if (!current() || !ready || gm?.connectionId !== connectionId) return;
       const now = Date.now();
       for (const [id, expiry] of recent) if (expiry <= now) recent.delete(id);
       if (recent.has(data.requestId)) return;
       recent.set(data.requestId, now + 10000);
-      await wait(data.delay);
+      if (data.afterAnimation === true) {
+        await waitForAnimation(data.requestId, self.connectionId, data.delay);
+      } else {
+        await wait(data.delay);
+      }
       if (current()) await show([...new Set(data.tokenIds)], current);
     } catch (error) {
       console.error("Overhead Chat could not draw a hit marker", error);

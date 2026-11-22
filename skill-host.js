@@ -1,10 +1,10 @@
 import { canSpeak } from "./rules.js";
 import { isProjectileToken, isProjectileWall, openMeleeDoor, projectileImpact } from "./projectile-collision.js?v=2.6.13";
-import { HIT_MARKERS } from "./hit-markers.js?v=2.6.10";
+import { HIT_MARKERS, MELEE_ANIMATION_END } from "./hit-markers.js?v=2.6.14";
 import {
   DEFAULT_WEAPON, EMBERS_EFFECTS, SKILLS, SKILL_REQUEST, SKILL_RESULT,
   availableSkills, availableWeapons, readSkills, skillConnections, skillEffect,
-} from "./skills.js?v=2.6.12";
+} from "./skills.js?v=2.6.14";
 
 export function setupSkillHost(obr) {
   const lastCast = new Map();
@@ -113,6 +113,19 @@ export function setupSkillHost(obr) {
           });
         }
       }
+      const meleeHit = Boolean(skill.meleeReach && hitTokenIds.length);
+      const sendMarkers = (delay, afterAnimation = false) => obr.broadcast.sendMessage(HIT_MARKERS, {
+        requestId: data.requestId, tokenIds: hitTokenIds, delay, afterAnimation,
+      }, { destination: "ALL" }).catch((error) => console.error("Overhead Chat hit markers", error));
+      if (meleeHit) {
+        // Embers runs nested actions after removing the finished effect on each client.
+        instruction.instructions = [{
+          type: "action", id: "message", arguments: [MELEE_ANIMATION_END, data.requestId, "LOCAL"],
+        }];
+        // Keep a fallback for clients without the Embers completion signal.
+        await sendMarkers(4500, true);
+        if (version !== sceneVersion) return;
+      }
       await obr.broadcast.sendMessage(EMBERS_EFFECTS, {
         instructions, spellData: { name: skill.name, caster: sender.id },
       }, { destination: "ALL" });
@@ -120,10 +133,8 @@ export function setupSkillHost(obr) {
         await openMeleeDoor(obr, doorId, sender.role, () => version === sceneVersion)
           .catch((error) => console.error("Overhead Chat could not open the door", error));
       }
-      if (version === sceneVersion && hitTokenIds.length) {
-        await obr.broadcast.sendMessage(HIT_MARKERS, {
-          requestId: data.requestId, tokenIds: hitTokenIds, delay: skill.impact?.delay ?? skill.hitDelay,
-        }, { destination: "ALL" }).catch((error) => console.error("Overhead Chat hit markers", error));
+      if (version === sceneVersion && hitTokenIds.length && !meleeHit) {
+        await sendMarkers(skill.impact?.delay ?? skill.hitDelay);
       }
       await answer(result);
     } catch (error) {
