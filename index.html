@@ -4,8 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>overhead chat</title>
-  <link rel="stylesheet" href="./chat.css?v=2.3.6">
-  <script type="module" src="./chat.js?v=2.3.8"></script>
+  <link rel="stylesheet" href="./chat.css?v=2.3.9">
+  <script type="module" src="./chat.js?v=2.3.9"></script>
 </head>
 <body>
   <main>
@@ -19,7 +19,8 @@
       </nav>
     </header>
     <div id="chat-panel">
-    <select id="chat-room" aria-label="chat room" aria-controls="transcript">
+    <label class="chat-room-label" for="chat-room">public chat · visible to everyone in this owlbear room</label>
+    <select id="chat-room" aria-label="public chat tab" aria-controls="transcript">
       <option value="general" selected>general</option>
       <option value="rin">rin's room</option>
       <option value="kim">kim's room</option>
@@ -133,7 +134,8 @@
           <label>Discord webhook URL
             <input name="webhook" type="password" autocomplete="off" spellcheck="false" placeholder="Paste Discord webhook URL">
           </label>
-          <label class="discord-enabled"><input name="enabled" type="checkbox"> Mirror new chat messages</label>
+          <label class="discord-enabled"><input name="enabled" type="checkbox"> Mirror new general messages</label>
+          <label class="discord-enabled"><input name="otherTabs" type="checkbox"> Also mirror the other public chat tabs</label>
           <div class="discord-actions">
             <button type="submit">Save</button>
             <button id="discord-test" type="button">Send test</button>

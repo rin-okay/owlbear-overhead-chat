@@ -1,4 +1,5 @@
 import OBR from "./obr.js";
+import { GENERAL_CHAT_ROOM } from "./rules.js";
 
 function storageKey() {
   return JSON.stringify(["chat.overhead.discord.v1", OBR.room.id, OBR.player.id]);
@@ -22,9 +23,9 @@ export function discordSettings() {
   try {
     const saved = JSON.parse(localStorage.getItem(storageKey()));
     const url = normalizeWebhook(saved?.url ?? "");
-    return { url, enabled: Boolean(url && saved?.enabled) };
+    return { url, enabled: Boolean(url && saved?.enabled), otherTabs: saved?.otherTabs === true };
   } catch {
-    return { url: "", enabled: false };
+    return { url: "", enabled: false, otherTabs: false };
   }
 }
 
@@ -92,10 +93,14 @@ function claimRelay() {
 }
 
 let relayClaim;
+const canMirror = (entry, settings) => settings.enabled &&
+  (entry.roomId === GENERAL_CHAT_ROOM || settings.otherTabs);
+
 export function queueDiscord(entry, role, report) {
   if (role !== "GM") return;
-  const { url, enabled } = discordSettings();
-  if (!enabled) return;
+  const settings = discordSettings();
+  if (!canMirror(entry, settings)) return;
+  const { url } = settings;
   if (queued >= 60) {
     report("Discord is backed up. A message was skipped.");
     return;
@@ -106,7 +111,7 @@ export function queueDiscord(entry, role, report) {
     const stillEnabled = async () => {
       if (await OBR.player.getRole() !== "GM") return false;
       const settings = discordSettings();
-      return settings.enabled && settings.url === url;
+      return settings.url === url && canMirror(entry, settings);
     };
     if (!await stillEnabled()) return;
     const claim = relayClaim ??= claimRelay();

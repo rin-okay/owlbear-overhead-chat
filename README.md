@@ -25,7 +25,7 @@ Add `http://localhost:5173/owlbear-overhead-chat/manifest.json` to your Owlbear 
 
 Try two messages in quick succession, then move the token and confirm the latest bubble stays attached and disappears. Repeat from a player account with Owner Only enabled to check the ownership filter.
 
-The chat room dropdown starts on **general** and also offers **rin's room** and **kim's room**. Messages and dice results go to the log for the chat room selected when you send. Overhead bubbles are still public to the Owlbear room. Use them for tokens the room is meant to see. Fog is not a privacy boundary for broadcasts. The transcript keeps the latest 1,000 messages across all chat rooms in memory for the current room tab. Switching chat rooms shows the latest 100 messages in that room, and **load older messages** shows earlier messages in batches. Closing the chat panel keeps the transcript, and reloading the room starts a new one. Avatar selection is remembered for this room in the same browser.
+All chat tabs are visible to everyone in the Owlbear room. The public chat dropdown starts on **general** and also offers **rin's room** and **kim's room**. Messages and dice results go to the log for the chat room selected when you send. Overhead bubbles are still public to the Owlbear room. Use them for tokens the room is meant to see. Fog is not a privacy boundary for broadcasts. The transcript keeps the latest 1,000 messages across all chat rooms in memory for the current room tab. Switching chat rooms shows the latest 100 messages in that room, and **load older messages** shows earlier messages in batches. Closing the chat panel keeps the transcript, and reloading the room starts a new one. Avatar selection is remembered for this room in the same browser.
 
 Click **move**, press Tab then Space from the message box, or use F2 to control your unlocked chat avatar. The arrow keys and WASD move it by one grid interval. Hold Shift with any movement key to move half a grid interval. Q or comma rotates left, and E or period rotates right, 15 degrees at a time. Hold a rotation key to keep turning. Press R to mirror the avatar horizontally. Space, Enter, F2, or Escape returns to typing. Clicking away also exits move mode.
 
@@ -37,9 +37,9 @@ The GM can turn on **habbo hotel mode** in the **gm** tab for pixel-style bubble
 
 ## Discord relay
 
-In a Discord text channel, create an incoming webhook under **Edit Channel → Integrations** and copy its URL. As the Owlbear room GM, open the **gm** tab, paste the webhook URL under **discord mirroring**, and use **send test**. To start sending new messages, turn on **mirror new chat messages** and save.
+In a Discord text channel, create an incoming webhook under **Edit Channel → Integrations** and copy its URL. As the Owlbear room GM, open the **gm** tab, paste the webhook URL under **discord mirroring**, and use **send test**. To start sending new messages, turn on **mirror new general messages** and save. To include the other tabs, also enable **also mirror the other public chat tabs**. Existing relay settings default to General after the update.
 
-The relay runs while the configured GM has the Owlbear room tab open. It mirrors new public Overhead Chat messages; it does not replay history or bring Discord messages back into Owlbear. Use one configured GM browser per room. The webhook URL stays in that browser’s local storage for that GM and room.
+The relay runs while the configured GM has the Owlbear room tab open. It mirrors new public Overhead Chat messages in the selected scope. The relay only runs from Owlbear to Discord and starts with new messages. Use one configured GM browser per room. The webhook URL stays in that browser’s local storage for that GM and room.
 
 ## Rolling dice
 

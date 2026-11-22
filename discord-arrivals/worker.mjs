@@ -127,30 +127,83 @@ function avatarUrl(user) {
 }
 
 const avatarPath = /^(?:\/avatars\/\d{16,22}\/(?:a_)?[0-9a-f]{32}|\/embed\/avatars\/[0-5])\.png$/;
-const tokenPrefix = "/token/v1";
+const legacyTokenPrefix = "/token/v1";
+const tokenPrefix = "/token/v2";
 
-async function tokenUrl(key, origin, avatar) {
-  const source = new URL(avatar);
-  if (source.origin !== "https://cdn.discordapp.com" || !avatarPath.test(source.pathname)) throw Error("Invalid Discord avatar.");
-  const pathname = tokenPrefix + source.pathname;
-  const token = new URL(pathname, origin);
-  // Default Discord portraits are a fixed set of six public images.
-  if (!source.pathname.startsWith("/embed/")) {
-    token.searchParams.set("sig",base64(new Uint8Array(await crypto.subtle.sign("HMAC",key,encoder.encode(pathname)))));
-  }
-  return token.href;
+function mac(key, value) {
+  return crypto.subtle.sign("HMAC", key, encoder.encode(value));
 }
 
-async function tokenImage(request, url, key, fetchDiscord, ctx) {
-  const sourcePath = url.pathname.slice(tokenPrefix.length);
-  if (request.method !== "GET" || !avatarPath.test(sourcePath)) return json({},404);
+async function encryptionKey(key, purpose) {
+  return crypto.subtle.importKey("raw", await mac(key, purpose), "AES-GCM", false, ["encrypt", "decrypt"]);
+}
+
+async function encrypt(key, purpose, value, binding = "") {
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const algorithm = {name:"AES-GCM", iv, additionalData:encoder.encode(binding)};
+  const encrypted = await crypto.subtle.encrypt(algorithm, await encryptionKey(key, purpose), encoder.encode(JSON.stringify(value)));
+  return base64(new Uint8Array([...iv, ...new Uint8Array(encrypted)]));
+}
+
+async function decrypt(key, purpose, value, binding = "") {
+  if (typeof value !== "string" || !/^[\w-]{40,4000}$/.test(value)) return;
+  try {
+    const bytes = fromBase64(value);
+    const algorithm = {name:"AES-GCM", iv:bytes.subarray(0,12), additionalData:encoder.encode(binding)};
+    return JSON.parse(decoder.decode(await crypto.subtle.decrypt(algorithm, await encryptionKey(key, purpose), bytes.subarray(12))));
+  } catch {}
+}
+
+async function avatarId(key, sourcePath) {
+  return base64(new Uint8Array(await mac(key, "avatar-id:v2:" + sourcePath)));
+}
+
+function revoked(env, id) {
+  return (env.AVATAR_REVOKED_IDS ?? "").split(/[\s,]+/).includes(id);
+}
+
+async function tokenUrl(key, origin, sourcePath) {
+  const id = await avatarId(key, sourcePath);
+  const locator = await encrypt(key, "avatar-link:v2", sourcePath, id);
+  return new URL(tokenPrefix + "/" + id + "/" + locator + ".png", origin).href;
+}
+
+async function legacyPath(url, key) {
+  if (!url.pathname.startsWith(legacyTokenPrefix + "/")) return;
+  const sourcePath = url.pathname.slice(legacyTokenPrefix.length);
+  if (!avatarPath.test(sourcePath)) return;
   const signature = url.searchParams.get("sig");
-  if (sourcePath.startsWith("/embed/") ? url.search !== "" :
-    !/^[\w-]{43}$/.test(signature ?? "") || url.search !== "?sig=" + signature ||
-    !await crypto.subtle.verify("HMAC",key,fromBase64(signature),encoder.encode(url.pathname))) return json({},404);
+  if (sourcePath.startsWith("/embed/") ? url.search === "" :
+    /^[\w-]{43}$/.test(signature ?? "") && url.search === "?sig=" + signature &&
+    await crypto.subtle.verify("HMAC",key,fromBase64(signature),encoder.encode(url.pathname))) return sourcePath;
+}
+
+async function tokenImage(request, url, env, key, fetchDiscord, ctx) {
+  if (request.method !== "GET") return json({},404);
+  const opaque = /^\/token\/v2\/([\w-]{43})\/([\w-]{40,400})\.png$/.exec(url.pathname);
+  let sourcePath;
+  let id;
+  if (opaque && !url.search) {
+    [, id] = opaque;
+    if (revoked(env, id)) return json({},404);
+    sourcePath = await decrypt(key, "avatar-link:v2", opaque[2], id);
+  } else {
+    if (env.DISABLE_LEGACY_AVATAR_URLS === "true") return json({},404);
+    sourcePath = await legacyPath(url, key);
+    if (!sourcePath) return json({},404);
+    id = await avatarId(key, sourcePath);
+    if (revoked(env, id)) return json({},404);
+  }
+  if (typeof sourcePath !== "string" || !avatarPath.test(sourcePath)) return json({},404);
+  const cacheKey = new URL("/internal-avatar-cache/" + id, url.origin).href;
+  const uncached = (response) => {
+    const headers = new Headers(response.headers);
+    headers.set("Cache-Control","private, no-store");
+    return new Response(response.body,{headers});
+  };
   const cache = globalThis.caches?.default;
-  const cached = await cache?.match(url.href);
-  if (cached) return cached;
+  const cached = await cache?.match(cacheKey);
+  if (cached) return uncached(cached);
   try {
     const source = new URL(sourcePath, "https://cdn.discordapp.com");
     source.searchParams.set("size","256");
@@ -160,8 +213,8 @@ async function tokenImage(request, url, key, fetchDiscord, ctx) {
       ...standardHeaders, "Content-Type":"image/png", "Access-Control-Allow-Origin":"*",
       "Cache-Control":"public, max-age=86400, s-maxage=604800",
     }});
-    if (cache && ctx) ctx.waitUntil(cache.put(url.href,png.clone()).catch(() => {}));
-    return png;
+    if (cache && ctx) ctx.waitUntil(cache.put(cacheKey,png.clone()).catch(() => {}));
+    return uncached(png);
   } catch {
     return json({error:"Discord avatar could not be rendered."},502);
   }
@@ -173,14 +226,15 @@ export function createWorker({ fetchDiscord = fetch, clock = Date.now } = {}) {
       const url = new URL(request.url);
       const activation = url.pathname === "/discord/interactions/register";
       const interaction = (url.pathname === "/discord/interactions" || activation) && request.method === "POST";
-      const image = url.pathname.startsWith(tokenPrefix + "/");
-      if (!image && !interaction && !url.pathname.startsWith("/oauth/")) return env.ASSETS.fetch(request);
+      const image = [legacyTokenPrefix, tokenPrefix].some((prefix) => url.pathname.startsWith(prefix + "/"));
+      const migration = url.pathname === "/token/migrate";
+      if (!image && !migration && !interaction && !url.pathname.startsWith("/oauth/")) return env.ASSETS.fetch(request);
       if (url.origin !== env.PUBLIC_ORIGIN || !snowflake(env.DISCORD_CLIENT_ID) ||
           !env.DISCORD_CLIENT_SECRET || (env.SIGNING_SECRET && env.SIGNING_SECRET.length < 32)) {
         return json({ error: "Server configuration is incomplete." }, 503);
       }
       const key = await importKey(env.SIGNING_SECRET ?? await digest("discord-arrivals/signing/v1:" + env.DISCORD_CLIENT_SECRET));
-      if (image) return tokenImage(request,url,key,fetchDiscord,ctx);
+      if (image) return tokenImage(request,url,env,key,fetchDiscord,ctx);
       const now = Math.floor(clock() / 1000);
       if (interaction) return discordInteraction(request, env, key, now, activation && ctx ? () => {
         if (!snowflake(env.DISCORD_GUILD_ID)) return;
@@ -190,7 +244,9 @@ export function createWorker({ fetchDiscord = fetch, clock = Date.now } = {}) {
       const frontend = new URL(env.FRONTEND_ORIGIN || env.PUBLIC_ORIGIN).origin;
       async function claimFor(context, user) {
         const profile = base64(new Uint8Array(await crypto.subtle.sign("HMAC", key, encoder.encode("profile:" + context.room + ":" + user.id))));
-        return seal(key, {kind:"claim", ...context, profile, name:user.name, avatar:user.avatar, exp:now+TICKET_SECONDS});
+        const privateProfile = {profile, name:user.name, sourcePath:new URL(user.avatar).pathname};
+        const payload = await encrypt(key, "profile-claim:v2", privateProfile, JSON.stringify([context.room, context.player, context.connection]));
+        return seal(key, {kind:"claim", ...context, payload, exp:now+TICKET_SECONDS});
       }
       if (["/oauth/start", "/oauth/join"].includes(url.pathname) && request.method === "GET") {
         let context;
@@ -262,7 +318,7 @@ export function createWorker({ fetchDiscord = fetch, clock = Date.now } = {}) {
           return callbackPage(undefined, expired);
         }
       }
-      if (url.pathname === "/oauth/verify" && ["POST", "OPTIONS"].includes(request.method)) {
+      if ((migration || url.pathname === "/oauth/verify") && ["POST", "OPTIONS"].includes(request.method)) {
         const origin = request.headers.get("Origin");
         if (origin && origin !== frontend && origin !== url.origin) return json({error:"Invalid frontend origin."}, 403);
         const cors = origin ? {"Access-Control-Allow-Origin":origin, "Vary":"Origin"} : {};
@@ -272,13 +328,23 @@ export function createWorker({ fetchDiscord = fetch, clock = Date.now } = {}) {
         try {
           const raw = await request.text();
           if (raw.length > 6000) return json({error:"Invalid claim."}, 400, cors);
-          const {ticket, room, player, connection} = JSON.parse(raw);
+          const input = JSON.parse(raw);
+          if (migration) {
+            const legacy = new URL(input.url);
+            if (legacy.origin !== url.origin || legacy.username || legacy.password || legacy.hash) return json({},404,cors);
+            const sourcePath = await legacyPath(legacy, key);
+            if (!sourcePath || revoked(env, await avatarId(key, sourcePath))) return json({},404,cors);
+            return json({tokenImage:await tokenUrl(key,url.origin,sourcePath)},200,cors);
+          }
+          const {ticket, room, player, connection} = input;
           const claim = await unseal(key, ticket, "claim", now);
           if (!claim || claim.room !== room || claim.player !== player || claim.connection !== connection)
             return json({error:"This sign-in code is expired or belongs to a different connection."}, 403, cors);
+          const identity = await decrypt(key, "profile-claim:v2", claim.payload, JSON.stringify([room, player, connection]));
+          if (!identity || !avatarPath.test(identity.sourcePath)) return json({error:"Connect Discord again to get a new sign-in code."},403,cors);
           return json({
-            profile:claim.profile, name:claim.name, avatar:claim.avatar,
-            tokenImage:await tokenUrl(key,url.origin,claim.avatar),
+            profile:identity.profile, name:identity.name,
+            tokenImage:await tokenUrl(key,url.origin,identity.sourcePath),
           }, 200, cors);
         } catch {
           return json({error:"Invalid claim."}, 400, cors);

@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Discord Arrivals</title>
 <link rel="stylesheet" href="./style.css?v=0.1.4">
-<script type="module" src="./panel.js?v=0.1.9"></script>
+<script type="module" src="./panel.js?v=0.1.10"></script>
 </head>
 <body class="arrivals-panel">
 <h1>discord arrivals</h1>
@@ -28,6 +28,7 @@
   </div>
   <label id="native-options" hidden>vision radius (grid spaces)<input id="radius" type="number" min="1" max="100" step="1" value="12"></label>
   <div class="actions"><button id="save" type="button" class="primary">save scene settings</button></div>
+  <div class="actions"><button id="migrate-portraits" type="button">update legacy avatar links in this scene</button></div>
 </section>
 <section id="player" hidden>
   <p>Use your Discord profile picture to create a character token you can control.</p>
@@ -47,6 +48,6 @@
 <button id="check-scene" type="button" hidden>check scene again</button>
 <button id="continue-to-tutorial" type="button" class="primary" hidden>continue</button>
 <button id="find-token" type="button" hidden>find my token</button>
-<footer class="arrivals-version"><small>v0.1.9</small></footer>
+<footer class="arrivals-version"><small>v0.1.10</small></footer>
 </body>
 </html>

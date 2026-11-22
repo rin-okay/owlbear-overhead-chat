@@ -1,6 +1,7 @@
 import OBR, { buildImage, buildLight } from "./obr.js";
-import { ARRIVAL, CLAIM, CONFIG, MODAL, RESULT, character, linkKey, workerOrigin } from "./model.mjs";
+import { ARRIVAL, CONFIG, MODAL, RESULT, character, linkKey, workerOrigin } from "./model.mjs";
 import { planToken } from "./provision.mjs";
+import { CLAIM_KEY, CLAIM_KEY_REQUEST, PRIVATE_CLAIM, decryptClaim, makeClaimKey } from "./claim-privacy.mjs";
 
 let offered = false;
 let sceneEpoch = 0;
@@ -8,6 +9,9 @@ let pending = Promise.resolve();
 let lightQueue = Promise.resolve();
 let light;
 let nativeTokenId;
+let claimKey;
+const inProgress = new Set();
+const requestId = (value) => typeof value === "string" && /^[a-f\d-]{36}$/i.test(value);
 
 const report = (error) => console.warn("Discord Arrivals:", error);
 const sameScene = (epoch) => epoch === sceneEpoch;
@@ -39,7 +43,7 @@ async function answer(connection, request, response) {
 
 async function provision({connectionId, data}, epoch) {
   if (!sameScene(epoch) || await OBR.player.getRole() !== "GM") return;
-  if (typeof data?.request !== "string" || !/^[a-f\d-]{36}$/i.test(data.request) ||
+  if (!requestId(data?.request) ||
       typeof data.ticket !== "string" || data.ticket.length > 4096) return;
   const players = await OBR.party.getPlayers();
   const player = players.find((entry) => entry.connectionId === connectionId && entry.role === "PLAYER");
@@ -74,15 +78,17 @@ async function provision({connectionId, data}, epoch) {
     const plan = await planToken({room:OBR.room.id, player:player.id, profile, config, items, party});
     if (!sameScene(epoch)) return;
     if (!plan.existing) {
-      if (profile.tokenImage) {
-        const image = await fetch(profile.tokenImage,{signal:AbortSignal.timeout(10000)});
-        if (!image.ok || image.headers.get("Content-Type") !== "image/png") {
-          throw Error("The Discord portrait could not be framed. Try connecting again.");
-        }
-        await image.arrayBuffer();
+      const portrait = new URL(profile.tokenImage);
+      if (portrait.origin !== worker || !portrait.pathname.startsWith("/token/v2/")) {
+        throw Error("The Discord sign-in service needs its privacy update.");
       }
+      const image = await fetch(portrait.href,{signal:AbortSignal.timeout(10000)});
+      if (!image.ok || image.headers.get("Content-Type") !== "image/png") {
+        throw Error("The Discord portrait could not be framed. Try connecting again.");
+      }
+      await image.arrayBuffer();
       if (!sameScene(epoch)) return;
-      const item = buildImage({url:profile.tokenImage ?? profile.avatar, mime:"image/png", width:256, height:256},
+      const item = buildImage({url:portrait.href, mime:"image/png", width:256, height:256},
         {dpi:256, offset:{x:128, y:128}})
         .id(plan.id).name(profile.name).layer("CHARACTER").position(config.spawn)
         .createdUserId(player.id).metadata(plan.metadata).build();
@@ -145,9 +151,35 @@ function updateLight(items) {
 }
 
 OBR.onReady(() => {
-  OBR.broadcast.onMessage(CLAIM, (event) => {
+  OBR.broadcast.onMessage(CLAIM_KEY_REQUEST, async ({connectionId, data}) => {
+    if (!requestId(data?.request)) return;
+    try {
+      if (!await OBR.scene.isReady() || await OBR.player.getRole() !== "GM" ||
+          !(await OBR.party.getPlayers()).some((entry) => entry.connectionId === connectionId && entry.role === "PLAYER")) return;
+      claimKey ??= makeClaimKey().catch((error) => { claimKey = undefined; throw error; });
+      const {publicKey} = await claimKey;
+      await OBR.broadcast.sendMessage(CLAIM_KEY, {connection:connectionId, request:data.request, key:publicKey});
+    } catch (error) {
+      report(error);
+    }
+  });
+  OBR.broadcast.onMessage(PRIVATE_CLAIM, async ({connectionId, data}) => {
+    if (!claimKey || !requestId(data?.request) || data.gm !== await OBR.player.getConnectionId() ||
+        await OBR.player.getRole() !== "GM" ||
+        !(await OBR.party.getPlayers()).some((entry) => entry.connectionId === connectionId && entry.role === "PLAYER")) return;
+    const id = connectionId + ":" + data.request;
+    if (inProgress.has(id)) return;
+    inProgress.add(id);
     const epoch = sceneEpoch;
-    pending = pending.then(() => provision(event, epoch)).catch(report);
+    try {
+      const ticket = await decryptClaim(data.envelope, (await claimKey).privateKey);
+      pending = pending.then(() => provision({connectionId, data:{request:data.request, ticket}}, epoch)).catch(report);
+      await pending;
+    } catch {
+      // Old keys and malformed envelopes carry no usable claim.
+    } finally {
+      inProgress.delete(id);
+    }
   });
   OBR.scene.onReadyChange((ready) => {
     ++sceneEpoch;

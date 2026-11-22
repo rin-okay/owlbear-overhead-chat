@@ -1,6 +1,6 @@
 {
   "name": "Discord Arrivals",
-  "version": "0.1.9",
+  "version": "0.1.10",
   "manifest_version": 1,
   "description": "Offer Discord sign-in and spawn player-owned avatar tokens at a GM-defined point.",
   "icon": "/owlbear-overhead-chat/discord-arrivals/arrivals.svg",

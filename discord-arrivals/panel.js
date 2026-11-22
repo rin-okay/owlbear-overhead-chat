@@ -1,5 +1,6 @@
 import OBR from "./obr.js";
-import { AVATAR, CLAIM, CONFIG, MODAL, RESULT, character, defaults, httpsOrigin, linkKey, point, smokeFields, workerOrigin } from "./model.mjs";
+import { ARRIVAL, AVATAR, CONFIG, MODAL, RESULT, character, defaults, httpsOrigin, linkKey, point, smokeFields, workerOrigin } from "./model.mjs";
+import { CLAIM_KEY, CLAIM_KEY_REQUEST, PRIVATE_CLAIM, encryptClaim } from "./claim-privacy.mjs";
 
 const el = (id) => document.getElementById(id);
 const status = (message) => { el("status").textContent = message; };
@@ -75,6 +76,51 @@ async function setupGM() {
     status(settings.enabled && !permissions.includes("CHARACTER_UPDATE")
       ? "Saved. Enable Character Update in Owlbear’s player permissions so players can move their tokens."
       : "Scene settings saved.");
+  });
+  listen("migrate-portraits", async () => {
+    const current = cfg;
+    if (await OBR.player.getRole() !== "GM") throw Error("Only the GM can update avatar links.");
+    const worker = workerOrigin(current, location.origin);
+    if (!worker) throw Error("Save the Worker address for this scene first.");
+    checkScene(current);
+    const button = el("migrate-portraits");
+    button.disabled = true;
+    status("Updating legacy avatar links…");
+    let updated = 0;
+    let failed = 0;
+    try {
+      const items = await OBR.scene.items.getItems();
+      for (const item of items) {
+        if (!character(item) || !item.metadata?.[ARRIVAL] ||
+            !item.image?.url?.startsWith(worker + "/token/v1/")) continue;
+        checkScene(current);
+        const previous = item.image.url;
+        let portrait;
+        try {
+          const response = await fetch(new URL("/token/migrate", worker), {
+            method:"POST", headers:{"Content-Type":"application/json"},
+            body:JSON.stringify({url:previous}), signal:AbortSignal.timeout(10000),
+          });
+          if (!response.ok) throw Error("Migration failed.");
+          portrait = new URL((await response.json()).tokenImage);
+          if (portrait.origin !== worker || !portrait.pathname.startsWith("/token/v2/")) throw Error("Invalid avatar link.");
+        } catch {
+          failed++;
+          continue;
+        }
+        checkScene(current);
+        await OBR.scene.items.updateItems([item.id], ([saved]) => {
+          if (current === cfg && saved?.metadata?.[ARRIVAL] && saved.image?.url === previous) {
+            saved.image.url = portrait.href;
+            updated++;
+          }
+        });
+      }
+      checkScene(current);
+      status("Updated " + updated + " legacy avatar links." + (failed ? " Couldn’t update " + failed + "." : ""));
+    } finally {
+      button.disabled = false;
+    }
   });
   async function loadScene(ready) {
     const request = ++generation;
@@ -199,15 +245,36 @@ async function setupPlayer() {
     }
     const request = claim;
     try {
-      await OBR.broadcast.sendMessage(CLAIM, {ticket:request.ticket, request:request.request});
+      await OBR.broadcast.sendMessage(CLAIM_KEY_REQUEST, {request:request.request});
       if (claim === request) status("Discord connected. Waiting for the GM to place your token…");
     } catch {
       if (claim === request) status("Owlbear is reconnecting. Retrying…");
     }
   }
+  const unsubscribeKey = OBR.broadcast.onMessage(CLAIM_KEY, async ({connectionId, data}) => {
+    const request = claim;
+    if (!request || data?.connection !== connection || data.request !== request.request || request.sending) return;
+    request.sending = true;
+    try {
+      const party = await OBR.party.getPlayers();
+      if (claim !== request || !party.some((entry) => entry.connectionId === connectionId && entry.role === "GM") ||
+          party.some((entry) => entry.connectionId === request.gm && entry.role === "GM" && entry.connectionId !== connectionId)) return;
+      if (request.key !== data.key?.n || request.gm !== connectionId) {
+        request.envelope = await encryptClaim(request.ticket, data.key);
+        request.key = data.key.n;
+        request.gm = connectionId;
+      }
+      if (claim !== request) return;
+      await OBR.broadcast.sendMessage(PRIVATE_CLAIM, {gm:connectionId, request:request.request, envelope:request.envelope});
+    } catch {
+      if (claim === request) status("Couldn’t send the private sign-in code. Retrying…");
+    } finally {
+      request.sending = false;
+    }
+  });
   const unsubscribe = OBR.broadcast.onMessage(RESULT, async ({connectionId, data}) => {
     try {
-      if (!claim || data?.connection !== connection || data.request !== claim.request) return;
+      if (!claim || connectionId !== claim.gm || data?.connection !== connection || data.request !== claim.request) return;
       const [party, items] = await Promise.all([
         OBR.party.getPlayers(), typeof data.tokenId === "string" ? OBR.scene.items.getItems([data.tokenId]) : [],
       ]);
@@ -271,7 +338,7 @@ async function setupPlayer() {
     popup = undefined;
     await OBR.modal.close(MODAL);
   });
-  window.addEventListener("pagehide", () => { clearClaim(); unsubscribe(); }, {once:true});
+  window.addEventListener("pagehide", () => { clearClaim(); unsubscribe(); unsubscribeKey(); }, {once:true});
   connect.disabled = false;
   setVisible("skip", welcome);
   setVisible("player", true);

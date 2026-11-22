@@ -1,5 +1,5 @@
 import OBR from "./obr.js";
-import { discordSettings, normalizeWebhook, saveDiscordSettings, sendDiscord } from "./discord.js?v=2.3.6";
+import { discordSettings, normalizeWebhook, saveDiscordSettings, sendDiscord } from "./discord.js?v=2.3.9";
 
 export function setupDiscordPanel(openChat, openGm) {
   const tab = document.querySelector("#gm-tab");
@@ -8,6 +8,7 @@ export function setupDiscordPanel(openChat, openGm) {
   const form = discord.querySelector("form");
   const field = form.elements.namedItem("webhook");
   const enabled = form.elements.namedItem("enabled");
+  const otherTabs = form.elements.namedItem("otherTabs");
   const status = discord.querySelector("#discord-status");
   const test = discord.querySelector("#discord-test");
   const versionLabel = panel.querySelector("#extension-version");
@@ -25,6 +26,7 @@ export function setupDiscordPanel(openChat, openGm) {
     field.value = "";
     field.placeholder = saved.url ? "Webhook URL saved" : "Paste Discord webhook URL";
     enabled.checked = saved.enabled;
+    otherTabs.checked = saved.otherTabs;
   }
 
   function draftUrl() {
@@ -68,9 +70,10 @@ export function setupDiscordPanel(openChat, openGm) {
     try {
       const url = draftUrl();
       if (!url) throw new Error("Paste a webhook URL before saving.");
-      saveDiscordSettings({ url, enabled: enabled.checked });
+      saveDiscordSettings({ url, enabled: enabled.checked, otherTabs: otherTabs.checked });
       load();
-      status.textContent = enabled.checked ? "Saved. New chat messages will be mirrored." : "Saved. Mirroring is paused.";
+      status.textContent = !enabled.checked ? "Saved. Mirroring is paused."
+        : otherTabs.checked ? "Saved. All public chat tabs will be mirrored." : "Saved. Only General will be mirrored.";
     } catch (error) {
       status.textContent = error.name === "SecurityError" || error.name === "QuotaExceededError"
         ? "This browser blocked saving the webhook." : error.message;
