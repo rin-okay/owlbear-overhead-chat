@@ -51,6 +51,7 @@ export const SKILLS = {
     parameter: { label: "range (in cells)", min: 1, defaultValue: 6 },
     targetLimit: { label: "maximum targets", min: 1, defaultValue: 3, integer: true },
   },
+  shield: { name: "shield", key: "l", spellLevel: 1 },
   heart: { name: "heart", key: "p", effect: "generic.marker.heart.3" },
   // Keep the original skill ID so existing bindings and clients still work.
   spear: { name: "melee weapon attack", key: "f", meleeReach: 1 },

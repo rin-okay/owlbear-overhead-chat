@@ -1,7 +1,7 @@
 import { isProjectileToken } from "./projectile-collision.js?v=2.6.13";
 import { skillConnections } from "./skills.js?v=2.6.15";
 import { validMeleeDamage } from "./melee-damage.js?v=2.7.19";
-import { MAGIC_MISSILE_INTERVAL, MAGIC_MISSILE_MAX_LEVEL, validMagicMissileDamage, validSpellDamage } from "./spell-damage.js?v=2.8.4";
+import { MAGIC_MISSILE_INTERVAL, MAGIC_MISSILE_MAX_LEVEL, validMagicMissileDamage, validSpellDamage } from "./spell-damage.js?v=2.8.6";
 
 export const HIT_MARKERS = "chat.overhead.skills/hits.v1";
 export const MELEE_HIT_CUE = "chat.overhead.skills/melee-hit-cue.v1";
@@ -57,7 +57,8 @@ export function setupHitMarkers(obr, buildLabel) {
     if (!Number.isFinite(scale) || scale <= 0 || !current()) return;
     const maxRoll = damage?.maxRoll === true;
     const amount = damage?.amount ?? 1;
-    const text = amount > 0 ? `-${amount}` : "0";
+    const blocked = damage?.blocked === true;
+    const text = blocked ? "blocked" : amount > 0 ? `-${amount}` : "0";
     const step = (maxRoll ? 6 : 4) / scale;
     const labels = (await Promise.all(targets.filter(isProjectileToken).map(async (target) => {
       // A target may be deleted between fetching the items and getting its bounds.
@@ -65,9 +66,9 @@ export function setupHitMarkers(obr, buildLabel) {
       if (!Number.isFinite(bounds?.center?.x) || !Number.isFinite(bounds?.min?.y)) return null;
       const label = buildLabel().plainText(text).padding(0).backgroundOpacity(0)
         .pointerWidth(0).pointerHeight(0).textAlign("CENTER")
-        .fontSize(maxRoll ? 32 : 21).fontWeight(maxRoll ? 900 : 700)
-        .fillColor(maxRoll ? "#ffc278" : "#ff4d61")
-        .strokeColor(maxRoll ? "#78142b" : "#26070d").strokeWidth(maxRoll ? 2 : 1).strokeOpacity(1)
+        .fontSize(blocked ? 15 : maxRoll ? 32 : 21).fontWeight(maxRoll ? 900 : 700)
+        .fillColor(blocked ? "#b3e7ff" : maxRoll ? "#ffc278" : "#ff4d61")
+        .strokeColor(blocked ? "#183149" : maxRoll ? "#78142b" : "#26070d").strokeWidth(maxRoll ? 2 : 1).strokeOpacity(1)
         .position({ x: bounds.center.x + xOffset / scale, y: bounds.min.y - 12 / scale })
         .layer("ATTACHMENT").locked(true).attachedTo(target.id).build();
       label.disableHit = true;
@@ -99,13 +100,14 @@ export function setupHitMarkers(obr, buildLabel) {
     if (typeof data?.requestId !== "string" || !/^[a-f0-9-]{36}$/i.test(data.requestId) ||
         !Array.isArray(data.tokenIds) || !data.tokenIds.length ||
         !data.tokenIds.every((id) => typeof id === "string" && id.length && id.length <= 128) ||
-        !Number.isFinite(data.delay) || data.delay < 0 || data.delay > 6000 ||
-        (data.damage !== undefined && !validMeleeDamage(data.damage) && !validSpellDamage(data.damage))) return;
+        !Number.isFinite(data.delay) || data.delay < 0 || data.delay > 6000) return;
     const followUps = data.missileFollowUps;
     if (followUps !== undefined &&
         (!Array.isArray(followUps) || followUps.length < 2 || followUps.length > MAGIC_MISSILE_MAX_LEVEL + 1 ||
           data.useAnimationCue === true || data.delay + followUps.length * MAGIC_MISSILE_INTERVAL > 6000 ||
           !validMagicMissileDamage(data.damage) || !followUps.every(validMagicMissileDamage))) return;
+    if (followUps === undefined && data.damage !== undefined &&
+        (!validMeleeDamage(data.damage) && !validSpellDamage(data.damage) || data.damage.blocked === true)) return;
     const version = sceneVersion;
     const current = () => version === sceneVersion;
     try {
@@ -118,10 +120,11 @@ export function setupHitMarkers(obr, buildLabel) {
       const tokenIds = [...new Set(data.tokenIds)];
       if (followUps) {
         // Separate splats that are still on screen when the next dart hits.
-        const offsets = [0, -22, 22, -44, 44];
+        const lanes = [0, -1, 1, -2, 2];
         await Promise.all([data.damage, ...followUps].map(async (damage, index) => {
           await wait(data.delay + index * MAGIC_MISSILE_INTERVAL);
-          if (current()) await show(tokenIds, current, damage, offsets[index % offsets.length]);
+          const offset = lanes[index % lanes.length] * (damage.blocked ? 54 : 22);
+          if (current()) await show(tokenIds, current, damage, offset);
         }));
         return;
       }

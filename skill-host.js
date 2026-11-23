@@ -1,16 +1,17 @@
 import { setupBless } from "./bless.js?v=2.7.11";
+import { isShieldGraphic, readShieldGraphics, setupShield } from "./shield.js?v=2.8.6";
 import { canSpeak, MELEE_HIT_TIMING, normalizeMeleeHitTiming } from "./rules.js?v=2.6.16";
 import {
   areaHits, clearSpellPath, coneHits, isProjectileToken, isProjectileWall, openMeleeDoor, projectileImpact, teleportLandingClear,
 } from "./projectile-collision.js?v=2.8.3";
-import { HIT_MARKERS, MELEE_HIT_CUE } from "./hit-markers.js?v=2.8.4";
+import { HIT_MARKERS, MELEE_HIT_CUE } from "./hit-markers.js?v=2.8.6";
 import { rollMeleeDamage } from "./melee-damage.js?v=2.7.19";
 import { readTokenStats } from "./stats.js?v=2.8.5";
-import { eldritchBeamCount, MAGIC_MISSILE_INTERVAL, MAGIC_MISSILE_MAX_LEVEL, rollMagicMissileDart, rollSpellDamage } from "./spell-damage.js?v=2.8.4";
+import { BLOCKED_MAGIC_MISSILE, eldritchBeamCount, MAGIC_MISSILE_INTERVAL, MAGIC_MISSILE_MAX_LEVEL, rollMagicMissileDart, rollSpellDamage } from "./spell-damage.js?v=2.8.6";
 import {
   DEFAULT_WEAPON, EMBERS_EFFECTS, MELEE_DURATION_MS, SKILLS, SKILL_REQUEST, SKILL_RESULT,
   aimsAtLocation, availableSkills, availableWeapons, friendlyFireMode, readSkills, skillConnections, skillEffect, spellParameter, tokenTeams, turnToHeading,
-} from "./skills.js?v=2.8.5";
+} from "./skills.js?v=2.8.6";
 
 function aimAtTarget(source, target, range = 0, passThrough = false, maxRange = Infinity) {
   if (![target?.center?.x, target?.center?.y].every(Number.isFinite)) return;
@@ -56,6 +57,7 @@ async function teleportCaster(obr, token, source, destination, sender, permissio
 
 export function setupSkillHost(obr, buildImage) {
   const castBless = setupBless(obr, buildImage);
+  const toggleShield = setupShield(obr, buildImage);
   const lastCast = new Map();
   let sceneVersion = 0;
   obr.scene.onReadyChange(() => { sceneVersion++; lastCast.clear(); });
@@ -93,7 +95,15 @@ export function setupSkillHost(obr, buildImage) {
         await answer(result);
         return;
       }
-      if (!skills.includes(data.skill)) {
+      const skill = SKILLS[data.skill];
+      const granted = skills.includes(data.skill);
+      const maxSpellLevel = readTokenStats(token).details.spellLevel;
+      const canActivateShield = granted && maxSpellLevel >= skill.spellLevel;
+      // A shield can still be removed after the grant is revoked or the cap is lowered.
+      const removingShield = data.skill === "shield" && !canActivateShield &&
+        (await readShieldGraphics(obr, token.id)).length > 0;
+      if (version !== sceneVersion) return;
+      if (!granted && !removingShield) {
         await answer({ ...result, error: config.enabled ? "This avatar hasn’t been granted that skill." : "The GM hasn’t enabled skill hotkeys." });
         return;
       }
@@ -102,15 +112,13 @@ export function setupSkillHost(obr, buildImage) {
         await answer({ ...result, error: "This avatar hasn’t been granted that weapon." });
         return;
       }
-      const skill = SKILLS[data.skill];
       const missile = data.skill === "missile";
       const spellLevel = missile && data.spellLevel !== undefined ? data.spellLevel : skill.spellLevel;
       if (missile && (!Number.isInteger(spellLevel) || spellLevel < 1 || spellLevel > MAGIC_MISSILE_MAX_LEVEL)) {
         await answer({ ...result, error: "Choose a Magic Missile spell level from 1 to 9." });
         return;
       }
-      const maxSpellLevel = readTokenStats(token).details.spellLevel;
-      if (spellLevel > maxSpellLevel) {
+      if (spellLevel > maxSpellLevel && !removingShield) {
         await answer({
           ...result,
           errorCode: "spell-level",
@@ -124,6 +132,15 @@ export function setupSkillHost(obr, buildImage) {
         return;
       }
       lastCast.set(sender.id, now);
+      if (data.skill === "shield") {
+        const current = () => version === sceneVersion;
+        const error = await toggleShield(token, canActivateShield, current).catch((cause) => {
+          console.error("Overhead Chat could not update Shield", cause);
+          return "Couldn’t update Shield.";
+        });
+        if (current()) await answer({ ...result, error });
+        return;
+      }
       if (data.skill === "bless") {
         const targets = data.targetIds ?? [];
         if (!Array.isArray(targets) || targets.length > 100 ||
@@ -143,6 +160,7 @@ export function setupSkillHost(obr, buildImage) {
       const checksHit = aimsAtLocation(data.skill);
       const geometry = checksHit ? Promise.all([
         obr.scene.items.getItems((item) => isProjectileToken(item) || isProjectileWall(item) ||
+          (missile && isShieldGraphic(item)) ||
           (skill.location === "teleport" && item.type === "IMAGE" && item.layer === "CHARACTER")),
         obr.scene.local.getItems(isProjectileWall),
       ]).catch(() => null) : [];
@@ -168,6 +186,7 @@ export function setupSkillHost(obr, buildImage) {
       }
       const instructions = [instruction];
       let hitTokenIds = [];
+      let missileBlocked = false;
       let doorId;
       if (checksHit) {
         if (!obstacles) {
@@ -261,6 +280,8 @@ export function setupSkillHost(obr, buildImage) {
             instruction.effectProperties.destination = impact.destination;
             if (eldritch) instruction.effectProperties.copies = eldritchBeamCount(token);
             hitTokenIds = impact.hitTokenIds;
+            missileBlocked = missile && Boolean(hitTokenIds.length) &&
+              items.some((item) => item.attachedTo === hitTokenIds[0] && isShieldGraphic(item));
             if (skill.impact) {
               const { effect, delay } = skill.impact;
               instructions.push({
@@ -314,8 +335,9 @@ export function setupSkillHost(obr, buildImage) {
           .catch((error) => console.error("Overhead Chat could not open the door", error));
       }
       if (version === sceneVersion && hitTokenIds.length && missile) {
-        const missileFollowUps = instructions.slice(1).map(() => rollMagicMissileDart());
-        await sendMarkers(skill.hitDelay, rollMagicMissileDart(), { missileFollowUps });
+        const damages = instructions.map(() => missileBlocked ? BLOCKED_MAGIC_MISSILE : rollMagicMissileDart());
+        const [damage, ...missileFollowUps] = damages;
+        await sendMarkers(skill.hitDelay, damage, { missileFollowUps });
       } else if (version === sceneVersion && hitTokenIds.length && !meleeHit) {
         const damage = data.skill === "eldritch-blast" || data.skill === "shatter"
           ? rollSpellDamage(data.skill, token) : undefined;

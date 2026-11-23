@@ -51,6 +51,8 @@ Misty Step (**I**) moves your avatar to an open map target within six cells and 
 
 Shatter (**O**) uses the map marker or a single selected token within 12 cells. Its radius defaults to two cells and can be changed per token in **skills → grants**. The blast rolls 3d8 thunder damage once and shows that amount on eligible tokens in the area. Resolve spell attacks, saves, and HP changes at the table.
 
+Shield (**L**) is a first-level spell that applies to your own avatar. Cast it once to attach the blue shield and cast it again to remove it. A token with Shield active when Magic Missile is cast takes zero damage from its darts and shows **blocked** for each impact.
+
 Bless (default **B**) uses the same team assignments. With no selection, Bless affects the caster and randomly fills the remaining slots with allies in range. With a selection, it affects only the selected eligible allies, including the caster if selected. The GM can set the range and maximum recipients in **skills → grants**. The defaults are six cells and three targets. Cast again to remove this caster’s Bless graphics. Bless uses the [JB2A loop from Embers](https://github.com/ArmindoFlores/embers).
 
 Use **team** under **skills → grants** to assign any combination of the six teams to a token. Tokens are allies if they share at least one team. Assignments are private to the GM’s browser. **Enable friendly fire** defaults to **enabled**, so all eligible targets can be hit. **Disabled** lets projectiles pass through allies and excludes allies from all hit markers. **AoE** lets projectiles pass through allies and applies allied hit markers to Fireball’s explosion, the Burning Hands cone, and Shatter.

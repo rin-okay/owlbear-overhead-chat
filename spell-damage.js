@@ -2,6 +2,7 @@ import { readTokenStats } from "./stats.js?v=2.7.21";
 
 export const MAGIC_MISSILE_INTERVAL = 200;
 export const MAGIC_MISSILE_MAX_LEVEL = 9;
+export const BLOCKED_MAGIC_MISSILE = { amount: 0, type: "force", maxRoll: false, blocked: true };
 
 export function rollMagicMissileDart(random = Math.random) {
   const amount = 2 + Math.floor(random() * 4);
@@ -9,6 +10,9 @@ export function rollMagicMissileDart(random = Math.random) {
 }
 
 export function validMagicMissileDamage(damage) {
+  if (damage?.blocked === true) {
+    return damage.amount === 0 && damage.type === "force" && damage.maxRoll === false;
+  }
   return validSpellDamage(damage) && damage.type === "force" && damage.amount >= 2 && damage.amount <= 5;
 }
 
