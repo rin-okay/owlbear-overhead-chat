@@ -10,14 +10,14 @@ import {
 } from "./session.js?v=2.7.21";
 
 import { drawBubble, normalizeAppearance, prepareBubbleFont } from "./appearance.js?v=2.7.9";
-import { setupDiscordPanel } from "./discord-panel.js?v=2.8.8";
-import { openCombatLog } from "./combat-log.js?v=2.8.8";
+import { setupDiscordPanel } from "./discord-panel.js?v=2.8.9";
+import { openCombatLog } from "./combat-log.js?v=2.8.9";
 import { setupAvatarPanel } from "./avatar-panel.js?v=2.8.6";
 import { setupSkillGrants, setupSkillPanel } from "./skill-panel.js?v=2.8.6";
 import { setupStatsEditor } from "./stats-panel.js?v=2.8.5";
 import { EMOTE } from "./emotes.js?v=2.7.21";
 import { setupTargeting } from "./targeting.js?v=2.7.17";
-import { listenForChatShortcut } from "./chat-shortcut.js?v=2.6.4";
+import { listenForChatShortcut, requestChatShortcut } from "./chat-shortcut.js?v=2.6.4";
 import { cameraFollowPreference, centerAvatar, prepareKeyboardPan } from "./avatar-viewport.js?v=2.7.9";
 
 import { readMovementGrid, stepAvatar, turnAvatar } from "./movement.js?v=2.7.5";
@@ -25,6 +25,8 @@ import { rollSpans, validateRollSpans } from "./dice.js";
 import { rollWithRumble } from "./rumble.js";
 import { rollWithNativeDice } from "./native-dice.js";
 
+const combatView = new URLSearchParams(location.search).has("combat-log");
+const combatWindow = combatView ? document.querySelector("#combat-window") : null;
 const transcript = document.querySelector("#transcript");
 const chatRoom = document.querySelector("#chat-room");
 const entries = document.querySelector("#entries");
@@ -38,6 +40,20 @@ const moveModeLabel = form.querySelector("#move-mode-label");
 const moveWarning = form.querySelector("#move-warning");
 const status = document.querySelector("#status");
 
+if (combatWindow) {
+  document.querySelector("main").hidden = true;
+  combatWindow.hidden = false;
+  document.body.classList.add("combat-view");
+  document.querySelector("#combat-controls-status").append(
+    moveModeLabel, moveWarning, status, document.querySelector("#skill-cast-status"),
+  );
+  const stylesheet = document.createElement("link");
+  stylesheet.rel = "stylesheet";
+  stylesheet.href = new URL("./combat-log.css?v=2.8.9", import.meta.url).href;
+  document.head.append(stylesheet);
+  void import("./combat-log-panel.js?v=2.8.9").catch(console.error);
+}
+
 let avatar = null;
 let selectedAvatarId = null;
 let observedToken = null;
@@ -48,6 +64,7 @@ let rollInProgress = false;
 let refreshVersion = 0;
 let tokenControl;
 let pendingChatShortcut;
+let combatAvatarId;
 let sendChatNotice;
 let movingAvatar = false;
 let modeExitKey;
@@ -266,7 +283,15 @@ async function refresh() {
     updateControls();
     const shortcut = pendingChatShortcut;
     pendingChatShortcut = undefined;
-    if (shortcut === "move" && !moveButton.disabled) startTokenControl();
+    if (combatWindow) {
+      if (!avatar) {
+        combatAvatarId = undefined;
+        stopTokenControl();
+      } else if (combatAvatarId !== avatar.id) {
+        combatAvatarId = avatar.id;
+        startTokenControl();
+      }
+    } else if (shortcut === "move" && !moveButton.disabled) startTokenControl();
     else if ((shortcut || shouldFocus) && !tokenControl && !input.disabled) input.focus();
   } catch (error) {
     if (version !== refreshVersion) return;
@@ -307,7 +332,7 @@ function startTokenControl() {
     moveModeLabel.hidden = false;
     moveButton.setAttribute("aria-pressed", "true");
   }
-  moveButton.focus();
+  if (!combatWindow) moveButton.focus();
 }
 
 function toggleTokenControl() {
@@ -551,19 +576,18 @@ window.addEventListener("blur", () => {
   updateMoveModeLabel();
 });
 document.addEventListener("pointerdown", (event) => {
-  if (event.target !== input && !moveButton.contains(event.target)) stopTokenControl();
+  if (!combatWindow && event.target !== input && !moveButton.contains(event.target)) stopTokenControl();
 });
 moveButton.addEventListener("click", toggleTokenControl);
-form.addEventListener("keyup", (event) => {
+function handleControlKeyUp(event) {
   if (event.key === modeExitKey) {
     modeExitKey = undefined;
     event.preventDefault();
   }
   if (tokenControl?.heldRotation?.key === (event.code || event.key.toLowerCase())) stopRotation(tokenControl);
-});
+}
 
-form.addEventListener("keydown", (event) => {
-  if (event.target !== input && (event.target !== moveButton || !tokenControl)) return;
+function handleControlKeyDown(event) {
   const physicalKey = event.code || event.key.toLowerCase();
   if (event.repeat && tokenControl?.heldRotation?.key === physicalKey) {
     event.preventDefault();
@@ -588,7 +612,7 @@ form.addEventListener("keydown", (event) => {
       if (event.repeat) return;
       modeExitKey = event.key;
       stopTokenControl();
-      input.focus();
+      if (!combatWindow) input.focus();
     } else if (/^[1-9]$/.test(key) && !event.ctrlKey && !event.altKey && !event.metaKey) {
       event.preventDefault();
       if (!event.repeat) useAvatarSlot(tokenControl, key);
@@ -620,9 +644,42 @@ form.addEventListener("keydown", (event) => {
     }
     return;
   }
-  if (event.key !== "Enter" || event.shiftKey) return;
+  if (combatWindow || event.key !== "Enter" || event.shiftKey) return;
   event.preventDefault();
   form.requestSubmit();
+}
+
+async function focusChatFromCombat() {
+  stopTokenControl();
+  combatAvatarId = undefined;
+  await OBR.action.open();
+  requestChatShortcut(OBR, "chat");
+}
+
+form.addEventListener("keyup", handleControlKeyUp);
+form.addEventListener("keydown", (event) => {
+  if (event.target === input || (event.target === moveButton && tokenControl)) handleControlKeyDown(event);
+});
+if (combatWindow) window.addEventListener("focus", () => {
+  if (avatar && !tokenControl) {
+    combatAvatarId = avatar.id;
+    startTokenControl();
+  }
+});
+combatWindow?.addEventListener("keyup", (event) => {
+  if (!event.target.closest("dialog")) handleControlKeyUp(event);
+});
+combatWindow?.addEventListener("keydown", (event) => {
+  if (event.target.closest("dialog") || event.isComposing || event.keyCode === 229) return;
+  const pressingSpace = event.key === " " && !event.ctrlKey && !event.altKey && !event.metaKey;
+  if (pressingSpace && !targeting?.editing() && !tokenControl?.missileLevelPending) {
+    event.preventDefault();
+    if (!event.repeat) void focusChatFromCombat().catch(console.error);
+    return;
+  }
+  // Enter activates the focused Apply or Undo button as usual.
+  if (event.key === "Enter" && event.target.closest("button, input")) return;
+  if (tokenControl) handleControlKeyDown(event);
 });
 
 form.addEventListener("submit", async (event) => {
@@ -981,6 +1038,7 @@ function setupSettings() {
     void refresh();
   }
   document.addEventListener("keydown", (event) => {
+    if (combatWindow && event.target.closest("dialog")) return;
     if (!["F1", "F2", "F3", "F4"].includes(event.key) || event.ctrlKey || event.altKey ||
         event.metaKey || event.shiftKey || event.isComposing) return;
     event.preventDefault();
@@ -988,9 +1046,11 @@ function setupSettings() {
     if (event.repeat) return;
     if (event.key === "F4") void cameraFollow.toggle().catch(console.error);
     else if (event.key === "F3") void centerAvatar(OBR).catch(console.error);
-    else openFromShortcut(event.key === "F1" ? "chat" : "move");
+    else if (!combatWindow) openFromShortcut(event.key === "F1" ? "chat" : "move");
+    else if (event.key === "F1") void focusChatFromCombat().catch(console.error);
+    else startTokenControl();
   }, true);
-  if (!welcome) listenForChatShortcut(OBR, openFromShortcut);
+  if (!welcome && !combatWindow) listenForChatShortcut(OBR, openFromShortcut);
   setupDiscordPanel(() => select(0), () => select(2));
   fields.addEventListener("submit", (event) => event.preventDefault());
   fields.addEventListener("input", () => {
@@ -1021,7 +1081,7 @@ OBR.onReady(() => {
     const nextSelection = JSON.stringify(selection ?? []);
     if (nextSelection !== mapSelection) {
       mapSelection = nextSelection;
-      if (tokenControl && selection?.some((id) => id !== tokenControl.tokenId)) {
+      if (!combatWindow && tokenControl && selection?.some((id) => id !== tokenControl.tokenId)) {
         moveButton.focus({ preventScroll: true });
       }
     }
@@ -1046,6 +1106,7 @@ OBR.onReady(() => {
   });
   OBR.scene.onReadyChange((ready) => {
     if (!ready) {
+      combatAvatarId = undefined;
       stopTokenControl();
       showPlayerStats?.();
     }

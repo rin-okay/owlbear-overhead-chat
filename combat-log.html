@@ -4,14 +4,24 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>combat log</title>
-  <link rel="stylesheet" href="./combat-log.css?v=2.8.8">
-  <script type="module" src="./combat-log-panel.js?v=2.8.8"></script>
+  <link rel="stylesheet" href="./combat-log.css?v=2.8.9">
+  <script type="module" src="./combat-log-panel.js?v=2.8.9"></script>
 </head>
 <body>
-  <header><h1>combat log</h1><button id="close" type="button" aria-label="close combat log">×</button></header>
-  <main id="log" role="log" aria-label="combat results">
-    <p id="empty">No combat yet.</p>
-    <ol id="entries"></ol>
+  <header><h1>combat log</h1><button id="combat-close" type="button" aria-label="close combat log">×</button></header>
+  <main id="combat-transcript" role="log" aria-label="combat results">
+    <p id="combat-empty">No combat yet.</p>
+    <ol id="combat-entries"></ol>
   </main>
+  <dialog id="custom-damage" aria-labelledby="custom-label">
+    <form method="dialog">
+      <label id="custom-label" for="custom-amount">custom damage</label>
+      <input id="custom-amount" type="number" min="0" step="1" required autofocus>
+      <div>
+        <button type="submit" value="apply">apply</button>
+        <button type="submit" value="cancel" formnovalidate>cancel</button>
+      </div>
+    </form>
+  </dialog>
 </body>
 </html>

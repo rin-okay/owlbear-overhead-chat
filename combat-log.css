@@ -5,32 +5,66 @@
   color: #f5efff;
 }
 * { box-sizing: border-box; }
-body { display: flex; flex-direction: column; height: 100dvh; margin: 0; }
+body, #combat-window { display: flex; flex-direction: column; height: 100dvh; margin: 0; }
 header {
   display: flex; align-items: center; justify-content: space-between;
   padding: 8px 12px; border-bottom: 1px solid #544762;
 }
 h1 { margin: 0; font-size: 15px; font-weight: 650; }
-button, input, select { font: inherit; }
-button, summary { cursor: pointer; }
-button, select, input {
+button, input { font: inherit; }
+button { cursor: pointer; }
+button, input[type="number"] {
   color: inherit; background: #312940; border: 1px solid #645775;
   border-radius: 6px; padding: 4px 8px;
 }
-button:hover, summary:hover { background: #423353; }
+button:enabled:hover { background: #423353; }
 button:disabled { cursor: default; opacity: .6; }
 :focus-visible { outline: 2px solid #dac9fd; outline-offset: 2px; }
-#close { line-height: 1; font-size: 19px; min-width: 29px; min-height: 29px; }
-main { flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; }
-#entries { margin: 0; padding: 0; list-style: none; }
+#combat-close { line-height: 1; font-size: 19px; min-width: 29px; min-height: 29px; }
+#combat-transcript { flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; }
+#combat-entries { margin: 0; padding: 0; list-style: none; }
 .entry { padding: 10px 12px; border-bottom: 1px solid #483c59; overflow-wrap: anywhere; }
 p { margin: 0; }
-#empty { padding: 12px; color: #d2c4e1; }
+#combat-empty { padding: 12px; color: #d2c4e1; }
 .outcome { margin-top: 3px; color: #d2c4e1; }
 .damage { margin-top: 3px; font-variant-numeric: tabular-nums; }
-details { margin-top: 5px; }
-summary { width: fit-content; border-radius: 5px; padding: 2px 5px; color: #dfccfc; }
-form { display: flex; align-items: center; flex-wrap: wrap; gap: 5px; margin: 4px 0; }
-input { width: 6em; }
+.apply-row {
+  display: flex; align-items: center; gap: 8px; margin: 5px 0 0;
+  white-space: nowrap; font-size: 12px;
+}
+.apply-row label { display: inline-flex; align-items: center; gap: 3px; cursor: pointer; }
+.apply-row input {
+  appearance: none; display: grid; place-items: center; margin: 0;
+  width: 13px; height: 13px; border: 1px solid #b5a4c7; border-radius: 2px;
+  color: #211c2b; cursor: pointer;
+}
+.apply-row input:checked { background: #dac9fd; border-color: #dac9fd; }
+.apply-row input:checked::after { content: "✓"; line-height: 1; font-weight: 700; }
+.apply-row input:disabled { opacity: .55; }
+.apply-row button { min-height: 25px; padding: 2px 7px; }
+.apply-row .applied { min-width: 34px; color: #a6edbf; opacity: 1; }
+.apply-row .undo { font-size: 16px; line-height: 1; }
+dialog {
+  width: min(260px, calc(100% - 24px)); padding: 14px;
+  border: 1px solid #645775; border-radius: 8px; background: #211c2b; color: inherit;
+}
+dialog::backdrop { background: #100b19b0; }
+dialog label, dialog input { display: block; width: 100%; margin-bottom: 8px; }
+dialog form > div { display: flex; justify-content: flex-end; gap: 6px; }
+dialog button[value=cancel] { order: -1; }
 [hidden] { display: none !important; }
 .feedback { color: #c5b2d9; font-size: 12px; margin-top: 4px; }
+body.combat-view { text-transform: none; }
+#combat-window label { margin: 0; color: inherit; }
+#combat-window header { flex: none; }
+#combat-window #combat-close { padding: 2px 6px; }
+#combat-controls-status {
+  flex: none; padding: 4px 12px; border-top: 1px solid #544762;
+  color: #d2c4e1; font-size: 12px;
+}
+#combat-controls-status #move-mode-label { position: static; padding: 0; font-size: inherit; }
+#combat-controls-status #status,
+#combat-controls-status #skill-cast-status,
+#combat-controls-status #move-warning { min-height: 0; margin: 0; }
+#combat-controls-status p:empty { display: none; }
+body.combat-view > main[hidden] { display: none; }

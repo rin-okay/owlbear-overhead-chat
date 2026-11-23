@@ -37,9 +37,9 @@ The GM can turn on **habbo hotel mode** in the **gm** tab for pixel-style bubble
 
 ## Combat log
 
-Click **combat log** in Overhead Chat to open the bottom-right panel. It stays open while you use the map. The log shows recent casts, targets, misses, blocks, and the dice behind rolled damage. Combat history starts when you join the scene and clears on a scene change.
+Click **combat log** in Overhead Chat to open the bottom-right panel. It stays open while you use the map. The avatar has the same move-mode controls while the log has focus. Press Space to focus chat, or use it to confirm a map target while targeting. The log shows recent casts, targets, misses, blocks, and the dice behind rolled damage. Combat history starts when you join the scene and clears on a scene change.
 
-For each damaging hit, the GM can choose **apply** to subtract full damage, half rounded down, or a custom amount from that target's mapped current HP in Forge!. Hits with no extension damage roll accept a custom amount. Set current HP on the Forge! unit first. A successful application is marked on the combat entry.
+For each damaging hit, the GM can choose **full**, **half** (rounded down), or **custom** and apply damage to the target’s mapped current HP in Forge!. The custom choice opens an amount dialog. Press Enter to confirm and apply. Hits with no extension damage roll accept a custom amount. Set current HP on the Forge! unit first. After applying, the check mark confirms the update and **⟲** adds that hit’s applied amount back to current HP.
 
 ## Skill hotkeys with Embers
 

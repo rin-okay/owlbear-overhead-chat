@@ -1,9 +1,9 @@
 import OBR from "./obr.js";
-import { COMBAT_POPOVER, formatCombatDamage, openCombatChannel } from "./combat-log.js?v=2.8.8";
-import { appliedCombatDamage, applyForgeDamage, forgeHpKey, hasForgeHp } from "./forge-hp.js?v=2.8.8";
+import { COMBAT_POPOVER, formatCombatDamage, openCombatChannel } from "./combat-log.js?v=2.8.9";
+import { appliedCombatDamage, applyForgeDamage, forgeHpKey, hasForgeHp, undoForgeDamage } from "./forge-hp.js?v=2.8.9";
 
-const entries = document.querySelector("#entries");
-const empty = document.querySelector("#empty");
+const entries = document.querySelector("#combat-entries");
+const empty = document.querySelector("#combat-empty");
 const displayed = new Map();
 let role;
 let hpKey;
@@ -17,72 +17,103 @@ function paragraph(text, className) {
   return element;
 }
 
+const customDialog = document.querySelector("#custom-damage");
+const customInput = customDialog.querySelector("input");
+
+function askCustomDamage(target) {
+  customDialog.querySelector("label").textContent = "custom damage for " + target.name;
+  customDialog.returnValue = "";
+  customInput.value = "";
+  return new Promise((resolve) => {
+    customDialog.addEventListener("close", () => {
+      resolve(customDialog.returnValue === "apply" ? customInput.valueAsNumber : undefined);
+    }, { once: true });
+    customDialog.showModal();
+    customInput.focus();
+  });
+}
+
 function applyControls(entry, target, parent) {
-  const details = document.createElement("details");
-  const summary = document.createElement("summary");
-  summary.textContent = "apply";
   const form = document.createElement("form");
-  const mode = document.createElement("select");
-  mode.setAttribute("aria-label", "damage amount for " + target.name);
-  if (entry.damage) {
-    mode.add(new Option("full damage", "full"));
-    mode.add(new Option("half damage", "half"));
-  }
-  mode.add(new Option("custom amount", "custom"));
-  const custom = document.createElement("input");
-  custom.type = "number";
-  custom.min = "0";
-  custom.step = "1";
-  custom.placeholder = "amount";
-  custom.setAttribute("aria-label", "custom damage");
+  form.className = "apply-row";
+  form.setAttribute("aria-label", "damage for " + target.name);
+  const choices = ["full", "half", "custom"].map((kind) => {
+    const label = document.createElement("label");
+    const input = document.createElement("input");
+    input.type = "radio";
+    input.name = "damage";
+    input.value = kind;
+    label.append(input, kind);
+    form.append(label);
+    return input;
+  });
+  const [full, , custom] = choices;
+  (entry.damage ? full : custom).checked = true;
   const button = document.createElement("button");
   button.type = "submit";
-  button.textContent = "apply damage";
+  const undo = document.createElement("button");
+  undo.type = "button";
+  undo.className = "undo";
+  undo.textContent = "⟲";
+  undo.title = "undo damage";
+  undo.setAttribute("aria-label", "undo damage to " + target.name);
   const feedback = paragraph("", "feedback");
   feedback.setAttribute("role", "status");
-  let applied;
+  let localReceipt;
   let busy = false;
   let error = "";
 
   function update() {
     const token = tokens.get(target.id);
-    const receipt = appliedCombatDamage(token, entry.id) ?? applied;
+    if (localReceipt && localReceipt.token !== token) localReceipt = undefined;
+    const receipt = localReceipt ? localReceipt.amount : appliedCombatDamage(token, entry.id);
+    const applied = receipt !== undefined;
     const ready = hasForgeHp(token, hpKey);
-    details.hidden = role !== "GM" || receipt !== undefined || !ready;
+    form.hidden = role !== "GM" || (!applied && !ready);
+    choices.forEach((input) => { input.disabled = applied || busy || (!entry.damage && input !== custom); });
+    button.disabled = applied || busy;
+    button.textContent = applied ? "✓" : "apply";
+    button.classList.toggle("applied", applied);
+    button.setAttribute("aria-label", applied ? "damage applied" : "apply damage to " + target.name);
+    undo.hidden = !applied;
+    undo.disabled = busy || !token;
     feedback.hidden = role !== "GM";
-    feedback.textContent = receipt !== undefined ? "applied " + receipt + " damage"
-      : error || (!token ? "target unavailable" : !ready ? "set this token’s current HP in Forge! to apply damage" : "");
-    const manual = mode.value === "custom";
-    custom.hidden = !manual;
-    custom.required = manual;
-    custom.disabled = !manual || busy;
-    mode.disabled = button.disabled = busy;
+    feedback.textContent = error || (applied ? "applied " + receipt + " damage"
+      : !token ? "target unavailable" : !ready ? "set this token’s current HP in Forge! to apply damage" : "");
   }
 
-  mode.addEventListener("change", update);
-  form.addEventListener("submit", async (event) => {
-    event.preventDefault();
-    if (busy || details.hidden) return;
-    const amount = mode.value === "custom" ? custom.valueAsNumber
-      : mode.value === "half" ? Math.floor(entry.damage.amount / 2) : entry.damage.amount;
+  async function submit(kind, undoing = false) {
+    if (busy || form.hidden || role !== "GM") return;
     const version = sceneVersion;
     const current = () => version === sceneVersion && displayed.has(entry.id);
     busy = true;
     error = "";
     update();
     try {
-      applied = await applyForgeDamage(OBR, target.id, entry.id, amount, current);
-      details.open = false;
+      const amount = undoing ? undefined : kind === "custom" ? await askCustomDamage(target)
+        : kind === "half" ? Math.floor(entry.damage.amount / 2) : entry.damage.amount;
+      if ((!undoing && amount === undefined) || !current()) return;
+      const before = tokens.get(target.id);
+      const applied = undoing
+        ? await undoForgeDamage(OBR, target.id, entry.id, current)
+        : await applyForgeDamage(OBR, target.id, entry.id, amount, current);
+      if (current() && tokens.get(target.id) === before) localReceipt = { token: before, amount: applied };
     } catch (cause) {
-      error = cause.message || "Couldn’t apply damage.";
+      error = cause.message || "Couldn’t update damage.";
     } finally {
       busy = false;
       if (current()) update();
     }
+  }
+
+  custom.addEventListener("change", () => { if (custom.checked) void submit("custom"); });
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    if (!button.disabled) return submit(choices.find((input) => input.checked)?.value);
   });
-  form.append(mode, custom, button);
-  details.append(summary, form);
-  parent.append(details, feedback);
+  undo.addEventListener("click", () => submit(undefined, true));
+  form.append(button, undo);
+  parent.append(form, feedback);
   update();
   return update;
 }
@@ -117,14 +148,14 @@ function render(log) {
     item.remove();
     displayed.delete(id);
   }
-  const atTop = document.querySelector("#log").scrollTop < 12;
+  const atTop = document.querySelector("#combat-transcript").scrollTop < 12;
   for (const entry of log) {
     if (displayed.has(entry.id)) continue;
     const row = createEntry(entry);
     displayed.set(entry.id, row);
     entries.prepend(row.item);
   }
-  if (atTop) document.querySelector("#log").scrollTop = 0;
+  if (atTop) document.querySelector("#combat-transcript").scrollTop = 0;
   empty.hidden = displayed.size > 0;
 }
 
@@ -138,7 +169,7 @@ function updateItems(items) {
 }
 
 OBR.onReady(() => {
-  document.querySelector("#close").addEventListener("click", () => void OBR.popover.close(COMBAT_POPOVER));
+  document.querySelector("#combat-close").addEventListener("click", () => void OBR.popover.close(COMBAT_POPOVER));
   OBR.player.onChange((player) => { role = player.role; refreshControls(); });
   OBR.room.onMetadataChange((metadata) => { hpKey = forgeHpKey(metadata); refreshControls(); });
   let itemRevision = 0;
@@ -155,6 +186,7 @@ OBR.onReady(() => {
   OBR.scene.onReadyChange((ready) => {
     itemRevision++;
     sceneVersion++;
+    if (customDialog.open) customDialog.close();
     updateItems([]);
     render([]);
     if (ready) void loadItems().catch(console.error);
