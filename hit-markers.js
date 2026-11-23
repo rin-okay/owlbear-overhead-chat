@@ -1,7 +1,7 @@
 import { isProjectileToken } from "./projectile-collision.js?v=2.6.13";
 import { skillConnections } from "./skills.js?v=2.6.15";
 import { validMeleeDamage } from "./melee-damage.js?v=2.7.19";
-import { validSpellDamage } from "./spell-damage.js?v=2.8.3";
+import { MAGIC_MISSILE_INTERVAL, MAGIC_MISSILE_MAX_LEVEL, validMagicMissileDamage, validSpellDamage } from "./spell-damage.js?v=2.8.4";
 
 export const HIT_MARKERS = "chat.overhead.skills/hits.v1";
 export const MELEE_HIT_CUE = "chat.overhead.skills/melee-hit-cue.v1";
@@ -50,7 +50,7 @@ export function setupHitMarkers(obr, buildLabel) {
     });
   }
 
-  async function show(tokenIds, current, damage) {
+  async function show(tokenIds, current, damage, xOffset = 0) {
     const [targets, scale] = await Promise.all([
       obr.scene.items.getItems(tokenIds), obr.viewport.getScale(),
     ]);
@@ -68,7 +68,7 @@ export function setupHitMarkers(obr, buildLabel) {
         .fontSize(maxRoll ? 32 : 21).fontWeight(maxRoll ? 900 : 700)
         .fillColor(maxRoll ? "#ffc278" : "#ff4d61")
         .strokeColor(maxRoll ? "#78142b" : "#26070d").strokeWidth(maxRoll ? 2 : 1).strokeOpacity(1)
-        .position({ x: bounds.center.x, y: bounds.min.y - 12 / scale })
+        .position({ x: bounds.center.x + xOffset / scale, y: bounds.min.y - 12 / scale })
         .layer("ATTACHMENT").locked(true).attachedTo(target.id).build();
       label.disableHit = true;
       label.disableAttachmentBehavior = ["COPY", "LOCKED", "ROTATION", "SCALE"];
@@ -101,6 +101,11 @@ export function setupHitMarkers(obr, buildLabel) {
         !data.tokenIds.every((id) => typeof id === "string" && id.length && id.length <= 128) ||
         !Number.isFinite(data.delay) || data.delay < 0 || data.delay > 6000 ||
         (data.damage !== undefined && !validMeleeDamage(data.damage) && !validSpellDamage(data.damage))) return;
+    const followUps = data.missileFollowUps;
+    if (followUps !== undefined &&
+        (!Array.isArray(followUps) || followUps.length < 2 || followUps.length > MAGIC_MISSILE_MAX_LEVEL + 1 ||
+          data.useAnimationCue === true || data.delay + followUps.length * MAGIC_MISSILE_INTERVAL > 6000 ||
+          !validMagicMissileDamage(data.damage) || !followUps.every(validMagicMissileDamage))) return;
     const version = sceneVersion;
     const current = () => version === sceneVersion;
     try {
@@ -110,12 +115,22 @@ export function setupHitMarkers(obr, buildLabel) {
       for (const [id, expiry] of recent) if (expiry <= now) recent.delete(id);
       if (recent.has(data.requestId)) return;
       recent.set(data.requestId, now + 10000);
+      const tokenIds = [...new Set(data.tokenIds)];
+      if (followUps) {
+        // Separate splats that are still on screen when the next dart hits.
+        const offsets = [0, -22, 22, -44, 44];
+        await Promise.all([data.damage, ...followUps].map(async (damage, index) => {
+          await wait(data.delay + index * MAGIC_MISSILE_INTERVAL);
+          if (current()) await show(tokenIds, current, damage, offsets[index % offsets.length]);
+        }));
+        return;
+      }
       if (data.useAnimationCue === true) {
         await waitForAnimationCue(data.requestId, self.connectionId, data.delay);
       } else {
         await wait(data.delay);
       }
-      if (current()) await show([...new Set(data.tokenIds)], current, data.damage);
+      if (current()) await show(tokenIds, current, data.damage);
     } catch (error) {
       console.error("Overhead Chat could not draw a hit marker", error);
     }

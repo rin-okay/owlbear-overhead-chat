@@ -3,9 +3,9 @@ import { canSpeak, MELEE_HIT_TIMING, normalizeMeleeHitTiming } from "./rules.js?
 import {
   areaHits, clearSpellPath, coneHits, isProjectileToken, isProjectileWall, openMeleeDoor, projectileImpact, teleportLandingClear,
 } from "./projectile-collision.js?v=2.8.3";
-import { HIT_MARKERS, MELEE_HIT_CUE } from "./hit-markers.js?v=2.8.3";
+import { HIT_MARKERS, MELEE_HIT_CUE } from "./hit-markers.js?v=2.8.4";
 import { rollMeleeDamage } from "./melee-damage.js?v=2.7.19";
-import { eldritchBeamCount, rollSpellDamage } from "./spell-damage.js?v=2.8.3";
+import { eldritchBeamCount, MAGIC_MISSILE_INTERVAL, MAGIC_MISSILE_MAX_LEVEL, rollMagicMissileDart, rollSpellDamage } from "./spell-damage.js?v=2.8.4";
 import {
   DEFAULT_WEAPON, EMBERS_EFFECTS, MELEE_DURATION_MS, SKILLS, SKILL_REQUEST, SKILL_RESULT,
   aimsAtLocation, availableSkills, availableWeapons, friendlyFireMode, readSkills, skillConnections, skillEffect, spellParameter, tokenTeams, turnToHeading,
@@ -99,6 +99,12 @@ export function setupSkillHost(obr, buildImage) {
       const weapon = data.weapon ?? DEFAULT_WEAPON;
       if (data.skill === "spear" && !weapons.includes(weapon)) {
         await answer({ ...result, error: "This avatar hasn’t been granted that weapon." });
+        return;
+      }
+      const missile = data.skill === "missile";
+      const spellLevel = data.spellLevel === undefined ? 1 : data.spellLevel;
+      if (missile && (!Number.isInteger(spellLevel) || spellLevel < 1 || spellLevel > MAGIC_MISSILE_MAX_LEVEL)) {
+        await answer({ ...result, error: "Choose a Magic Missile spell level from 1 to 9." });
         return;
       }
       const now = Date.now();
@@ -263,10 +269,17 @@ export function setupSkillHost(obr, buildImage) {
           }
         }
       }
+      if (missile) {
+        const dartCount = spellLevel + 2;
+        for (let index = 1; index < dartCount; index++) {
+          instructions.push({ ...instruction, delay: index * MAGIC_MISSILE_INTERVAL });
+        }
+      }
       const meleeHit = Boolean(skill.meleeReach && hitTokenIds.length);
-      const sendMarkers = (delay, damage, useAnimationCue = false) => obr.broadcast.sendMessage(HIT_MARKERS, {
+      const sendMarkers = (delay, damage, { useAnimationCue = false, missileFollowUps } = {}) => obr.broadcast.sendMessage(HIT_MARKERS, {
         requestId: data.requestId, tokenIds: hitTokenIds, delay, useAnimationCue,
         ...(damage ? { damage } : {}),
+        ...(missileFollowUps ? { missileFollowUps } : {}),
       }, { destination: "ALL" }).catch((error) => console.error("Overhead Chat hit markers", error));
       if (meleeHit) {
         const metadata = await obr.room.getMetadata().catch(() => ({}));
@@ -280,7 +293,7 @@ export function setupSkillHost(obr, buildImage) {
         } else {
           instructions.push({ ...cue, delay: cueDelay });
         }
-        await sendMarkers(cueDelay + 750, rollMeleeDamage(weapon, token), true);
+        await sendMarkers(cueDelay + 750, rollMeleeDamage(weapon, token), { useAnimationCue: true });
         if (version !== sceneVersion) return;
       }
       await obr.broadcast.sendMessage(EMBERS_EFFECTS, {
@@ -290,7 +303,10 @@ export function setupSkillHost(obr, buildImage) {
         await openMeleeDoor(obr, doorId, sender.role, () => version === sceneVersion)
           .catch((error) => console.error("Overhead Chat could not open the door", error));
       }
-      if (version === sceneVersion && hitTokenIds.length && !meleeHit) {
+      if (version === sceneVersion && hitTokenIds.length && missile) {
+        const missileFollowUps = instructions.slice(1).map(() => rollMagicMissileDart());
+        await sendMarkers(skill.hitDelay, rollMagicMissileDart(), { missileFollowUps });
+      } else if (version === sceneVersion && hitTokenIds.length && !meleeHit) {
         const damage = data.skill === "eldritch-blast" || data.skill === "shatter"
           ? rollSpellDamage(data.skill, token) : undefined;
         await sendMarkers(skill.impact?.delay ?? skill.hitDelay, damage);

@@ -115,7 +115,7 @@ export function setupSkillPanel(obr, getAvatar, keyAllowed, showSpells) {
     pending.delete(type);
   }
 
-  async function request(type, token, id, revision, location) {
+  async function request(type, token, id, revision, location, spellLevel) {
     const [{ gm, self }, selection] = await Promise.all([
       skillConnections(obr), type === "cast" ? obr.player.getSelection().catch(() => undefined) : undefined,
     ]);
@@ -144,6 +144,7 @@ export function setupSkillPanel(obr, getAvatar, keyAllowed, showSpells) {
         requestId, tokenId: token.id, type,
         ...(type === "cast" ? { skill: id, facing: facingFor(preferences, token) } : {}),
         ...(id === "spear" ? { weapon: selectedWeapon(token.id) } : {}),
+        ...(id === "missile" && spellLevel !== undefined ? { spellLevel } : {}),
         ...(targetIds ? { targetIds } : targetId ? { targetId } : {}),
         ...(location && aimsAtLocation(id) ? { targetLocation: location } : {}),
       }, { destination: "ALL" });
@@ -204,10 +205,10 @@ export function setupSkillPanel(obr, getAvatar, keyAllowed, showSpells) {
     if (!playerPanel.closest("[hidden]")) refresh(getAvatar(), true);
   });
 
-  async function cast(id, token, location) {
+  async function cast(id, token, location, spellLevel) {
     if (pending.has("cast")) return;
     try {
-      await request("cast", token, id, undefined, location);
+      await request("cast", token, id, undefined, location, spellLevel);
     } catch {
       setCastStatus("Couldn’t send the cast to the GM.");
     }

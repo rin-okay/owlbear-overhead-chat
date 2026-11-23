@@ -10,9 +10,9 @@ import {
 } from "./session.js?v=2.7.21";
 
 import { drawBubble, normalizeAppearance, prepareBubbleFont } from "./appearance.js?v=2.7.9";
-import { setupDiscordPanel } from "./discord-panel.js?v=2.8.3";
+import { setupDiscordPanel } from "./discord-panel.js?v=2.8.4";
 import { setupAvatarPanel } from "./avatar-panel.js?v=2.8.3";
-import { setupSkillGrants, setupSkillPanel } from "./skill-panel.js?v=2.8.3";
+import { setupSkillGrants, setupSkillPanel } from "./skill-panel.js?v=2.8.4";
 import { setupStatsEditor } from "./stats-panel.js?v=2.7.21";
 import { EMOTE } from "./emotes.js?v=2.7.21";
 import { setupTargeting } from "./targeting.js?v=2.7.17";
@@ -347,7 +347,7 @@ async function moveAvatar(mode) {
   try {
     while (mode === tokenControl && !mode.switching && mode.actions.length) {
       const tokenId = mode.tokenId;
-      const { offset, rotation, mirror, artwork, onApplied, skill, targetLocation, emote } = mode.actions.shift();
+      const { offset, rotation, mirror, artwork, onApplied, skill, targetLocation, spellLevel, emote } = mode.actions.shift();
       const [{ token }, grid, pan] = await Promise.all([
         getAvatar(),
         offset ? (mode.movementGrid ??= readMovementGrid(OBR.scene.grid)) : undefined,
@@ -357,7 +357,7 @@ async function moveAvatar(mode) {
       if (token?.id !== tokenId || token.locked) throw new Error("Avatar is unavailable or locked.");
       if (offset && (!Number.isFinite(grid.dpi) || grid.dpi <= 0)) throw new Error("Scene grid size unavailable.");
       if (skill) {
-        await skillPanel.cast(skill, token, targetLocation);
+        await skillPanel.cast(skill, token, targetLocation, spellLevel);
         continue;
       }
 
@@ -483,8 +483,26 @@ function useAvatarSlot(mode, key) {
 }
 
 function updateMoveModeLabel() {
-  moveModeLabel.textContent = targeting?.editing() ? "set target · wasd, space to set"
+  moveModeLabel.textContent = tokenControl?.missileLevelPending ? "magic missile level · 1–9, esc to cancel"
+    : targeting?.editing() ? "set target · wasd, space to set"
     : targeting?.location() ? "move mode · target set" : "move mode enabled";
+}
+
+function handleMissileLevelKey(event) {
+  const mode = tokenControl;
+  if (!mode?.missileLevelPending) return false;
+  if (event.ctrlKey || event.altKey || event.metaKey) return false;
+  if (event.repeat) return true;
+
+  const digit = event.code ? /^Digit([1-9])$/.exec(event.code)?.[1] : /^[1-9]$/.exec(event.key)?.[0];
+  if (digit || event.key === "Escape") {
+    mode.missileLevelPending = false;
+    updateMoveModeLabel();
+    if (digit && !mode.switching) {
+      queueAvatarAction(mode, { skill: "missile", targetLocation: targeting?.location(), spellLevel: Number(digit) });
+    }
+  }
+  return true;
 }
 
 function handleTargetKey(event) {
@@ -511,7 +529,12 @@ moveButton.addEventListener("blur", (event) => {
   stopRotation(tokenControl);
   if (event.relatedTarget) stopTokenControl();
 });
-window.addEventListener("blur", () => stopRotation(tokenControl));
+window.addEventListener("blur", () => {
+  stopRotation(tokenControl);
+  if (!tokenControl?.missileLevelPending) return;
+  tokenControl.missileLevelPending = false;
+  updateMoveModeLabel();
+});
 document.addEventListener("pointerdown", (event) => {
   if (event.target !== input && !moveButton.contains(event.target)) stopTokenControl();
 });
@@ -532,7 +555,7 @@ form.addEventListener("keydown", (event) => {
     return;
   }
   if (event.isComposing || event.keyCode === 229) return;
-  if (handleTargetKey(event)) {
+  if (handleMissileLevelKey(event) || handleTargetKey(event)) {
     event.preventDefault();
     return;
   }
@@ -567,11 +590,17 @@ form.addEventListener("keydown", (event) => {
       }
       queueAvatarAction(tokenControl, action);
       if (action.rotation) holdRotation(tokenControl, physicalKey, action);
-    } else if (!event.ctrlKey && !event.altKey && !event.metaKey && !event.shiftKey) {
+    } else if (!event.ctrlKey && !event.altKey && !event.metaKey) {
       const skill = skillPanel?.skillForKey(key);
-      if (skill && !tokenControl.switching) {
-        event.preventDefault();
-        if (!event.repeat && tokenControl.actions.length < 4) queueAvatarAction(tokenControl, { skill, targetLocation: targeting?.location() });
+      if (!skill || tokenControl.switching || (event.shiftKey && skill !== "missile")) return;
+      event.preventDefault();
+      if (event.repeat || tokenControl.actions.length >= 4) return;
+      if (event.shiftKey) {
+        stopRotation(tokenControl);
+        tokenControl.missileLevelPending = true;
+        updateMoveModeLabel();
+      } else {
+        queueAvatarAction(tokenControl, { skill, targetLocation: targeting?.location() });
       }
     }
     return;

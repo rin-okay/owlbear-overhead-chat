@@ -1,5 +1,17 @@
 import { readTokenStats } from "./stats.js?v=2.7.21";
 
+export const MAGIC_MISSILE_INTERVAL = 200;
+export const MAGIC_MISSILE_MAX_LEVEL = 9;
+
+export function rollMagicMissileDart(random = Math.random) {
+  const amount = 2 + Math.floor(random() * 4);
+  return { amount, type: "force", maxRoll: amount === 5 };
+}
+
+export function validMagicMissileDamage(damage) {
+  return validSpellDamage(damage) && damage.type === "force" && damage.amount >= 2 && damage.amount <= 5;
+}
+
 export function eldritchBeamCount(token) {
   const { level } = readTokenStats(token).details;
   return 1 + Number(level >= 5) + Number(level >= 11) + Number(level >= 17);
