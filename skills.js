@@ -170,7 +170,7 @@ export function skillEffect(skillId, token, center, dpi, facing, weapon = DEFAUL
     // The heart travels vertically around the center of the clip over one loop.
     return {
       type: "effect", id: effect, layer: "ATTACHMENT", loops: 1,
-      effectProperties: { source: { x: center.x, y: center.y }, size: 2, disableHit: true },
+      effectProperties: { source: { x: center.x, y: center.y }, size: 2, disableHit: true, attachedTo: token.id },
     };
   }
   const rotation = token.rotation + artworkFacingAngle(token, facing);

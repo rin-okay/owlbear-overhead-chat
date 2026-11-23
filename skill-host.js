@@ -6,7 +6,7 @@ import { rollMeleeDamage } from "./melee-damage.js?v=2.7.19";
 import {
   DEFAULT_WEAPON, EMBERS_EFFECTS, MELEE_DURATION_MS, SKILLS, SKILL_REQUEST, SKILL_RESULT,
   aimsAtLocation, availableSkills, availableWeapons, friendlyFireMode, readSkills, skillConnections, skillEffect, spellParameter, tokenTeams, turnToHeading,
-} from "./skills.js?v=2.7.16";
+} from "./skills.js?v=2.7.20";
 
 function aimAtTarget(source, target, range = 0, passThrough = false) {
   if (![target?.center?.x, target?.center?.y].every(Number.isFinite)) return;
