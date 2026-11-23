@@ -60,6 +60,16 @@ export const SKILLS = {
     parameter: { label: "length (in cells)", min: 1, defaultValue: 3 },
   },
   "fire-bolt": { name: "fire bolt", key: "j", effect: "fire_bolt", range: 24, hitDelay: 800 },
+  "eldritch-blast": {
+    name: "eldritch blast", key: "u", effect: "eldritch_blast", range: 24, hitDelay: 1000,
+  },
+  "misty-step": {
+    name: "misty step", key: "i", effect: "misty_step.out", location: "teleport", range: 6,
+  },
+  shatter: {
+    name: "shatter", key: "o", effect: "shatter", location: "area", range: 12, hitDelay: 650,
+    parameter: { label: "radius (in cells)", min: 1, defaultValue: 2 },
+  },
   fireball: {
     name: "fireball", key: "k", effect: "fireball.beam", range: 30,
     impact: { effect: "fireball.explosion", delay: 3000 },
@@ -177,7 +187,9 @@ export function skillEffect(skillId, token, center, dpi, facing, weapon = DEFAUL
   const radians = rotation * Math.PI / 180;
   const source = { x: center.x, y: center.y };
   const effectProperties = { source, disableHit: true };
-  if (skill.range) {
+  if (skill.location) {
+    effectProperties.size = skill.location === "area" ? parameter * 2 : 2;
+  } else if (skill.range) {
     effectProperties.destination = {
       x: source.x + dpi * skill.range * Math.cos(radians),
       y: source.y + dpi * skill.range * Math.sin(radians),

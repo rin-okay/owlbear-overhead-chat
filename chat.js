@@ -10,9 +10,9 @@ import {
 } from "./session.js?v=2.7.21";
 
 import { drawBubble, normalizeAppearance, prepareBubbleFont } from "./appearance.js?v=2.7.9";
-import { setupDiscordPanel } from "./discord-panel.js?v=2.8.0";
-import { setupAvatarPanel } from "./avatar-panel.js?v=2.7.21";
-import { setupSkillGrants, setupSkillPanel } from "./skill-panel.js?v=2.7.21";
+import { setupDiscordPanel } from "./discord-panel.js?v=2.8.1";
+import { setupAvatarPanel } from "./avatar-panel.js?v=2.8.1";
+import { setupSkillGrants, setupSkillPanel } from "./skill-panel.js?v=2.8.1";
 import { setupStatsEditor } from "./stats-panel.js?v=2.7.21";
 import { EMOTE } from "./emotes.js?v=2.7.21";
 import { setupTargeting } from "./targeting.js?v=2.7.17";

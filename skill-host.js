@@ -1,14 +1,17 @@
 import { setupBless } from "./bless.js?v=2.7.11";
 import { canSpeak, MELEE_HIT_TIMING, normalizeMeleeHitTiming } from "./rules.js?v=2.6.16";
-import { coneHits, isProjectileToken, isProjectileWall, openMeleeDoor, projectileImpact } from "./projectile-collision.js?v=2.7.3";
-import { HIT_MARKERS, MELEE_HIT_CUE } from "./hit-markers.js?v=2.7.19";
+import {
+  areaHits, clearSpellPath, coneHits, isProjectileToken, isProjectileWall, openMeleeDoor, projectileImpact, teleportLandingClear,
+} from "./projectile-collision.js?v=2.8.1";
+import { HIT_MARKERS, MELEE_HIT_CUE } from "./hit-markers.js?v=2.8.1";
 import { rollMeleeDamage } from "./melee-damage.js?v=2.7.19";
+import { eldritchBeamCount, rollSpellDamage } from "./spell-damage.js?v=2.8.1";
 import {
   DEFAULT_WEAPON, EMBERS_EFFECTS, MELEE_DURATION_MS, SKILLS, SKILL_REQUEST, SKILL_RESULT,
   aimsAtLocation, availableSkills, availableWeapons, friendlyFireMode, readSkills, skillConnections, skillEffect, spellParameter, tokenTeams, turnToHeading,
-} from "./skills.js?v=2.7.20";
+} from "./skills.js?v=2.8.1";
 
-function aimAtTarget(source, target, range = 0, passThrough = false) {
+function aimAtTarget(source, target, range = 0, passThrough = false, maxRange = Infinity) {
   if (![target?.center?.x, target?.center?.y].every(Number.isFinite)) return;
   const dx = target.center.x - source.x;
   const dy = target.center.y - source.y;
@@ -17,11 +20,37 @@ function aimAtTarget(source, target, range = 0, passThrough = false) {
   const width = target.max?.x - target.min?.x;
   const height = target.max?.y - target.min?.y;
   const radius = passThrough && Number.isFinite(width) && Number.isFinite(height) ? Math.hypot(width, height) / 2 : 0;
-  const reach = Math.max(distance + radius, range);
+  const reach = Math.min(maxRange, Math.max(distance + radius, range));
   return {
     heading: Math.atan2(dy, dx) * 180 / Math.PI,
     destination: { x: source.x + dx / distance * reach, y: source.y + dy / distance * reach },
   };
+}
+
+async function spellDestination(obr, data, items, canSelectToken) {
+  if (data.targetLocation !== undefined) {
+    const target = data.targetLocation;
+    if ([target?.x, target?.y].every(Number.isFinite)) return { x: target.x, y: target.y };
+    return;
+  }
+  if (!canSelectToken || typeof data.targetId !== "string" ||
+      !items.some((item) => item.id === data.targetId && isProjectileToken(item))) return;
+  const bounds = await obr.scene.items.getItemBounds([data.targetId]).catch(() => null);
+  return bounds?.center;
+}
+
+async function teleportCaster(obr, token, source, destination, sender, permissions, current) {
+  let moved = false;
+  await obr.scene.items.updateItems([token.id], ([item]) => {
+    if (!current() || !canSpeak(sender, item, permissions) || item.locked ||
+        item.position.x !== token.position.x || item.position.y !== token.position.y) return;
+    item.position = {
+      x: item.position.x + destination.x - source.x,
+      y: item.position.y + destination.y - source.y,
+    };
+    moved = true;
+  });
+  return moved;
 }
 
 export function setupSkillHost(obr, buildImage) {
@@ -97,7 +126,8 @@ export function setupSkillHost(obr, buildImage) {
       const projectile = Boolean(skill.range);
       const checksHit = aimsAtLocation(data.skill);
       const geometry = checksHit ? Promise.all([
-        obr.scene.items.getItems((item) => isProjectileToken(item) || isProjectileWall(item)),
+        obr.scene.items.getItems((item) => isProjectileToken(item) || isProjectileWall(item) ||
+          (skill.location === "teleport" && item.type === "IMAGE" && item.layer === "CHARACTER")),
         obr.scene.local.getItems(isProjectileWall),
       ]).catch(() => null) : [];
       const [dpi, bounds, currentRole, obstacles] = await Promise.all([
@@ -115,7 +145,7 @@ export function setupSkillHost(obr, buildImage) {
         return;
       }
       const parameter = spellParameter(latest, token.id, data.skill);
-      const instruction = skillEffect(data.skill, token, bounds.center, dpi, data.facing, weapon, parameter);
+      const instruction = skillEffect(data.skill, token, bounds?.center, dpi, data.facing, weapon, parameter);
       if (!instruction) {
         await answer({ ...result, error: "Couldn’t determine avatar facing. Check the scene grid and facing setting." });
         return;
@@ -133,66 +163,110 @@ export function setupSkillHost(obr, buildImage) {
         const isAlly = (item) => casterTeams.length > 0 && isProjectileToken(item) &&
           tokenTeams(latest, item.id).some((team) => casterTeams.includes(team));
         const items = obstacles.flat();
-        const hitsAllies = mode === "enabled" || (mode === "aoe" && (skill.impact || skill.cone));
+        const hitsAllies = mode === "enabled" || (mode === "aoe" && (skill.impact || skill.cone || skill.location === "area"));
         const targets = hitsAllies ? items : items.filter((item) => !isAlly(item));
         const { source, size } = instruction.effectProperties;
         let { destination, rotation } = instruction.effectProperties;
-        let aimed = aimAtTarget(source, { center: data.targetLocation });
-        if (!aimed && typeof data.targetId === "string" && data.targetId !== token.id) {
-          const selected = items.find((item) => item.id === data.targetId && isProjectileToken(item));
-          if (selected) {
-            const target = await obr.scene.items.getItemBounds([selected.id]).catch(() => null);
-            if (version !== sceneVersion) return;
-            aimed = aimAtTarget(source, target, (skill.range ?? 0) * dpi, mode !== "enabled" && isAlly(selected));
-          }
-        }
-        if (aimed) {
-          let applied = false;
-          await obr.scene.items.updateItems([token.id], ([item]) => {
-            if (version !== sceneVersion || !canSpeak(sender, item, permissions) || item.locked) return;
-            turnToHeading(item, data.facing, aimed.heading);
-            applied = true;
-          });
-          if (version !== sceneVersion || !applied) {
-            if (version === sceneVersion) await answer({ ...result, error: "Couldn’t turn the avatar toward the target." });
+        if (skill.location) {
+          const isArea = skill.location === "area";
+          const target = await spellDestination(obr, data, items, isArea);
+          if (version !== sceneVersion) return;
+          if (![target?.x, target?.y].every(Number.isFinite)) {
+            await answer({ ...result, error: "Set a map target with Z, WASD, and Space first." });
             return;
           }
-          if (projectile) destination = aimed.destination;
-          else {
-            rotation = aimed.heading;
-            instruction.effectProperties.rotation = rotation;
+          const distance = Math.hypot(target.x - source.x, target.y - source.y);
+          if (distance > skill.range * dpi + 1e-7) {
+            await answer({ ...result, error: `That target is beyond ${skill.range} cells.` });
+            return;
           }
-        }
-        if (skill.cone) {
-          hitTokenIds = coneHits(source, rotation, size * dpi, targets, token.id, dpi);
-        } else if (projectile) {
-          const blastRadius = skill.impact ? parameter * dpi : 0;
-          // In AoE mode an ally can be caught in the blast without stopping its projectile.
-          const canIntercept = mode === "aoe" && skill.impact ? (item) => !isAlly(item) : undefined;
-          const impact = projectileImpact(source, destination, targets, token.id, dpi, blastRadius, canIntercept);
-          instruction.effectProperties.destination = impact.destination;
-          hitTokenIds = impact.hitTokenIds;
-          if (skill.impact) {
-            const { effect, delay } = skill.impact;
+          if (isArea) {
+            if (!clearSpellPath(source, target, items)) {
+              await answer({ ...result, error: "A wall blocks the target point." });
+              return;
+            }
+            instruction.effectProperties.source = target;
+            const areaTargets = hitsAllies ? targets : targets.filter((item) => item.id !== token.id);
+            hitTokenIds = areaHits(target, parameter * dpi, areaTargets, dpi);
+          } else {
+            if (distance <= 1e-7 || !teleportLandingClear(source, target, token, items, dpi)) {
+              await answer({ ...result, error: "Choose a different, clear space for Misty Step." });
+              return;
+            }
+            const current = () => version === sceneVersion;
+            const moved = await teleportCaster(obr, token, source, target, sender, permissions, current);
+            if (!current()) return;
+            if (!moved) {
+              await answer({ ...result, error: "The avatar moved or became unavailable. Try again." });
+              return;
+            }
+            instruction.loops = 1;
             instructions.push({
-              type: "effect", id: effect, delay, layer: instruction.layer,
-              // Embers takes the explosion width, while the GM assigns its radius.
-              effectProperties: { source: impact.destination, size: parameter * 2, disableHit: true },
+              ...instruction, id: "misty_step.in",
+              effectProperties: { ...instruction.effectProperties, source: target },
             });
           }
         } else {
-          const angle = rotation * Math.PI / 180;
-          const reach = skill.meleeReach * dpi;
-          const end = { x: source.x + reach * Math.cos(angle), y: source.y + reach * Math.sin(angle) };
-          const impact = projectileImpact(source, end, targets, token.id, dpi);
-          hitTokenIds = impact.hitTokenIds;
-          doorId = impact.doorId;
+          const eldritch = data.skill === "eldritch-blast";
+          const maxRange = eldritch ? skill.range * dpi : Infinity;
+          let aimed = aimAtTarget(source, { center: data.targetLocation }, 0, false, maxRange);
+          if (!aimed && typeof data.targetId === "string" && data.targetId !== token.id) {
+            const selected = items.find((item) => item.id === data.targetId && isProjectileToken(item));
+            if (selected) {
+              const target = await obr.scene.items.getItemBounds([selected.id]).catch(() => null);
+              if (version !== sceneVersion) return;
+              aimed = aimAtTarget(source, target, (skill.range ?? 0) * dpi, mode !== "enabled" && isAlly(selected), maxRange);
+            }
+          }
+          if (aimed) {
+            let applied = false;
+            await obr.scene.items.updateItems([token.id], ([item]) => {
+              if (version !== sceneVersion || !canSpeak(sender, item, permissions) || item.locked) return;
+              turnToHeading(item, data.facing, aimed.heading);
+              applied = true;
+            });
+            if (version !== sceneVersion || !applied) {
+              if (version === sceneVersion) await answer({ ...result, error: "Couldn’t turn the avatar toward the target." });
+              return;
+            }
+            if (projectile) destination = aimed.destination;
+            else {
+              rotation = aimed.heading;
+              instruction.effectProperties.rotation = rotation;
+            }
+          }
+          if (skill.cone) {
+            hitTokenIds = coneHits(source, rotation, size * dpi, targets, token.id, dpi);
+          } else if (projectile) {
+            const blastRadius = skill.impact ? parameter * dpi : 0;
+            // In AoE mode an ally can be caught in the blast without stopping its projectile.
+            const canIntercept = mode === "aoe" && skill.impact ? (item) => !isAlly(item) : undefined;
+            const impact = projectileImpact(source, destination, targets, token.id, dpi, blastRadius, canIntercept);
+            instruction.effectProperties.destination = impact.destination;
+            if (eldritch) instruction.effectProperties.copies = eldritchBeamCount(token);
+            hitTokenIds = impact.hitTokenIds;
+            if (skill.impact) {
+              const { effect, delay } = skill.impact;
+              instructions.push({
+                type: "effect", id: effect, delay, layer: instruction.layer,
+                // Embers takes the explosion width, while the GM assigns its radius.
+                effectProperties: { source: impact.destination, size: parameter * 2, disableHit: true },
+              });
+            }
+          } else {
+            const angle = rotation * Math.PI / 180;
+            const reach = skill.meleeReach * dpi;
+            const end = { x: source.x + reach * Math.cos(angle), y: source.y + reach * Math.sin(angle) };
+            const impact = projectileImpact(source, end, targets, token.id, dpi);
+            hitTokenIds = impact.hitTokenIds;
+            doorId = impact.doorId;
+          }
         }
       }
       const meleeHit = Boolean(skill.meleeReach && hitTokenIds.length);
-      const sendMarkers = (delay, damage) => obr.broadcast.sendMessage(HIT_MARKERS, {
-        requestId: data.requestId, tokenIds: hitTokenIds, delay,
-        ...(damage ? { useAnimationCue: true, damage } : {}),
+      const sendMarkers = (delay, damage, useAnimationCue = false) => obr.broadcast.sendMessage(HIT_MARKERS, {
+        requestId: data.requestId, tokenIds: hitTokenIds, delay, useAnimationCue,
+        ...(damage ? { damage } : {}),
       }, { destination: "ALL" }).catch((error) => console.error("Overhead Chat hit markers", error));
       if (meleeHit) {
         const metadata = await obr.room.getMetadata().catch(() => ({}));
@@ -206,7 +280,7 @@ export function setupSkillHost(obr, buildImage) {
         } else {
           instructions.push({ ...cue, delay: cueDelay });
         }
-        await sendMarkers(cueDelay + 750, rollMeleeDamage(weapon, token));
+        await sendMarkers(cueDelay + 750, rollMeleeDamage(weapon, token), true);
         if (version !== sceneVersion) return;
       }
       await obr.broadcast.sendMessage(EMBERS_EFFECTS, {
@@ -217,7 +291,9 @@ export function setupSkillHost(obr, buildImage) {
           .catch((error) => console.error("Overhead Chat could not open the door", error));
       }
       if (version === sceneVersion && hitTokenIds.length && !meleeHit) {
-        await sendMarkers(skill.impact?.delay ?? skill.hitDelay);
+        const damage = data.skill === "eldritch-blast" || data.skill === "shatter"
+          ? rollSpellDamage(data.skill, token) : undefined;
+        await sendMarkers(skill.impact?.delay ?? skill.hitDelay, damage);
       }
       await answer(result);
     } catch (error) {

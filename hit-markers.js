@@ -1,6 +1,7 @@
 import { isProjectileToken } from "./projectile-collision.js?v=2.6.13";
 import { skillConnections } from "./skills.js?v=2.6.15";
 import { validMeleeDamage } from "./melee-damage.js?v=2.7.19";
+import { validSpellDamage } from "./spell-damage.js?v=2.8.1";
 
 export const HIT_MARKERS = "chat.overhead.skills/hits.v1";
 export const MELEE_HIT_CUE = "chat.overhead.skills/melee-hit-cue.v1";
@@ -99,7 +100,7 @@ export function setupHitMarkers(obr, buildLabel) {
         !Array.isArray(data.tokenIds) || !data.tokenIds.length ||
         !data.tokenIds.every((id) => typeof id === "string" && id.length && id.length <= 128) ||
         !Number.isFinite(data.delay) || data.delay < 0 || data.delay > 6000 ||
-        (data.damage !== undefined && !validMeleeDamage(data.damage))) return;
+        (data.damage !== undefined && !validMeleeDamage(data.damage) && !validSpellDamage(data.damage))) return;
     const version = sceneVersion;
     const current = () => version === sceneVersion;
     try {
