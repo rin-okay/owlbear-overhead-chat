@@ -16,7 +16,7 @@ import { queueDicePopup, resetDicePopups } from "./dice-popup.js";
 import { setupSkillHost } from "./skill-host.js?v=2.9.4";
 import { setupCombatLog } from "./combat-log.js?v=2.9.4";
 import { EMOTE, floatEmote, parseEmote } from "./emotes.js?v=2.7.22";
-import { setupHitMarkers } from "./hit-markers.js?v=2.9.4";
+import { setupHitMarkers } from "./hit-markers.js?v=2.9.8";
 import { requestChatShortcut } from "./chat-shortcut.js?v=2.6.4";
 import { setupChatRecovery } from "./chat-recovery.js?v=2.6.6";
 import { centerAvatar, setupCameraFollow } from "./avatar-viewport.js?v=2.7.9";

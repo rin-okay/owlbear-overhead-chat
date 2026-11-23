@@ -72,7 +72,7 @@ export function setupHitMarkers(obr, buildLabel, buildPath, command) {
       if (!Number.isFinite(bounds?.center?.x) || !Number.isFinite(bounds?.min?.y)) return null;
       const graphic = splat
         ? buildPath().commands(splatPath).fillColor("#f02f49").strokeColor("#78142b").strokeWidth(1.5)
-          .scale({ x: 1 / scale, y: 1 / scale })
+          .scale({ x: 0.5 / scale, y: 0.5 / scale })
         : buildLabel().plainText(text).padding(0).backgroundOpacity(0)
         .pointerWidth(0).pointerHeight(0).textAlign("CENTER")
         .fontSize(blocked ? 15 : maxRoll ? 32 : 21).fontWeight(maxRoll ? 900 : 700)
