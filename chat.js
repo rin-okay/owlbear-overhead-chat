@@ -7,14 +7,14 @@ import {
 import {
   openSessionChannel, savedAvatar, saveAvatar, savedAvatarSlots, savedAvatarMode, savedAvatarArtSlots,
   savedAppearance, saveAppearance,
-} from "./session.js?v=2.7.8";
+} from "./session.js?v=2.7.9";
 
-import { drawBubble, prepareBubbleFont } from "./appearance.js?v=2.7.8";
-import { setupDiscordPanel } from "./discord-panel.js?v=2.7.8";
-import { setupAvatarPanel } from "./avatar-panel.js?v=2.7.8";
+import { drawBubble, normalizeAppearance, prepareBubbleFont } from "./appearance.js?v=2.7.9";
+import { setupDiscordPanel } from "./discord-panel.js?v=2.7.9";
+import { setupAvatarPanel } from "./avatar-panel.js?v=2.7.9";
 import { setupSkillGrants, setupSkillPanel } from "./skill-panel.js?v=2.7.7";
 import { listenForChatShortcut } from "./chat-shortcut.js?v=2.6.4";
-import { cameraFollowPreference, centerAvatar, prepareKeyboardPan } from "./avatar-viewport.js?v=2.7.8";
+import { cameraFollowPreference, centerAvatar, prepareKeyboardPan } from "./avatar-viewport.js?v=2.7.9";
 
 import { readMovementGrid, stepAvatar, turnAvatar } from "./movement.js?v=2.7.5";
 import { rollSpans, validateRollSpans } from "./dice.js";
@@ -225,7 +225,7 @@ async function getAvatar() {
     return { tokenId, observed: token, hint: choose };
   }
 
-  return { tokenId, observed: token, token, hint: "" };
+  return { tokenId, observed: token, token, role, hint: "" };
 }
 
 async function refresh() {
@@ -539,7 +539,7 @@ form.addEventListener("submit", async (event) => {
   sending = true;
   updateControls();
   try {
-    const { token } = await getAvatar();
+    const { token, role } = await getAvatar();
     if (token?.id !== intendedToken) {
       await refresh();
       status.textContent = "Your avatar changed. Review the speaker and send again.";
@@ -555,7 +555,7 @@ form.addEventListener("submit", async (event) => {
       return;
     }
 
-    const message = { ...speech, appearance: savedAppearance(), messageId: crypto.randomUUID() };
+    const message = { ...speech, appearance: normalizeAppearance(savedAppearance(), role ?? null), messageId: crypto.randomUUID() };
     if (spans.length) {
       message.rollId = crypto.randomUUID();
       await OBR.broadcast.sendMessage(SPEECH, { ...message, rollPhase: "pending" }, { destination: "ALL" });
@@ -783,6 +783,9 @@ function setupSettings() {
   refreshAvatarPanel = (items) => updateAvatarPanel(items, playerRole);
   const fields = settingsPanel.querySelector("form");
   const preview = settingsPanel.querySelector("#bubble-preview");
+  const fontPicker = fields.elements.namedItem("font");
+  const interOption = new Option("Inter", "inter");
+  const visibleAppearance = () => normalizeAppearance(savedAppearance(), playerRole ?? null);
 
   let previewRevision = 0;
   async function drawPreview(style) {
@@ -799,12 +802,22 @@ function setupSettings() {
     drawPreview(style);
   }
 
-  showAppearance(savedAppearance());
+  function updateFontRole(role) {
+    const gm = role === "GM";
+    if (gm === (interOption.parentElement === fontPicker)) return;
+    if (gm) fontPicker.add(interOption);
+    else interOption.remove();
+    const style = visibleAppearance();
+    fontPicker.value = style.font;
+    drawPreview(style);
+  }
+
+  showAppearance(visibleAppearance());
   settingsPanel.querySelector("#reset-appearance").addEventListener("click", () => {
     showAppearance(saveAppearance());
   });
   settingsPanel.querySelector("#export-appearance").addEventListener("click", () => {
-    const { border, fill, color, font, size } = savedAppearance();
+    const { border, fill, color, font, size } = visibleAppearance();
     const json = JSON.stringify({ border, fill, color, font, size }, null, 2) + "\n";
     const url = URL.createObjectURL(new Blob([json], { type: "application/json" }));
     const link = document.createElement("a");
@@ -877,12 +890,13 @@ function setupSettings() {
   fields.addEventListener("input", () => {
     const values = Object.fromEntries(new FormData(fields));
     values.size = Number(values.size);
-    drawPreview(saveAppearance(values));
+    drawPreview(saveAppearance(normalizeAppearance(values, playerRole ?? null)));
   });
+  return updateFontRole;
 }
 
 OBR.onReady(() => {
-  setupSettings();
+  const updateFontRole = setupSettings();
   setupMeleeHitTiming();
   setupRoomToggle("gm-fog-settings", ABOVE_FOG);
   setupRoomToggle("gm-rumble-settings", RUMBLE_DICE);
@@ -899,6 +913,7 @@ OBR.onReady(() => {
       }
     }
     playerRole = role;
+    updateFontRole(role);
     showSkillsForRole(role);
     const state = JSON.stringify([metadata[AVATAR]?.tokenId, role]);
     if (state === avatarState) return;
@@ -909,6 +924,7 @@ OBR.onReady(() => {
   void OBR.player.getRole().then((role) => {
     if (playerRole !== undefined) return;
     playerRole = role;
+    updateFontRole(role);
     showSkillsForRole(role);
     return refreshAvatarPanel();
   }).catch(console.error);

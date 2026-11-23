@@ -2,8 +2,9 @@ export const BUBBLE_LINE_HEIGHT = 1.15;
 
 export const fonts = {
   sans: { face: "Arial", fallback: "sans-serif" },
+  inter: { face: "Inter", fallback: "Arial, sans-serif", file: "inter-latin.woff2", gmOnly: true },
   serif: { face: "Georgia", fallback: "serif" },
-  garamond: { face: "EB Garamond", fallback: '"Garamond", Georgia, serif', nativeFace: "Garamond" },
+  garamond: { face: "EB Garamond", fallback: '"Garamond", Georgia, serif', nativeFace: "Garamond", file: "eb-garamond-latin.woff2" },
   mono: { face: "Courier New", fallback: "monospace" },
   comic: { face: "Comic Sans MS", fallback: '"Comic Sans", "Chalkboard SE", Chalkboard, cursive' },
   rounded: { face: "Trebuchet MS", fallback: '"Avenir Next", Verdana, sans-serif' },
@@ -13,18 +14,19 @@ const defaults = {
   name: "", border: "#8b75b5", fill: "#fbf6ff", color: "#241d31", font: "sans", size: 15,
 };
 
-export function normalizeAppearance(value) {
+export function normalizeAppearance(value, role) {
   const color = (key) => {
     const candidate = value?.[key];
     return typeof candidate === "string" && /^#[0-9a-f]{6}$/i.test(candidate) ? candidate : defaults[key];
   };
   const size = value?.size;
+  const font = typeof value?.font === "string" && Object.hasOwn(fonts, value.font) ? fonts[value.font] : undefined;
   return {
     name: typeof value?.name === "string" ? value.name.trim().replace(/\s+/gu, " ").slice(0, 32) : "",
     border: color("border"),
     fill: color("fill"),
     color: color("color"),
-    font: typeof value?.font === "string" && Object.hasOwn(fonts, value.font) ? value.font : defaults.font,
+    font: font && (!font.gmOnly || role === undefined || role === "GM") ? value.font : defaults.font,
     size: Number.isInteger(size) ? Math.max(10, Math.min(28, size)) : defaults.size,
   };
 }
@@ -71,15 +73,20 @@ function wrapParagraph(paragraph, measure) {
   return lines;
 }
 
-let garamondReady;
+const bubbleFontsReady = new Map();
 
 export function prepareBubbleFont(style) {
-  if (style.font !== "garamond") return;
-  return garamondReady ??= (async () => {
-    const url = new URL("./fonts/eb-garamond-latin.woff2", import.meta.url);
-    const font = new FontFace(fonts.garamond.face, `url("${url}") format("woff2")`, { weight: "400 800" });
-    document.fonts.add(await font.load());
-  })().catch((error) => console.warn("Overhead Chat could not load Garamond", error));
+  const { face, file } = fonts[style.font];
+  if (!file) return;
+  if (!bubbleFontsReady.has(file)) {
+    const ready = (async () => {
+      const url = new URL("./fonts/" + file, import.meta.url);
+      const font = new FontFace(face, `url("${url}") format("woff2")`, { weight: "400 800" });
+      document.fonts.add(await font.load());
+    })().catch((error) => console.warn("Overhead Chat could not load " + face, error));
+    bubbleFontsReady.set(file, ready);
+  }
+  return bubbleFontsReady.get(file);
 }
 
 function bubbleFont(style) {

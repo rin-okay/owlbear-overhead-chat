@@ -4,10 +4,10 @@ import {
   canSpeak, isChatRoom, isPublicToken, normalizeHabboScale, parseSpeech,
 } from "./rules.js?v=2.5.1";
 
-import { BUBBLE_LINE_HEIGHT, drawBubble, drawFloatingBubble, fonts, normalizeAppearance, prepareBubbleFont } from "./appearance.js?v=2.7.8";
+import { BUBBLE_LINE_HEIGHT, drawBubble, drawFloatingBubble, fonts, normalizeAppearance, prepareBubbleFont } from "./appearance.js?v=2.7.9";
 import { canvasPaths } from "./bubble-paths.js?v=2.5.1";
 import { FLOAT_LINE, placeFloatingBubbles } from "./floating-layout.js?v=2.5.1";
-import { openSessionChannel, saveAvatar } from "./session.js?v=2.7.8";
+import { openSessionChannel, saveAvatar } from "./session.js?v=2.7.9";
 import { chatParts, isRollCommand, rollSpans } from "./dice.js";
 import { queueDiscord } from "./discord.js?v=2.3.9";
 import { parseTray } from "./dice-replay.js";
@@ -16,7 +16,7 @@ import { setupSkillHost } from "./skill-host.js?v=2.7.7";
 import { setupHitMarkers } from "./hit-markers.js?v=2.6.16";
 import { requestChatShortcut } from "./chat-shortcut.js?v=2.6.4";
 import { setupChatRecovery } from "./chat-recovery.js?v=2.6.6";
-import { centerAvatar, setupCameraFollow } from "./avatar-viewport.js?v=2.7.8";
+import { centerAvatar, setupCameraFollow } from "./avatar-viewport.js?v=2.7.9";
 
 const HISTORY_LIMIT = 1000;
 const HISTORY_PAGE_SIZE = 100;
@@ -247,7 +247,7 @@ async function acceptSpeech(event, speech, version, receivedAt) {
        previousRoll.tokenId !== tokenId || previousRoll.roomId !== roomId))) return;
   const parts = chatParts(speech.text, event.data.rolls);
   const text = parts.map((part) => typeof part === "string" ? part : `${part.notation}: ${part.total}`).join("");
-  const appearance = normalizeAppearance(event.data.appearance);
+  const appearance = normalizeAppearance(event.data.appearance, sender.role ?? null);
   const entry = {
     name: appearance.name || token.name || "Character",
     text,

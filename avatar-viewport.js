@@ -1,5 +1,5 @@
 import { AVATAR, isPublicToken } from "./rules.js";
-import { savedAvatar } from "./session.js?v=2.7.8";
+import { savedAvatar } from "./session.js?v=2.7.9";
 
 function avatarId(metadata) {
   return metadata[AVATAR]?.tokenId ?? savedAvatar();
