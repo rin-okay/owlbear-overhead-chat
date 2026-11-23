@@ -4,10 +4,10 @@ import {
   canSpeak, isChatRoom, isPublicToken, normalizeHabboScale, parseSpeech,
 } from "./rules.js?v=2.5.1";
 
-import { BUBBLE_LINE_HEIGHT, drawBubble, drawFloatingBubble, fonts, normalizeAppearance } from "./appearance.js?v=2.6.1";
+import { BUBBLE_LINE_HEIGHT, drawBubble, drawFloatingBubble, fonts, normalizeAppearance, prepareBubbleFont } from "./appearance.js?v=2.7.8";
 import { canvasPaths } from "./bubble-paths.js?v=2.5.1";
 import { FLOAT_LINE, placeFloatingBubbles } from "./floating-layout.js?v=2.5.1";
-import { openSessionChannel, saveAvatar } from "./session.js";
+import { openSessionChannel, saveAvatar } from "./session.js?v=2.7.8";
 import { chatParts, isRollCommand, rollSpans } from "./dice.js";
 import { queueDiscord } from "./discord.js?v=2.3.9";
 import { parseTray } from "./dice-replay.js";
@@ -16,7 +16,7 @@ import { setupSkillHost } from "./skill-host.js?v=2.7.7";
 import { setupHitMarkers } from "./hit-markers.js?v=2.6.16";
 import { requestChatShortcut } from "./chat-shortcut.js?v=2.6.4";
 import { setupChatRecovery } from "./chat-recovery.js?v=2.6.6";
-import { centerAvatar, setupCameraFollow } from "./avatar-viewport.js?v=2.6.9";
+import { centerAvatar, setupCameraFollow } from "./avatar-viewport.js?v=2.7.8";
 
 const HISTORY_LIMIT = 1000;
 const HISTORY_PAGE_SIZE = 100;
@@ -141,9 +141,10 @@ async function addBubbleDrawing(drawing, appearance, position, layer, tokenId, s
   }
   if (!current()) return [];
   const labelScale = tokenId ? 1 : scale;
+  const font = fonts[appearance.font];
   const nativeLabel = (borderWidth = 0) => buildLabel()
     .plainText(drawing.lines.join("\n")).width(tokenId ? drawing.width + borderWidth : "AUTO")
-    .fontFamily(fonts[appearance.font].face)
+    .fontFamily(font.nativeFace ?? font.face)
     .fontSize(appearance.size * labelScale)
     .lineHeight(BUBBLE_LINE_HEIGHT).textAlign("CENTER").pointerDirection("DOWN");
   const labels = [
@@ -309,7 +310,9 @@ async function showBubble({ tokenId, text, appearance, itemsAtValidation }, vers
     (floatingMode || !queuedBubbles.has(tokenId)) &&
     (sceneItems === itemsAtValidation || sceneItems?.some((item) => item.id === tokenId && isPublicToken(item)));
   if (!current()) return;
-  const bounds = await OBR.scene.items.getItemBounds([tokenId]);
+  const [bounds] = await Promise.all([
+    OBR.scene.items.getItemBounds([tokenId]), prepareBubbleFont(appearance),
+  ]);
   const layer = roomMetadata?.[ABOVE_FOG] === true ? "CONTROL" : "TEXT";
   if (!current() || !Number.isFinite(bounds?.min?.y) ||
       !Number.isFinite(bounds?.max?.y) ||

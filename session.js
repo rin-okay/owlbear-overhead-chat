@@ -1,5 +1,5 @@
 import OBR from "./obr.js";
-import { normalizeAppearance } from "./appearance.js";
+import { normalizeAppearance } from "./appearance.js?v=2.7.8";
 import { AVATAR } from "./rules.js";
 
 function avatarKey() {

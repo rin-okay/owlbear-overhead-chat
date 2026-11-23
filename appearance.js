@@ -3,6 +3,7 @@ export const BUBBLE_LINE_HEIGHT = 1.15;
 export const fonts = {
   sans: { face: "Arial", fallback: "sans-serif" },
   serif: { face: "Georgia", fallback: "serif" },
+  garamond: { face: "EB Garamond", fallback: '"Garamond", Georgia, serif', nativeFace: "Garamond" },
   mono: { face: "Courier New", fallback: "monospace" },
   comic: { face: "Comic Sans MS", fallback: '"Comic Sans", "Chalkboard SE", Chalkboard, cursive' },
   rounded: { face: "Trebuchet MS", fallback: '"Avenir Next", Verdana, sans-serif' },
@@ -68,6 +69,17 @@ function wrapParagraph(paragraph, measure) {
   }
   lines.push(line);
   return lines;
+}
+
+let garamondReady;
+
+export function prepareBubbleFont(style) {
+  if (style.font !== "garamond") return;
+  return garamondReady ??= (async () => {
+    const url = new URL("./fonts/eb-garamond-latin.woff2", import.meta.url);
+    const font = new FontFace(fonts.garamond.face, `url("${url}") format("woff2")`, { weight: "400 800" });
+    document.fonts.add(await font.load());
+  })().catch((error) => console.warn("Overhead Chat could not load Garamond", error));
 }
 
 function bubbleFont(style) {

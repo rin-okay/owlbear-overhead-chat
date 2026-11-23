@@ -7,14 +7,14 @@ import {
 import {
   openSessionChannel, savedAvatar, saveAvatar, savedAvatarSlots, savedAvatarMode, savedAvatarArtSlots,
   savedAppearance, saveAppearance,
-} from "./session.js";
+} from "./session.js?v=2.7.8";
 
-import { drawBubble } from "./appearance.js?v=2.6.1";
-import { setupDiscordPanel } from "./discord-panel.js?v=2.7.7";
-import { setupAvatarPanel } from "./avatar-panel.js?v=2.6.11";
+import { drawBubble, prepareBubbleFont } from "./appearance.js?v=2.7.8";
+import { setupDiscordPanel } from "./discord-panel.js?v=2.7.8";
+import { setupAvatarPanel } from "./avatar-panel.js?v=2.7.8";
 import { setupSkillGrants, setupSkillPanel } from "./skill-panel.js?v=2.7.7";
 import { listenForChatShortcut } from "./chat-shortcut.js?v=2.6.4";
-import { cameraFollowPreference, centerAvatar, prepareKeyboardPan } from "./avatar-viewport.js?v=2.6.9";
+import { cameraFollowPreference, centerAvatar, prepareKeyboardPan } from "./avatar-viewport.js?v=2.7.8";
 
 import { readMovementGrid, stepAvatar, turnAvatar } from "./movement.js?v=2.7.5";
 import { rollSpans, validateRollSpans } from "./dice.js";
@@ -784,7 +784,11 @@ function setupSettings() {
   const fields = settingsPanel.querySelector("form");
   const preview = settingsPanel.querySelector("#bubble-preview");
 
-  function drawPreview(style) {
+  let previewRevision = 0;
+  async function drawPreview(style) {
+    const revision = ++previewRevision;
+    await prepareBubbleFont(style);
+    if (revision !== previewRevision) return;
     const { canvas: bubble } = drawBubble("see you in the tavern!", style);
     bubble.setAttribute("aria-label", "speech bubble preview");
     preview.replaceChildren(bubble);
