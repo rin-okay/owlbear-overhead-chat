@@ -51,6 +51,7 @@ export const SKILLS = {
     parameter: { label: "range (in cells)", min: 1, defaultValue: 6 },
     targetLimit: { label: "maximum targets", min: 1, defaultValue: 3, integer: true },
   },
+  heart: { name: "heart", key: "p", effect: "generic.marker.heart.3" },
   // Keep the original skill ID so existing bindings and clients still work.
   spear: { name: "melee weapon attack", key: "f", meleeReach: 1 },
   missile: { name: "magic missile", key: "g", effect: "magic_missile", range: 8, hitDelay: 1000 },
@@ -149,6 +150,12 @@ export function skillEffect(skillId, token, center, dpi, facing, weapon = DEFAUL
   const skill = SKILLS[skillId];
   const effect = skill.effect ?? (Object.hasOwn(WEAPONS, weapon) && "generic.weapon_attacks.melee.single." + weapon);
   if (!effect) return;
+  if (skillId === "heart") {
+    return {
+      type: "effect", id: effect, layer: "ATTACHMENT", loops: 1,
+      effectProperties: { source: { x: center.x, y: center.y - dpi * 0.75 }, size: 2, disableHit: true },
+    };
+  }
   const rotation = token.rotation + artworkFacingAngle(token, facing);
   const radians = rotation * Math.PI / 180;
   const source = { x: center.x, y: center.y };
