@@ -1,7 +1,8 @@
-import { ABILITIES, abilityModifier, readTokenStats, validAbilityScore, writeTokenStats } from "./stats.js?v=2.7.18";
+import { ABILITIES, COMBAT_STATS, abilityModifier, readTokenStats, validAbilityScore, writeTokenStats } from "./stats.js?v=2.7.21";
 
 export function setupStatsEditor(obr, form, { gm = false } = {}) {
   const fields = form.querySelector("fieldset");
+  const details = form.querySelector(".stats-details");
   const button = form.querySelector("[type=submit]");
   const status = form.querySelector("[role=status]");
   const editable = form.elements.namedItem("editable");
@@ -26,6 +27,23 @@ export function setupStatsEditor(obr, form, { gm = false } = {}) {
     return [key, { input, modifier }];
   }));
 
+  const combatControls = Object.fromEntries(Object.entries(COMBAT_STATS).map(([key, { label: name, minimum, maximum }]) => {
+    const label = document.createElement("label");
+    const caption = document.createElement("span");
+    caption.textContent = key === "ac" ? "ac" : name;
+    const input = document.createElement("input");
+    input.type = "number";
+    input.name = key;
+    input.min = minimum;
+    if (maximum !== undefined) input.max = maximum;
+    input.step = 1;
+    input.required = true;
+    input.setAttribute("aria-label", name);
+    label.append(caption, input);
+    details.append(label);
+    return [key, input];
+  }));
+
   let tokenId;
   let baseline;
   let permission = false;
@@ -41,6 +59,7 @@ export function setupStatsEditor(obr, form, { gm = false } = {}) {
   function updateControls() {
     const locked = busy || !permission;
     for (const { input } of Object.values(controls)) input.readOnly = locked;
+    for (const input of Object.values(combatControls)) input.readOnly = locked;
     if (editable) editable.disabled = locked;
     button.disabled = locked;
   }
@@ -61,10 +80,11 @@ export function setupStatsEditor(obr, form, { gm = false } = {}) {
         input.value = id ? stats.scores[key] : "";
         showModifier(input, modifier);
       }
+      for (const [key, input] of Object.entries(combatControls)) input.value = id ? stats.details[key] : "";
       if (editable) editable.checked = stats.editable;
       if (changedToken || changedPermission) status.textContent = "";
     }
-    fields.hidden = !id;
+    fields.hidden = details.hidden = !id;
     if (editable) editable.closest("label").hidden = !id;
     button.hidden = !id || (!gm && !permission);
     updateControls();
@@ -80,10 +100,11 @@ export function setupStatsEditor(obr, form, { gm = false } = {}) {
     const at = revision;
     const current = () => at === revision && id === tokenId;
     const scores = Object.fromEntries(Object.entries(controls).map(([key, { input }]) => [key, input.valueAsNumber]));
+    const values = Object.fromEntries(Object.entries(combatControls).map(([key, input]) => [key, input.valueAsNumber]));
     busy = true;
     updateControls();
     try {
-      await writeTokenStats(obr, id, scores, { gm, editable: editable?.checked, expected, current });
+      await writeTokenStats(obr, id, scores, { gm, editable: editable?.checked, expected, current, details: values });
       if (current()) status.textContent = "Stats saved.";
     } catch (error) {
       if (current()) status.textContent = error.message || "Couldn’t save stats.";

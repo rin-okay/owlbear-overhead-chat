@@ -1,4 +1,4 @@
-import { setupStatsEditor } from "./stats-panel.js?v=2.7.18";
+import { setupStatsEditor } from "./stats-panel.js?v=2.7.21";
 import { isPublicToken } from "./rules.js";
 import {
   DEFAULT_WEAPON, FACINGS, FRIENDLY_FIRE_MODES, SKILLS, SKILL_CHANGED, SKILL_REQUEST, SKILL_RESULT, SPELLS, TEAMS, WEAPONS,
@@ -14,7 +14,7 @@ function facingFor(settings, token) {
   return FACINGS.some(([angle]) => angle === facing) ? facing : 0;
 }
 
-export function setupSkillPanel(obr, getAvatar, keyAllowed) {
+export function setupSkillPanel(obr, getAvatar, keyAllowed, showSpells) {
   const playerPanel = document.querySelector("#player-skills");
   const playerStatus = document.querySelector("#skill-settings-status");
   const castStatus = document.querySelector("#skill-cast-status");
@@ -53,6 +53,7 @@ export function setupSkillPanel(obr, getAvatar, keyAllowed) {
   }
 
   function render() {
+    showSpells(enabled ? available : []);
     facing.disabled = !avatar;
     facing.value = String(facingFor(preferences, avatar));
     arrow.style.transform = `rotate(${facing.value}deg)`;

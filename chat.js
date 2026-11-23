@@ -5,15 +5,16 @@ import {
 } from "./rules.js?v=2.6.16";
 
 import {
-  openSessionChannel, savedAvatar, saveAvatar, savedAvatarSlots, savedAvatarMode, savedAvatarArtSlots,
+  openSessionChannel, savedAvatar, saveAvatar, savedAvatarSlots, savedAvatarMode, savedQuickbarSlots,
   savedAppearance, saveAppearance,
-} from "./session.js?v=2.7.9";
+} from "./session.js?v=2.7.21";
 
 import { drawBubble, normalizeAppearance, prepareBubbleFont } from "./appearance.js?v=2.7.9";
-import { setupDiscordPanel } from "./discord-panel.js?v=2.7.20";
-import { setupAvatarPanel } from "./avatar-panel.js?v=2.7.9";
-import { setupSkillGrants, setupSkillPanel } from "./skill-panel.js?v=2.7.18";
-import { setupStatsEditor } from "./stats-panel.js?v=2.7.18";
+import { setupDiscordPanel } from "./discord-panel.js?v=2.7.21";
+import { setupAvatarPanel } from "./avatar-panel.js?v=2.7.21";
+import { setupSkillGrants, setupSkillPanel } from "./skill-panel.js?v=2.7.21";
+import { setupStatsEditor } from "./stats-panel.js?v=2.7.21";
+import { EMOTE } from "./emotes.js?v=2.7.21";
 import { setupTargeting } from "./targeting.js?v=2.7.17";
 import { listenForChatShortcut } from "./chat-shortcut.js?v=2.6.4";
 import { cameraFollowPreference, centerAvatar, prepareKeyboardPan } from "./avatar-viewport.js?v=2.7.9";
@@ -346,7 +347,7 @@ async function moveAvatar(mode) {
   try {
     while (mode === tokenControl && !mode.switching && mode.actions.length) {
       const tokenId = mode.tokenId;
-      const { offset, rotation, mirror, artwork, onApplied, skill, targetLocation } = mode.actions.shift();
+      const { offset, rotation, mirror, artwork, onApplied, skill, targetLocation, emote } = mode.actions.shift();
       const [{ token }, grid, pan] = await Promise.all([
         getAvatar(),
         offset ? (mode.movementGrid ??= readMovementGrid(OBR.scene.grid)) : undefined,
@@ -357,6 +358,11 @@ async function moveAvatar(mode) {
       if (offset && (!Number.isFinite(grid.dpi) || grid.dpi <= 0)) throw new Error("Scene grid size unavailable.");
       if (skill) {
         await skillPanel.cast(skill, token, targetLocation);
+        continue;
+      }
+
+      if (emote) {
+        await OBR.broadcast.sendMessage(EMOTE, { tokenId, emote }, { destination: "ALL" });
         continue;
       }
 
@@ -434,6 +440,17 @@ async function switchAvatarSlot(mode, index, onApplied) {
 
 function useAvatarSlot(mode, key) {
   const index = Number(key) - 1;
+  const talking = playerRole === "GM" && savedAvatarMode() === "talk";
+  const quickbar = talking ? undefined : savedQuickbarSlots()[index];
+  if (quickbar?.kind === "spell" || quickbar?.kind === "emote") {
+    mode.slotTap = undefined;
+    if (!mode.switching && mode.actions.length < 4) {
+      status.textContent = "";
+      queueAvatarAction(mode, quickbar.kind === "spell"
+        ? { skill: quickbar.skill, targetLocation: targeting?.location() } : { emote: quickbar.emote });
+    }
+    return;
+  }
   const now = performance.now();
   const previous = mode.slotTap;
   if (previous?.index === index && now - previous.time <= SLOT_DOUBLE_TAP_MS) {
@@ -452,13 +469,13 @@ function useAvatarSlot(mode, key) {
     if (tap.returnToChat) toggleTokenControl();
   }
 
-  if (playerRole === "GM" && savedAvatarMode() === "talk") {
+  if (talking) {
     void switchAvatarSlot(mode, index, onApplied);
     return;
   }
-  const artwork = savedAvatarArtSlots()[index];
+  const artwork = quickbar?.artwork;
   if (!artwork) {
-    status.textContent = `Choose artwork for slot ${index + 1} in the avatar tab first.`;
+    status.textContent = `Assign slot ${index + 1} in the quickbar first.`;
     return;
   }
   status.textContent = "";
@@ -791,8 +808,10 @@ function setupSettings() {
   const tutorialPanel = document.querySelector("#tutorial-panel");
   const tutorialButton = document.querySelector("#open-tutorial");
   const doneButton = document.querySelector("#tutorial-done");
+  const { refresh: updateAvatarPanel, showSpells } = setupAvatarPanel(avatarPanel);
+  refreshAvatarPanel = (items) => updateAvatarPanel(items, playerRole);
   skillPanel = setupSkillPanel(OBR, () => avatar, (key) =>
-    typeof key === "string" && /^[a-z]$/.test(key) && key !== "z" && !Object.hasOwn(movementKeys, key));
+    typeof key === "string" && /^[a-z]$/.test(key) && key !== "z" && !Object.hasOwn(movementKeys, key), showSpells);
   const refreshSkillGrants = setupSkillGrants(OBR);
   const loadoutTab = document.querySelector("#skill-loadout-tab");
   const statsTab = document.querySelector("#skill-stats-tab");
@@ -822,8 +841,6 @@ function setupSettings() {
     if (grantsTab.hidden && skillView === 2) selectSkillView(0);
   };
   skillViews.forEach(({ tab }, index) => tab.addEventListener("click", () => selectSkillView(index)));
-  const updateAvatarPanel = setupAvatarPanel(avatarPanel);
-  refreshAvatarPanel = (items) => updateAvatarPanel(items, playerRole);
   const fields = settingsPanel.querySelector("form");
   const preview = settingsPanel.querySelector("#bubble-preview");
   const fontPicker = fields.elements.namedItem("font");
@@ -909,6 +926,7 @@ function setupSettings() {
   avatarTab.addEventListener("click", () => {
     select(3);
     void refreshAvatarPanel();
+    skillPanel.refresh(avatar, true);
   });
   skillsTab.addEventListener("click", () => select(4));
   function openFromShortcut(mode) {

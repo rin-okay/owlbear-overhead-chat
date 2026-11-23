@@ -13,6 +13,7 @@ import { queueDiscord } from "./discord.js?v=2.3.9";
 import { parseTray } from "./dice-replay.js";
 import { queueDicePopup, resetDicePopups } from "./dice-popup.js";
 import { setupSkillHost } from "./skill-host.js?v=2.7.20";
+import { EMOTE, floatEmote, parseEmote } from "./emotes.js?v=2.7.21";
 import { setupHitMarkers } from "./hit-markers.js?v=2.7.19";
 import { requestChatShortcut } from "./chat-shortcut.js?v=2.6.4";
 import { setupChatRecovery } from "./chat-recovery.js?v=2.6.6";
@@ -453,6 +454,32 @@ OBR.onReady(() => {
     for (const result of results) if (result.status === "rejected") report(result.reason);
   });
   OBR.broadcast.onMessage(SPEECH, queueSpeech);
+  const lastEmote = new Map();
+  OBR.scene.onReadyChange(() => lastEmote.clear());
+  OBR.broadcast.onMessage(EMOTE, async (event) => {
+    const emote = parseEmote(event.data?.emote);
+    const tokenId = event.data?.tokenId;
+    if (!emote || typeof tokenId !== "string" || !tokenId || tokenId.length > 128) return;
+    const version = sceneVersion;
+    const current = () => sceneReady && version === sceneVersion;
+    try {
+      await initialState;
+      if (!current()) return;
+      const sender = event.connectionId === connectionId ? { id: OBR.player.id, role } : party?.get(event.connectionId);
+      if (!sender) return;
+      const now = Date.now();
+      for (const [id, time] of lastEmote) if (now - time >= 650) lastEmote.delete(id);
+      if (lastEmote.has(event.connectionId)) return;
+      const before = sceneItems;
+      const [fetched] = await OBR.scene.items.getItems([tokenId]);
+      const token = sceneItems === before ? fetched : sceneItems?.find((item) => item.id === tokenId);
+      if (!current() || lastEmote.has(event.connectionId) || token?.locked || !canSpeak(sender, token, permissions ?? [])) return;
+      lastEmote.set(event.connectionId, Date.now());
+      await floatEmote(OBR, buildImage, buildLabel, tokenId, emote, current);
+    } catch (error) {
+      if (current()) report(error);
+    }
+  });
   OBR.broadcast.onMessage("chat.overhead.arrival-guide.v1", async ({ connectionId: sender, data }) => {
     try {
       if (typeof data?.tokenId !== "string" || sender !== await OBR.player.getConnectionId()) return;

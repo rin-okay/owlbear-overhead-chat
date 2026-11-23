@@ -1,9 +1,11 @@
 import OBR from "./obr.js";
+import { BUILTIN_EMOTES } from "./emotes.js?v=2.7.21";
+import { SKILLS, SPELLS } from "./skills.js?v=2.7.20";
 import { isPublicToken } from "./rules.js";
 import {
   savedAvatarSlots, saveAvatarSlot, savedAvatarMode, saveAvatarMode,
-  savedAvatarArtSlots, saveAvatarArtSlot,
-} from "./session.js?v=2.7.9";
+  savedQuickbarSlots, saveQuickbarSlot,
+} from "./session.js?v=2.7.21";
 
 export function setupAvatarPanel(panel) {
   const list = panel.querySelector("#avatar-slots");
@@ -28,7 +30,7 @@ export function setupAvatarPanel(panel) {
   let revision = 0;
   let lastChoices;
 
-  setupArtSlots(changePanel);
+  const showSpells = setupQuickbar(changePanel);
 
   function showMode(mode) {
     const change = mode === "change";
@@ -46,7 +48,7 @@ export function setupAvatarPanel(panel) {
       void loadTokens();
     });
   }
-  return (items, role) => {
+  const refresh = (items, role) => {
     const gm = role === "GM";
     if (gm !== canTalk) {
       canTalk = gm;
@@ -56,6 +58,7 @@ export function setupAvatarPanel(panel) {
     }
     return loadTokens(items);
   };
+  return { refresh, showSpells };
 
   async function loadTokens(items) {
     if (!canTalk || panel.hidden || talkPanel.hidden) return;
@@ -87,119 +90,159 @@ export function setupAvatarPanel(panel) {
   }
 }
 
-function setupArtSlots(panel) {
+function setupQuickbar(panel) {
   const list = panel.querySelector("#avatar-art-slots");
   const status = panel.querySelector("[role=status]");
-  const slots = savedAvatarArtSlots();
+  const slots = savedQuickbarSlots();
   const picker = panel.querySelector("#avatar-scene-art");
   const source = panel.querySelector("#avatar-art-source");
   const use = panel.querySelector("#avatar-art-use");
   const cancel = panel.querySelector("#avatar-art-cancel");
+  let spells = [];
   let pending;
   let opening = false;
 
-  function closeScenePicker(restoreFocus = false) {
+  function closePicker(restoreFocus = false) {
     const previous = pending;
     pending = undefined;
     picker.hidden = true;
     source.replaceChildren();
-    if (restoreFocus) previous?.button.focus();
+    if (restoreFocus) previous?.control.focus();
   }
 
-  async function openScenePicker(index, button, render) {
-    if (!await OBR.scene.isReady()) {
-      status.textContent = "open a scene to choose artwork from one of your tokens.";
-      return;
+  function assignImage(index, kind, asset) {
+    const value = kind === "avatar" ? { kind, artwork: asset }
+      : { kind, emote: { image: asset.image }, name: asset.name };
+    if (!saveQuickbarSlot(index, value)) throw Error("This image couldn’t be saved. Choose another asset.");
+  }
+
+  async function chooseImage(index, kind, control, render) {
+    if (opening) { render(); return; }
+    opening = true;
+    closePicker();
+    control.disabled = true;
+    status.textContent = "";
+    try {
+      let assets;
+      try {
+        assets = await OBR.assets.downloadImages(false, undefined, kind === "avatar" ? "CHARACTER" : undefined);
+      } catch {
+        if (!await OBR.scene.isReady()) throw Error("Open a scene to choose an image from one of your tokens.");
+        const tokens = await OBR.scene.items.getItems((item) => item.type === "IMAGE" &&
+          item.visible === true && item.createdUserId === OBR.player.id && (kind === "emote" || isPublicToken(item)));
+        if (panel.closest("[hidden]")) return;
+        if (!tokens.length) throw Error("The assets picker is unavailable. Place the image in the scene first, or ask the GM to assign you as its owner.");
+        tokens.sort((left, right) => (left.name || "").localeCompare(right.name || ""));
+        source.replaceChildren(...tokens.map((token) => new Option(token.name || "unnamed image", token.id)));
+        pending = { index, kind, control, render, tokens };
+        picker.hidden = false;
+        status.textContent = "Choose an image for slot " + (index + 1) + ".";
+        source.focus();
+        return;
+      }
+      const [asset] = assets;
+      if (!asset) return;
+      if (kind === "avatar" && asset.type !== "CHARACTER") throw Error("Choose an image from Characters.");
+      assignImage(index, kind, asset);
+    } catch (error) {
+      status.textContent = error?.message || "Couldn’t load this image.";
+    } finally {
+      opening = false;
+      control.disabled = false;
+      render();
     }
-    const tokens = await OBR.scene.items.getItems((item) =>
-      isPublicToken(item) && item.createdUserId === OBR.player.id);
-    if (panel.closest("[hidden]")) return;
-    if (!tokens.length) {
-      status.textContent = "the characters picker is unavailable. add your artwork as a token from the characters dock, or ask the gm to place it and assign you as its owner.";
-      return;
-    }
-    tokens.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
-    source.replaceChildren(...tokens.map((token) => new Option(token.name || "unnamed token", token.id)));
-    pending = { index, button, render, tokens };
-    picker.hidden = false;
-    status.textContent = "choose scene artwork for slot " + (index + 1) + ".";
-    source.focus();
   }
 
   use.addEventListener("click", () => {
     if (!pending) return;
-    const token = pending.tokens.find(({ id }) => id === source.value);
-    if (!token || !saveAvatarArtSlot(pending.index, token)) {
-      status.textContent = "this token’s artwork couldn’t be saved. choose another token.";
-      return;
+    try {
+      const { index, kind, render, tokens } = pending;
+      const token = tokens.find(({ id }) => id === source.value);
+      if (!token) return;
+      assignImage(index, kind, token);
+      render();
+      closePicker(true);
+      status.textContent = "";
+    } catch (error) {
+      status.textContent = error.message;
     }
-    pending.render();
-    closeScenePicker(true);
-    status.textContent = "";
   });
-
   cancel.addEventListener("click", () => {
-    closeScenePicker(true);
+    closePicker(true);
     status.textContent = "";
   });
 
-  slots.forEach((_, index) => {
-    const slot = index + 1;
+  const renderSpells = slots.map((saved, index) => {
+    const number = document.createElement("span");
+    number.textContent = index + 1;
     const row = document.createElement("div");
     row.className = "avatar-art-slot";
-    const number = document.createElement("span");
-    number.textContent = slot;
-    const choose = document.createElement("button");
-    choose.type = "button";
-    const clear = document.createElement("button");
-    clear.type = "button";
-    clear.textContent = "clear";
-    clear.setAttribute("aria-label", `clear artwork from slot ${slot}`);
-
-    function render() {
-      const name = slots[index]?.name;
-      choose.textContent = name ?? "choose art";
-      choose.title = name ?? "choose character artwork";
-      choose.setAttribute("aria-label", name ? `change art in slot ${slot}: ${name}` : `choose art for slot ${slot}`);
-      clear.disabled = !name;
+    const type = document.createElement("select");
+    type.setAttribute("aria-label", "slot " + (index + 1) + " type");
+    for (const [id, name] of [["", "empty"], ["avatar", "avatar"], ["emote", "emote"], ["spell", "spell"]]) {
+      type.add(new Option(name, id));
     }
-    render();
-    row.append(number, choose, clear);
-    list.append(row);
-
-    choose.addEventListener("click", async () => {
-      if (opening) return;
-      opening = true;
-      closeScenePicker();
-      choose.disabled = true;
-      clear.disabled = true;
-      status.textContent = "";
-      try {
-        let assets;
-        try {
-          assets = await OBR.assets.downloadImages(false, undefined, "CHARACTER");
-        } catch {
-          await openScenePicker(index, choose, render);
-          return;
-        }
-        const [asset] = assets;
-        if (!asset) return;
-        if (asset.type !== "CHARACTER") throw new Error("choose an image from characters.");
-        if (!saveAvatarArtSlot(index, asset)) throw new Error("this artwork couldn’t be saved.");
-      } catch (error) {
-        status.textContent = error?.message || "couldn’t load character artwork.";
-      } finally {
-        opening = false;
-        choose.disabled = false;
-        render();
+    type.value = saved?.kind ?? "";
+    const art = document.createElement("button");
+    art.type = "button";
+    const emote = document.createElement("select");
+    emote.setAttribute("aria-label", "slot " + (index + 1) + " emote");
+    const spell = document.createElement("select");
+    spell.setAttribute("aria-label", "slot " + (index + 1) + " spell");
+    const updateSpells = () => {
+      const current = slots[index]?.skill;
+      spell.replaceChildren(new Option(spells.length ? "choose spell" : "no granted spells", ""),
+        ...spells.map((id) => new Option(SKILLS[id].name, id)));
+      if (current && !spells.includes(current) && Object.hasOwn(SKILLS, current)) {
+        spell.add(new Option(SKILLS[current].name + " (unavailable)", current));
       }
-    });
-
-    clear.addEventListener("click", () => {
-      if (pending?.index === index) closeScenePicker();
-      saveAvatarArtSlot(index, null);
-      status.textContent = "";
+      spell.value = current || "";
+    };
+    function render() {
+      const value = slots[index];
+      art.hidden = type.value !== "avatar";
+      emote.hidden = type.value !== "emote";
+      spell.hidden = type.value !== "spell";
+      art.textContent = value?.artwork?.name ?? "choose art";
+      art.title = art.textContent;
+      emote.replaceChildren(new Option("choose emote", ""),
+        ...Object.entries(BUILTIN_EMOTES).map(([id, glyph]) => new Option(glyph + " " + id, id)),
+        new Option("choose asset…", "custom"));
+      if (value?.emote?.image) emote.add(new Option(value.name || "custom image", "image"));
+      emote.value = value?.emote?.id ?? (value?.emote?.image ? "image" : "");
+      updateSpells();
+    }
+    type.addEventListener("change", () => {
+      if (opening) { type.value = slots[index]?.kind ?? ""; return; }
+      if (pending?.index === index) closePicker();
+      saveQuickbarSlot(index, null);
       render();
     });
+    art.addEventListener("click", () => void chooseImage(index, "avatar", art, render));
+    emote.addEventListener("change", () => {
+      if (emote.value === "custom") {
+        void chooseImage(index, "emote", emote, render);
+        return;
+      }
+      if (Object.hasOwn(BUILTIN_EMOTES, emote.value)) {
+        if (pending?.index === index) closePicker();
+        saveQuickbarSlot(index, { kind: "emote", emote: { id: emote.value } });
+      }
+      render();
+    });
+    spell.addEventListener("change", () => {
+      if (spells.includes(spell.value)) saveQuickbarSlot(index, { kind: "spell", skill: spell.value });
+      updateSpells();
+    });
+    render();
+    row.append(number, type, art, emote, spell);
+    list.append(row);
+    return updateSpells;
   });
+  return (available) => {
+    const next = SPELLS.filter((id) => available.includes(id));
+    if (next.join() === spells.join()) return;
+    spells = next;
+    renderSpells.forEach((update) => update());
+  };
 }

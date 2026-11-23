@@ -4,8 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>overhead chat</title>
-  <link rel="stylesheet" href="./chat.css?v=2.7.18">
-  <script type="module" src="./chat.js?v=2.7.20"></script>
+  <link rel="stylesheet" href="./chat.css?v=2.7.21">
+  <script type="module" src="./chat.js?v=2.7.21"></script>
 </head>
 <body>
   <main>
@@ -100,7 +100,7 @@
     <section id="avatar-panel" aria-label="avatar slots" hidden>
       <div class="avatar-modes" role="group" aria-label="avatar hotkey mode">
         <button id="avatar-talk" type="button" aria-pressed="false" aria-controls="avatar-talk-panel" hidden>talk as</button>
-        <button id="avatar-change" type="button" aria-pressed="true" aria-controls="avatar-change-panel">change to</button>
+        <button id="avatar-change" type="button" aria-pressed="true" aria-controls="avatar-change-panel">quickbar</button>
       </div>
       <div id="avatar-talk-panel" hidden>
         <p>Press 1–9 in move mode to switch to the assigned token.</p>
@@ -108,11 +108,11 @@
         <p role="status"></p>
       </div>
       <div id="avatar-change-panel">
-        <p>Choose artwork from Characters. Press 1–9 in move mode to apply it to your current avatar.</p>
+        <p>Assign avatar art, an emote, or a granted spell to slots 1–9. Press the slot number in move mode.</p>
         <div id="avatar-scene-art" hidden>
-          <label for="avatar-art-source">choose artwork from one of your scene tokens</label>
+          <label for="avatar-art-source">choose an image from one of your scene items</label>
           <select id="avatar-art-source"></select>
-          <button id="avatar-art-use" type="button">use art</button>
+          <button id="avatar-art-use" type="button">use image</button>
           <button id="avatar-art-cancel" type="button">cancel</button>
         </div>
         <p role="status"></p>
@@ -143,6 +143,7 @@
       <section id="player-stats" aria-label="avatar stats" hidden>
         <form class="stats-form">
           <fieldset aria-label="ability scores"></fieldset>
+          <fieldset class="stats-details" aria-label="combat stats"></fieldset>
           <button type="submit" hidden>save stats</button>
           <p class="skill-feedback" role="status"></p>
         </form>
@@ -178,6 +179,7 @@
         <section id="skill-grant-stats" aria-label="edit token stats" hidden>
           <form class="stats-form">
             <fieldset aria-label="ability scores"></fieldset>
+            <fieldset class="stats-details" aria-label="combat stats"></fieldset>
             <label class="discord-enabled"><input type="checkbox" name="editable"> editable stats for players</label>
             <button type="submit">save stats</button>
             <p class="skill-feedback" role="status"></p>

@@ -1,5 +1,6 @@
 import OBR from "./obr.js";
 import { normalizeAppearance } from "./appearance.js?v=2.7.9";
+import { parseEmote } from "./emotes.js?v=2.7.21";
 import { AVATAR } from "./rules.js";
 
 function avatarKey() {
@@ -24,7 +25,7 @@ export function saveAvatar(tokenId) {
 
 let avatarSlots;
 let avatarMode;
-let avatarArtSlots;
+let quickbarSlots;
 
 export function savedAvatarSlots() {
   if (avatarSlots) return avatarSlots;
@@ -68,21 +69,39 @@ function normalizeAvatarArt(asset) {
   };
 }
 
-export function savedAvatarArtSlots() {
-  if (avatarArtSlots) return avatarArtSlots;
-  let stored;
-  try { stored = JSON.parse(localStorage.getItem(avatarKey() + ":art")); } catch {}
-  avatarArtSlots = Array.from({ length: 9 }, (_, index) => normalizeAvatarArt(stored?.[index]));
-  return avatarArtSlots;
+function normalizeQuickbar(slot) {
+  if (slot?.kind === "avatar") {
+    const artwork = normalizeAvatarArt(slot.artwork);
+    if (artwork) return { kind: "avatar", artwork };
+  }
+  if (slot?.kind === "emote") {
+    const emote = parseEmote(slot.emote);
+    if (emote) return { kind: "emote", emote, name: typeof slot.name === "string" ? slot.name.slice(0, 100) : "" };
+  }
+  if (slot?.kind === "spell" && typeof slot.skill === "string") return { kind: "spell", skill: slot.skill };
+  return null;
 }
 
-export function saveAvatarArtSlot(index, asset) {
-  const artwork = normalizeAvatarArt(asset);
-  if (asset && !artwork) return null;
-  const slots = savedAvatarArtSlots();
-  slots[index] = artwork;
-  try { localStorage.setItem(avatarKey() + ":art", JSON.stringify(slots)); } catch {}
-  return artwork;
+export function savedQuickbarSlots() {
+  if (quickbarSlots) return quickbarSlots;
+  let stored;
+  let legacy;
+  try {
+    stored = JSON.parse(localStorage.getItem(avatarKey() + ":quickbar"));
+    if (!Array.isArray(stored)) legacy = JSON.parse(localStorage.getItem(avatarKey() + ":art"));
+  } catch {}
+  quickbarSlots = Array.from({ length: 9 }, (_, index) =>
+    normalizeQuickbar(legacy ? { kind: "avatar", artwork: legacy[index] } : stored?.[index]));
+  return quickbarSlots;
+}
+
+export function saveQuickbarSlot(index, value) {
+  const slot = normalizeQuickbar(value);
+  if (value && !slot) return null;
+  const slots = savedQuickbarSlots();
+  slots[index] = slot;
+  try { localStorage.setItem(avatarKey() + ":quickbar", JSON.stringify(slots)); } catch {}
+  return slot;
 }
 
 export async function openSessionChannel() {
