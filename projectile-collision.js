@@ -143,42 +143,6 @@ function hasClearPath(source, target, walls) {
   return closestWall(source, direction, walls).distance > range + EPSILON;
 }
 
-export function clearSpellPath(source, target, items) {
-  return hasClearPath(source, target, collectWalls(items));
-}
-
-function blastHits(source, coverOrigin, radius, targets, walls) {
-  return targets.filter((target) => {
-    const offset = subtract(target.center, source);
-    return Math.hypot(offset.x, offset.y) <= radius + target.radius &&
-      hasClearPath(coverOrigin, target.center, walls);
-  }).map(({ id }) => id);
-}
-
-export function areaHits(source, radius, items, dpi) {
-  const targets = [];
-  for (const item of items) {
-    if (!isProjectileToken(item)) continue;
-    const circle = tokenCircle(item, dpi);
-    if (circle) targets.push({ id: item.id, ...circle });
-  }
-  return blastHits(source, source, radius, targets, collectWalls(items));
-}
-
-export function teleportLandingClear(source, destination, caster, items, dpi) {
-  const { radius } = tokenCircle(caster, dpi) ?? { radius: dpi / 2 };
-  const walls = collectWalls(items);
-  if (!hasClearPath(source, destination, walls) ||
-      walls.some(({ a, b }) => Math.hypot(b.x - a.x, b.y - a.y) > EPSILON &&
-        distanceToSegment(destination, a, b) < radius - EPSILON)) return false;
-  return !items.some((item) => {
-    if (item.id === caster.id || item.type !== "IMAGE" || item.layer !== "CHARACTER") return false;
-    const circle = tokenCircle(item, dpi);
-    return circle && Math.hypot(destination.x - circle.center.x, destination.y - circle.center.y) <
-      radius + circle.radius - EPSILON;
-  });
-}
-
 function distanceToSegment(point, start, end) {
   const edge = subtract(end, start);
   const fraction = Math.max(0, Math.min(1, dot(subtract(point, start), edge) / dot(edge, edge)));
@@ -248,7 +212,11 @@ export function projectileImpact(source, destination, items, casterId, dpi, blas
   const impact = advance(source, direction, distance);
   // Start the cover ray just on the caster's side of the impact wall.
   const coverOrigin = hitWall ? advance(impact, direction, -dpi / 1000) : impact;
-  const hitTokenIds = blastHits(impact, coverOrigin, blastRadius, targets, walls);
+  const hitTokenIds = targets.filter((target) => {
+    const offset = subtract(target.center, impact);
+    if (Math.hypot(offset.x, offset.y) > blastRadius + target.radius) return false;
+    return hasClearPath(coverOrigin, target.center, walls);
+  }).map(({ id }) => id);
   return { destination: end, hitTokenIds };
 }
 
