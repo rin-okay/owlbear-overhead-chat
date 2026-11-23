@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>overhead chat</title>
   <link rel="stylesheet" href="./chat.css?v=2.8.10">
-  <script type="module" src="./chat.js?v=2.9.0"></script>
+  <script type="module" src="./chat.js?v=2.9.1"></script>
 </head>
 <body>
   <main>
@@ -246,7 +246,7 @@
       <footer id="extension-version" hidden></footer>
     </section>
   </main>
-  <section id="combat-window" aria-label="combat log" hidden>
+  <section id="combat-window" aria-label="combat log" tabindex="-1" hidden>
     <header><h1>combat log</h1><button id="combat-close" type="button" aria-label="close combat log">×</button></header>
       <section id="combat-transcript" role="log" aria-label="combat results">
         <p id="combat-empty">No combat yet.</p>

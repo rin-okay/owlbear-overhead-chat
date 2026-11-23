@@ -10,8 +10,8 @@ import {
 } from "./session.js?v=2.7.21";
 
 import { drawBubble, normalizeAppearance, prepareBubbleFont } from "./appearance.js?v=2.7.9";
-import { setupDiscordPanel } from "./discord-panel.js?v=2.9.0";
-import { openCombatLog } from "./combat-log.js?v=2.8.10";
+import { setupDiscordPanel } from "./discord-panel.js?v=2.9.1";
+import { openCombatLog } from "./combat-log.js?v=2.9.1";
 import { setupAvatarPanel } from "./avatar-panel.js?v=2.8.6";
 import { setupSkillGrants, setupSkillPanel } from "./skill-panel.js?v=2.8.6";
 import { setupStatsEditor } from "./stats-panel.js?v=2.8.5";
@@ -36,6 +36,7 @@ const speaker = document.querySelector("#speaker");
 const input = document.querySelector("#message");
 const send = form.querySelector("[type=submit]");
 const moveButton = form.querySelector("#move-avatar");
+const combatOpenButton = document.querySelector("#combat-log-open");
 const moveModeLabel = form.querySelector("#move-mode-label");
 const moveWarning = form.querySelector("#move-warning");
 const status = document.querySelector("#status");
@@ -64,6 +65,7 @@ let controlsInactive = false;
 let tokenFocusHandoff;
 let pendingChatShortcut;
 let combatAvatarId;
+let combatModePaused = false;
 let sendChatNotice;
 let movingAvatar = false;
 let modeExitKey;
@@ -252,6 +254,10 @@ function inactiveKey() {
   return JSON.stringify(["chat.overhead.controls-inactive", OBR.room.id, OBR.player.id]);
 }
 
+function combatFocusKey() {
+  return JSON.stringify(["chat.overhead.combat-focus", OBR.room.id, OBR.player.id]);
+}
+
 function setControlsInactive(inactive) {
   if (controlsInactive === inactive) return;
   controlsInactive = inactive;
@@ -347,15 +353,23 @@ function stopTokenControl() {
   updateControls();
 }
 
-function startTokenControl() {
-  if (moveButton.disabled) return;
+function startTokenControl({ combatKey = false } = {}) {
+  if (moveButton.disabled || !avatar) return;
   if (!combatWindow) moveButton.focus({ preventScroll: true });
-  if (!document.hasFocus() || (!combatWindow && document.activeElement !== moveButton)) {
+  const focused = combatWindow && combatKey ||
+    document.hasFocus() && (combatWindow || document.activeElement === moveButton);
+  if (!focused) {
     suspendTokenControl();
     setControlsInactive(true);
     return;
   }
-  if (!tokenControl) tokenControl = { tokenId: avatar.id, actions: [] };
+  if (!tokenControl) {
+    tokenControl = { tokenId: avatar.id, actions: [] };
+    if (combatWindow) {
+      combatAvatarId = avatar.id;
+      try { sessionStorage.setItem(combatFocusKey(), crypto.randomUUID()); } catch {}
+    }
+  }
   tokenFocusHandoff = undefined;
   setControlsInactive(false);
   moveButton.setAttribute("aria-pressed", "true");
@@ -595,12 +609,14 @@ function handleTargetKey(event) {
 
 moveButton.addEventListener("blur", (event) => {
   stopRotation(tokenControl);
-  if (event.relatedTarget && event.relatedTarget !== input) suspendTokenControl();
+  if (event.relatedTarget && event.relatedTarget !== input &&
+      !combatOpenButton?.contains(event.relatedTarget)) suspendTokenControl();
 });
 window.addEventListener("blur", () => suspendTokenControl(!combatWindow));
 window.addEventListener("pagehide", () => suspendTokenControl());
 document.addEventListener("pointerdown", (event) => {
-  if (!combatWindow && event.target !== input && !moveButton.contains(event.target)) suspendTokenControl();
+  if (!combatWindow && event.target !== input && !moveButton.contains(event.target) &&
+      !combatOpenButton?.contains(event.target)) suspendTokenControl();
 });
 input.addEventListener("pointerdown", () => {
   tokenFocusHandoff = undefined;
@@ -640,7 +656,8 @@ function handleControlKeyDown(event) {
       if (event.repeat) return;
       modeExitKey = event.key;
       stopTokenControl();
-      if (!combatWindow) input.focus();
+      if (combatWindow) combatModePaused = true;
+      else input.focus();
     } else if (/^[1-9]$/.test(key) && !event.ctrlKey && !event.altKey && !event.metaKey) {
       event.preventDefault();
       if (!event.repeat) useAvatarSlot(tokenControl, key);
@@ -679,7 +696,7 @@ function handleControlKeyDown(event) {
 
 async function focusChatFromCombat() {
   stopTokenControl();
-  combatAvatarId = undefined;
+  combatModePaused = true;
   await OBR.action.open();
   requestChatShortcut(OBR, "chat");
 }
@@ -688,12 +705,22 @@ form.addEventListener("keyup", handleControlKeyUp);
 form.addEventListener("keydown", (event) => {
   if (event.target === input || (event.target === moveButton && tokenControl)) handleControlKeyDown(event);
 });
-if (combatWindow) window.addEventListener("focus", () => {
-  if (avatar && !tokenControl) {
-    combatAvatarId = avatar.id;
-    startTokenControl();
-  }
-});
+function resumeCombatControls() {
+  combatModePaused = false;
+  if (!tokenControl) startTokenControl();
+}
+
+if (combatWindow) {
+  window.addEventListener("focus", resumeCombatControls);
+  combatWindow.addEventListener("focusin", (event) => {
+    if (!event.target.closest("dialog")) resumeCombatControls();
+  });
+  combatWindow.addEventListener("pointerdown", (event) => {
+    if (event.target.closest("dialog")) return;
+    if (!event.target.closest("button, input, label, a")) combatWindow.focus({ preventScroll: true });
+    resumeCombatControls();
+  });
+}
 combatWindow?.addEventListener("keyup", (event) => {
   if (!event.target.closest("dialog")) handleControlKeyUp(event);
 });
@@ -707,6 +734,7 @@ combatWindow?.addEventListener("keydown", (event) => {
   }
   // Enter activates the focused Apply or Undo button as usual.
   if (event.key === "Enter" && event.target.closest("button, input")) return;
+  if (!tokenControl && !combatModePaused) startTokenControl({ combatKey: true });
   if (tokenControl) handleControlKeyDown(event);
 });
 
@@ -1080,7 +1108,7 @@ function setupSettings() {
     else if (event.key === "F3") void centerAvatar(OBR).catch(console.error);
     else if (!combatWindow) openFromShortcut(event.key === "F1" ? "chat" : "move");
     else if (event.key === "F1") void focusChatFromCombat().catch(console.error);
-    else startTokenControl();
+    else resumeCombatControls();
   }, true);
   if (!welcome && !combatWindow) listenForChatShortcut(OBR, openFromShortcut);
   setupDiscordPanel(() => select(0), () => select(2));
@@ -1096,12 +1124,21 @@ function setupSettings() {
 OBR.onReady(() => {
   if (!combatWindow) {
     try { controlsInactive = sessionStorage.getItem(inactiveKey()) === "1"; } catch {}
+    window.addEventListener("storage", (event) => {
+      if (event.key !== combatFocusKey() || event.storageArea !== sessionStorage ||
+          !event.newValue || !tokenFocusHandoff) return;
+      tokenFocusHandoff = undefined;
+      setControlsInactive(false);
+    });
     updateControls();
   }
   targeting = setupTargeting(OBR, updateMoveModeLabel);
   const updateFontRole = setupSettings();
-  document.querySelector("#combat-log-open")?.addEventListener("click", () => {
+  combatOpenButton?.addEventListener("click", () => {
+    const wasMoving = Boolean(tokenControl);
+    if (wasMoving) stopTokenControl();
     void openCombatLog(OBR).catch((error) => {
+      if (wasMoving) startTokenControl();
       console.error("Overhead Chat could not open the combat log", error);
       void OBR.notification.show("Couldn’t open the combat log.");
     });
