@@ -1,17 +1,11 @@
 import { buildPath, Command } from "./obr.js";
 
-const TOOL = "chat.overhead.target";
-const MODE = "chat.overhead.target.pick";
-const ICON = new URL("./target.svg", import.meta.url).href;
 const report = (error) => console.warn("Overhead Chat target selection", error);
 const validPoint = (point) => Number.isFinite(point?.x) && Number.isFinite(point?.y);
 
-export function setupTargeting(obr, { onChange, onKey, onConfirm }) {
+export function setupTargeting(obr, onChange) {
   let current;
-  let activeState;
-  let registration;
   let markerWork = Promise.resolve();
-  let toolWork = Promise.resolve();
 
   function draw(state, position) {
     markerWork = markerWork.catch(report).then(async () => {
@@ -41,25 +35,12 @@ export function setupTargeting(obr, { onChange, onKey, onConfirm }) {
     }).catch(report);
   }
 
-  function restoreTool(state) {
-    toolWork = toolWork.then(() => state.work).then(async () => {
-      if (!state.previous || await obr.tool.getActiveToolMode() !== MODE) return;
-      await obr.tool.activateMode(...state.previous);
-    }).catch(report);
-    return toolWork;
-  }
-
-  function clear(refocus = false) {
+  function clear() {
     const state = current;
     if (!state) return;
     current = undefined;
     onChange();
     draw(state);
-    if (state.editing) {
-      void restoreTool(state).then(() => {
-        if (refocus && !current) onConfirm();
-      });
-    }
   }
 
   function enqueue(state, task) {
@@ -77,86 +58,34 @@ export function setupTargeting(obr, { onChange, onKey, onConfirm }) {
     draw(state, snapped);
   }
 
-  async function confirm(restore = true) {
+  async function confirm() {
     const state = current;
     if (!state?.editing) return;
     await state.work;
-    if (current !== state || !state.editing) return;
-    if (!state.point) {
-      clear();
-      return;
-    }
+    if (current !== state || !state.editing || !state.point) return;
     state.editing = false;
     onChange();
-    if (restore) {
-      await restoreTool(state);
-      if (current === state) onConfirm();
-    }
-  }
-
-  function register() {
-    if (!registration) {
-      registration = (async () => {
-        await obr.tool.createMode({
-          id: MODE,
-          icons: [{ icon: ICON, label: "Pick a spell target", filter: { activeTools: [TOOL] } }],
-          cursors: [{ cursor: "crosshair" }],
-          onToolClick(_, { pointerPosition }) {
-            const state = current;
-            if (!state?.editing || state !== activeState || !validPoint(pointerPosition)) return false;
-            void enqueue(state, () => setPoint(state, pointerPosition)).then(() => {
-              if (current === state) return confirm();
-            });
-            return false;
-          },
-          onToolDoubleClick: () => false,
-          onKeyDown: (_, event) => { if (activeState === current) onKey(event); },
-          onDeactivate() {
-            const state = activeState;
-            activeState = undefined;
-            if (state && current === state) void confirm(false);
-          },
-        });
-        await obr.tool.create({
-          id: TOOL, defaultMode: MODE,
-          icons: [{ icon: ICON, label: "Spell targeting (Z in move mode)" }],
-          onClick() { onKey({ key: "z" }); return false; },
-        });
-      })().catch((error) => {
-        registration = undefined;
-        throw error;
-      });
-    }
-    return registration;
   }
 
   function toggle(tokenId) {
     if (current) {
-      clear(true);
+      clear();
       return;
     }
-    const previousToolWork = toolWork;
     const state = { editing: true, work: Promise.resolve() };
     current = state;
     onChange();
     void enqueue(state, async () => {
       try {
-        await previousToolWork;
-        if (current !== state) return;
-        const [tool, mode, dpi, bounds] = await Promise.all([
-          obr.tool.getActiveTool(), obr.tool.getActiveToolMode(),
-          obr.scene.grid.getDpi(), obr.scene.items.getItemBounds([tokenId]), register(),
+        const [dpi, bounds] = await Promise.all([
+          obr.scene.grid.getDpi(), obr.scene.items.getItemBounds([tokenId]),
         ]);
         if (current !== state) return;
-        if (!tool || !mode || !Number.isFinite(dpi) || dpi <= 0 || !validPoint(bounds?.center)) {
-          throw Error("The active tool, scene grid, or avatar is unavailable.");
+        if (!Number.isFinite(dpi) || dpi <= 0 || !validPoint(bounds?.center)) {
+          throw Error("The scene grid or avatar is unavailable.");
         }
-        state.previous = [tool, mode];
         state.dpi = dpi;
         await setPoint(state, bounds.center);
-        if (current !== state) return;
-        activeState = state;
-        await obr.tool.activateMode(TOOL, MODE);
       } catch (error) {
         report(error);
         if (current === state) clear();
@@ -165,13 +94,12 @@ export function setupTargeting(obr, { onChange, onKey, onConfirm }) {
   }
 
   obr.scene.onReadyChange((ready) => { if (!ready) clear(); });
-  obr.scene.grid.onChange(() => clear());
-  window.addEventListener("pagehide", () => clear(), { once: true });
+  window.addEventListener("pagehide", clear, { once: true });
 
   return {
     toggle, clear, confirm,
     editing: () => Boolean(current?.editing),
-    location: () => current?.point,
+    location: () => current && !current.editing ? current.point : undefined,
     move(offset) {
       const state = current;
       if (!state?.editing) return;

@@ -10,10 +10,10 @@ import {
 } from "./session.js?v=2.7.9";
 
 import { drawBubble, normalizeAppearance, prepareBubbleFont } from "./appearance.js?v=2.7.9";
-import { setupDiscordPanel } from "./discord-panel.js?v=2.7.16";
+import { setupDiscordPanel } from "./discord-panel.js?v=2.7.17";
 import { setupAvatarPanel } from "./avatar-panel.js?v=2.7.9";
 import { setupSkillGrants, setupSkillPanel } from "./skill-panel.js?v=2.7.16";
-import { setupTargeting } from "./targeting.js?v=2.7.16";
+import { setupTargeting } from "./targeting.js?v=2.7.17";
 import { listenForChatShortcut } from "./chat-shortcut.js?v=2.6.4";
 import { cameraFollowPreference, centerAvatar, prepareKeyboardPan } from "./avatar-viewport.js?v=2.7.9";
 
@@ -462,7 +462,7 @@ function useAvatarSlot(mode, key) {
 }
 
 function updateMoveModeLabel() {
-  moveModeLabel.textContent = targeting?.editing() ? "set target · wasd or click a tile"
+  moveModeLabel.textContent = targeting?.editing() ? "set target · wasd, space to set"
     : targeting?.location() ? "move mode · target set" : "move mode enabled";
 }
 
@@ -478,22 +478,11 @@ function handleTargetKey(event) {
     return true;
   }
   if (!targeting.editing()) return false;
-  const offset = movementKeys[key]?.offset;
-  if (offset) targeting.move(offset);
-  else if (!event.repeat) {
-    if (key === "escape") targeting.clear(true);
-    else if (key === "enter") void targeting.confirm();
-    else {
-      const skill = !event.shiftKey && skillPanel?.skillForKey(key);
-      if (skill) {
-        void targeting.confirm().then(() => {
-          if (mode === tokenControl && !mode.switching && mode.actions.length < 4) {
-            queueAvatarAction(mode, { skill, targetLocation: targeting.location() });
-          }
-        });
-      }
-    }
-  }
+  if (/^[wasd]$/.test(key)) targeting.move(movementKeys[key].offset);
+  else if (!event.repeat && key === " ") {
+    modeExitKey = event.key;
+    void targeting.confirm();
+  } else if (!event.repeat && key === "escape") targeting.clear();
   return true;
 }
 
@@ -940,11 +929,7 @@ function setupSettings() {
 }
 
 OBR.onReady(() => {
-  targeting = setupTargeting(OBR, {
-    onChange: updateMoveModeLabel,
-    onKey: handleTargetKey,
-    onConfirm: () => { if (tokenControl) moveButton.focus({ preventScroll: true }); },
-  });
+  targeting = setupTargeting(OBR, updateMoveModeLabel);
   const updateFontRole = setupSettings();
   setupMeleeHitTiming();
   setupRoomToggle("gm-fog-settings", ABOVE_FOG);
