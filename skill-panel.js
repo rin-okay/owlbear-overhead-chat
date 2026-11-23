@@ -217,6 +217,7 @@ export function setupSkillGrants(obr) {
   const team = document.querySelector("#grant-team-type");
   const teamGrant = document.querySelector("#skill-grant-team");
   const tokens = document.querySelector("#skill-token");
+  const useSelectedToken = document.querySelector("#skill-use-selected-token");
   const spell = document.querySelector("#grant-spell-type");
   const spellGrant = document.querySelector("#skill-grant-spell");
   const parameterControls = [
@@ -249,6 +250,7 @@ export function setupSkillGrants(obr) {
     friendlyFire.disabled = !allowed || saving;
     friendlyFire.value = friendlyFireMode(config);
     tokens.disabled = !allowed || saving || tokens.options.length <= 1;
+    useSelectedToken.disabled = tokens.disabled;
     const disableGrants = !allowed || saving || !tokens.value;
     spell.disabled = weapon.disabled = team.disabled = disableGrants;
     teamGrant.disabled = disableGrants || !team.value;
@@ -314,7 +316,7 @@ export function setupSkillGrants(obr) {
   async function save(change) {
     if (saving) return;
     saving = true;
-    enabled.disabled = tokens.disabled = spell.disabled = spellGrant.disabled =
+    enabled.disabled = tokens.disabled = useSelectedToken.disabled = spell.disabled = spellGrant.disabled =
       weapon.disabled = weaponGrant.disabled =
       friendlyFire.disabled = team.disabled = teamGrant.disabled = true;
     for (const { input } of parameterControls) input.disabled = true;
@@ -377,7 +379,29 @@ export function setupSkillGrants(obr) {
   }
   enabled.addEventListener("change", () => { void save({ enabled: enabled.checked }); });
   friendlyFire.addEventListener("change", () => { void save({ friendlyFire: friendlyFire.value }); });
-  tokens.addEventListener("change", () => render(readSkills(obr, "gm")));
+  tokens.addEventListener("change", () => {
+    status.textContent = "";
+    render(readSkills(obr, "gm"));
+  });
+  useSelectedToken.addEventListener("click", async () => {
+    const requested = revision;
+    try {
+      const selection = new Set(await obr.player.getSelection());
+      if (requested !== revision || useSelectedToken.disabled || !isOpen()) return;
+      const matches = Array.from(tokens.options).filter(({ value }) => value && selection.has(value));
+      if (matches.length !== 1) {
+        status.textContent = "Select one character token on the map.";
+        return;
+      }
+      tokens.value = matches[0].value;
+      status.textContent = "";
+      render(readSkills(obr, "gm"));
+    } catch {
+      if (requested === revision && !useSelectedToken.disabled && isOpen()) {
+        status.textContent = "Couldn’t read the map selection.";
+      }
+    }
+  });
   team.addEventListener("change", () => render(readSkills(obr, "gm")));
   teamGrant.addEventListener("change", () => {
     if (tokens.value && team.value) void save({ tokenId: tokens.value, team: team.value, grant: teamGrant.checked });

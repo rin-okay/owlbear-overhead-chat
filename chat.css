@@ -154,6 +154,9 @@ select { font: inherit; background: #181321; color: inherit; border: 1px solid #
 #skill-avatar-preview span { position: absolute; inset: 0; text-align: center; line-height: 38px; color: #fff; text-shadow: 0 0 3px #17121f; }
 .skill-field { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 6px 0; }
 #skill-spell-parameter, #skill-spell-target-limit { width: 6em; min-height: 28px; }
+.skill-token-row { display: flex; align-items: center; gap: 8px; }
+.skill-token-row .skill-field { flex: 1; min-width: 0; }
+.skill-token-row button { flex: none; }
 .skill-field select { min-width: 0; max-width: 70%; }
 .skill-feedback { margin: 4px 0 0; font-size: 11px; color: #c8bbd5; }
 .skill-feedback:empty { display: none; }
