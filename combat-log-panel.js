@@ -125,17 +125,28 @@ function createEntry(entry) {
   const item = document.createElement("li");
   item.className = "entry";
   const level = entry.level > 0 ? " (level " + entry.level + ")" : "";
-  const heading = entry.selected && entry.attack
+  const multiple = entry.hits.length > 1;
+  const heading = !multiple && entry.selected && entry.attack
     ? entry.actor + " attacks " + entry.selected.name + " with " + entry.action + level
     : entry.actor + " uses " + entry.action + level;
   item.append(paragraph(heading, "action"));
 
   const controls = [];
   if (entry.attack && !entry.hits.length) item.append(paragraph("it misses!", "outcome"));
+  if (multiple && entry.damage) item.append(paragraph(formatCombatDamage(entry.damage), "damage"));
   for (const hit of entry.hits) {
     const hitSection = document.createElement("section");
-    if (hit.id !== entry.selected?.id || !entry.attack || entry.saveAbility) {
-      const line = paragraph("it hits " + hit.name + "!", "outcome");
+    if (multiple) hitSection.className = "target-line";
+    if (multiple || hit.id !== entry.selected?.id || !entry.attack || entry.saveAbility) {
+      const text = "it hits " + hit.name + "!";
+      const line = paragraph(multiple ? "" : text, "outcome");
+      if (multiple) {
+        const label = document.createElement("span");
+        label.className = "target-name";
+        label.textContent = text;
+        label.title = text;
+        line.append(label);
+      }
       if (entry.saveAbility) {
         const save = document.createElement("button");
         save.className = "save-button";
@@ -157,7 +168,7 @@ function createEntry(entry) {
       }
       hitSection.append(line);
     }
-    if (entry.damage) hitSection.append(paragraph(formatCombatDamage(entry.damage), "damage"));
+    if (!multiple && entry.damage) hitSection.append(paragraph(formatCombatDamage(entry.damage), "damage"));
     if (entry.attack && !entry.damage?.blocked) controls.push(applyControls(entry, hit, hitSection));
     item.append(hitSection);
   }
