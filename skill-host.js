@@ -4,7 +4,7 @@ import { canSpeak, MELEE_HIT_TIMING, normalizeMeleeHitTiming } from "./rules.js?
 import {
   areaHits, clearSpellPath, coneHits, isProjectileToken, isProjectileWall, openMeleeDoor, projectileImpact, teleportLandingClear,
 } from "./projectile-collision.js?v=2.8.3";
-import { HIT_MARKERS, MELEE_HIT_CUE } from "./hit-markers.js?v=2.8.6";
+import { HIT_MARKERS, MELEE_HIT_CUE } from "./hit-markers.js?v=2.8.7";
 import { rollMeleeDamage } from "./melee-damage.js?v=2.7.19";
 import { readTokenStats } from "./stats.js?v=2.8.5";
 import { BLOCKED_MAGIC_MISSILE, eldritchBeamCount, MAGIC_MISSILE_INTERVAL, MAGIC_MISSILE_MAX_LEVEL, rollMagicMissileDart, rollSpellDamage } from "./spell-damage.js?v=2.8.6";

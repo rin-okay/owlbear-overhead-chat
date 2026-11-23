@@ -50,7 +50,7 @@ export function setupHitMarkers(obr, buildLabel) {
     });
   }
 
-  async function show(tokenIds, current, damage, xOffset = 0) {
+  async function show(tokenIds, current, damage, { x = 0, y = 0 } = {}) {
     const [targets, scale] = await Promise.all([
       obr.scene.items.getItems(tokenIds), obr.viewport.getScale(),
     ]);
@@ -69,7 +69,7 @@ export function setupHitMarkers(obr, buildLabel) {
         .fontSize(blocked ? 15 : maxRoll ? 32 : 21).fontWeight(maxRoll ? 900 : 700)
         .fillColor(blocked ? "#b3e7ff" : maxRoll ? "#ffc278" : "#ff4d61")
         .strokeColor(blocked ? "#183149" : maxRoll ? "#78142b" : "#26070d").strokeWidth(maxRoll ? 2 : 1).strokeOpacity(1)
-        .position({ x: bounds.center.x + xOffset / scale, y: bounds.min.y - 12 / scale })
+        .position({ x: bounds.center.x + x / scale, y: bounds.min.y - (12 + y) / scale })
         .layer("ATTACHMENT").locked(true).attachedTo(target.id).build();
       label.disableHit = true;
       label.disableAttachmentBehavior = ["COPY", "LOCKED", "ROTATION", "SCALE"];
@@ -121,10 +121,16 @@ export function setupHitMarkers(obr, buildLabel) {
       if (followUps) {
         // Separate splats that are still on screen when the next dart hits.
         const lanes = [0, -1, 1, -2, 2];
+        // A blocked splat fades before its row is reused by the fourth following dart.
+        const blockedJitter = [0, -4, 5, -3];
         await Promise.all([data.damage, ...followUps].map(async (damage, index) => {
           await wait(data.delay + index * MAGIC_MISSILE_INTERVAL);
-          const offset = lanes[index % lanes.length] * (damage.blocked ? 54 : 22);
-          if (current()) await show(tokenIds, current, damage, offset);
+          if (!current()) return;
+          const row = index % blockedJitter.length;
+          const offset = damage.blocked
+            ? { x: blockedJitter[row], y: row * 23 }
+            : { x: lanes[index % lanes.length] * 22 };
+          await show(tokenIds, current, damage, offset);
         }));
         return;
       }
