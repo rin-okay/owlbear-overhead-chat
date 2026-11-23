@@ -151,9 +151,10 @@ export function skillEffect(skillId, token, center, dpi, facing, weapon = DEFAUL
   const effect = skill.effect ?? (Object.hasOwn(WEAPONS, weapon) && "generic.weapon_attacks.melee.single." + weapon);
   if (!effect) return;
   if (skillId === "heart") {
+    // The heart travels vertically around the center of the clip over one loop.
     return {
       type: "effect", id: effect, layer: "ATTACHMENT", loops: 1,
-      effectProperties: { source: { x: center.x, y: center.y + dpi * 0.25 }, size: 2, disableHit: true },
+      effectProperties: { source: { x: center.x, y: center.y }, size: 2, disableHit: true },
     };
   }
   const rotation = token.rotation + artworkFacingAngle(token, facing);

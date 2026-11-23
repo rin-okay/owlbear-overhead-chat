@@ -5,7 +5,7 @@ import { HIT_MARKERS, MELEE_HIT_CUE } from "./hit-markers.js?v=2.6.16";
 import {
   DEFAULT_WEAPON, EMBERS_EFFECTS, MELEE_DURATION_MS, SKILLS, SKILL_REQUEST, SKILL_RESULT,
   artworkFacingAngle, availableSkills, availableWeapons, friendlyFireMode, readSkills, skillConnections, skillEffect, spellParameter, tokenTeams,
-} from "./skills.js?v=2.7.14";
+} from "./skills.js?v=2.7.15";
 
 function aimAtTarget(source, target, range, passThrough) {
   if (![target?.center?.x, target?.center?.y].every(Number.isFinite)) return;
