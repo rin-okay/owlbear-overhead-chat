@@ -10,9 +10,10 @@ import {
 } from "./session.js?v=2.7.9";
 
 import { drawBubble, normalizeAppearance, prepareBubbleFont } from "./appearance.js?v=2.7.9";
-import { setupDiscordPanel } from "./discord-panel.js?v=2.7.17";
+import { setupDiscordPanel } from "./discord-panel.js?v=2.7.18";
 import { setupAvatarPanel } from "./avatar-panel.js?v=2.7.9";
-import { setupSkillGrants, setupSkillPanel } from "./skill-panel.js?v=2.7.16";
+import { setupSkillGrants, setupSkillPanel } from "./skill-panel.js?v=2.7.18";
+import { setupStatsEditor } from "./stats-panel.js?v=2.7.18";
 import { setupTargeting } from "./targeting.js?v=2.7.17";
 import { listenForChatShortcut } from "./chat-shortcut.js?v=2.6.4";
 import { cameraFollowPreference, centerAvatar, prepareKeyboardPan } from "./avatar-viewport.js?v=2.7.9";
@@ -49,6 +50,7 @@ let movingAvatar = false;
 let modeExitKey;
 let refreshAvatarPanel;
 let skillPanel;
+let showPlayerStats;
 let targeting;
 let showSkillsForRole;
 let moveWarningTimer;
@@ -244,6 +246,7 @@ async function refresh() {
     speaker.textContent = token ? `Speaking as ${token.name || "Character"}` : "Pick an avatar";
     status.textContent = hint;
     skillPanel?.refresh(avatar);
+    showPlayerStats?.(avatar);
     updateControls();
     const shortcut = pendingChatShortcut;
     pendingChatShortcut = undefined;
@@ -259,6 +262,7 @@ async function refresh() {
     }
     avatar = null;
     skillPanel?.refresh(null);
+    showPlayerStats?.();
     speaker.textContent = "Pick an avatar";
     status.textContent = "Couldn’t read your avatar. Close and reopen chat to retry.";
     updateControls();
@@ -790,28 +794,34 @@ function setupSettings() {
   skillPanel = setupSkillPanel(OBR, () => avatar, (key) =>
     typeof key === "string" && /^[a-z]$/.test(key) && key !== "z" && !Object.hasOwn(movementKeys, key));
   const refreshSkillGrants = setupSkillGrants(OBR);
-  const skillsViews = document.querySelector("#skills-views");
   const loadoutTab = document.querySelector("#skill-loadout-tab");
+  const statsTab = document.querySelector("#skill-stats-tab");
   const grantsTab = document.querySelector("#skill-grants-tab");
   const loadout = document.querySelector("#player-skills");
+  const stats = document.querySelector("#player-stats");
   const grants = document.querySelector("#gm-skills");
-
-  function selectSkillView(showGrants) {
-    const isGrants = showGrants && !skillsViews.hidden;
-    loadout.hidden = isGrants;
-    grants.hidden = !isGrants;
-    grantsTab.setAttribute("aria-pressed", String(isGrants));
-    loadoutTab.setAttribute("aria-pressed", String(!isGrants));
+  showPlayerStats = setupStatsEditor(OBR, stats.querySelector("form"));
+  const skillViews = [
+    { tab: loadoutTab, panel: loadout },
+    { tab: statsTab, panel: stats },
+    { tab: grantsTab, panel: grants },
+  ];
+  let skillView = 0;
+  function selectSkillView(index) {
+    skillView = skillViews[index].tab.hidden ? 0 : index;
+    skillViews.forEach(({ tab, panel }, i) => {
+      panel.hidden = i !== skillView;
+      tab.setAttribute("aria-pressed", String(!panel.hidden));
+    });
     if (skillsPanel.hidden) return;
-    if (isGrants) void refreshSkillGrants();
-    else skillPanel.refresh(avatar, true);
+    if (skillView === 2) void refreshSkillGrants();
+    else if (skillView === 0) skillPanel.refresh(avatar, true);
   }
   showSkillsForRole = (role) => {
-    skillsViews.hidden = role !== "GM";
-    if (skillsViews.hidden && !grants.hidden) selectSkillView(false);
+    grantsTab.hidden = role !== "GM";
+    if (grantsTab.hidden && skillView === 2) selectSkillView(0);
   };
-  loadoutTab.addEventListener("click", () => selectSkillView(false));
-  grantsTab.addEventListener("click", () => selectSkillView(true));
+  skillViews.forEach(({ tab }, index) => tab.addEventListener("click", () => selectSkillView(index)));
   const updateAvatarPanel = setupAvatarPanel(avatarPanel);
   refreshAvatarPanel = (items) => updateAvatarPanel(items, playerRole);
   const fields = settingsPanel.querySelector("form");
@@ -878,7 +888,7 @@ function setupSettings() {
       panel.hidden = index !== view;
     });
     if (index === 0) scrollToLatest();
-    if (index === 4) selectSkillView(!grants.hidden);
+    if (index === 4) selectSkillView(skillView);
   }
 
   function showTutorial() {
@@ -966,7 +976,10 @@ OBR.onReady(() => {
     if (tokenControl) tokenControl.movementGrid = undefined;
   });
   OBR.scene.onReadyChange((ready) => {
-    if (!ready) stopTokenControl();
+    if (!ready) {
+      stopTokenControl();
+      showPlayerStats?.();
+    }
     void refresh();
     void refreshAvatarPanel();
   });
@@ -977,7 +990,10 @@ OBR.onReady(() => {
     const fields = ["id", "name", "visible", "locked", "type", "layer", "createdUserId"];
     if (fields.some((field) => next?.[field] !== observedToken?.[field]) || next?.image?.url !== observedToken?.image?.url) {
       observedToken = next;
+      showPlayerStats?.();
       void refresh();
+    } else if (avatar?.id === next?.id) {
+      showPlayerStats?.(next);
     }
   });
   OBR.room.onPermissionsChange(() => {

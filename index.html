@@ -4,8 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>overhead chat</title>
-  <link rel="stylesheet" href="./chat.css?v=2.7.12">
-  <script type="module" src="./chat.js?v=2.7.17"></script>
+  <link rel="stylesheet" href="./chat.css?v=2.7.18">
+  <script type="module" src="./chat.js?v=2.7.18"></script>
 </head>
 <body>
   <main>
@@ -120,9 +120,10 @@
       </div>
     </section>
     <section id="skills-panel" aria-label="skills" hidden>
-      <nav id="skills-views" aria-label="skills views" hidden>
+      <nav id="skills-views" aria-label="skills views">
         <button type="button" id="skill-loadout-tab" aria-controls="player-skills" aria-pressed="true">loadout</button>
-        <button type="button" id="skill-grants-tab" aria-controls="gm-skills" aria-pressed="false">grants</button>
+        <button type="button" id="skill-stats-tab" aria-controls="player-stats" aria-pressed="false">stats</button>
+        <button type="button" hidden id="skill-grants-tab" aria-controls="gm-skills" aria-pressed="false">grants</button>
       </nav>
       <section id="player-skills" aria-label="skill loadout">
         <div class="skill-facing-controls">
@@ -139,6 +140,13 @@
         <label class="skill-field" hidden>heart <select id="skill-bind-heart" aria-label="heart key"></select></label>
         <p id="skill-settings-status" class="skill-feedback" role="status"></p>
       </section>
+      <section id="player-stats" aria-label="avatar stats" hidden>
+        <form class="stats-form">
+          <fieldset aria-label="ability scores"></fieldset>
+          <button type="submit" hidden>save stats</button>
+          <p class="skill-feedback" role="status"></p>
+        </form>
+      </section>
       <section id="gm-skills" aria-label="skill grants" hidden>
         <label class="discord-enabled"><input id="skill-enabled" type="checkbox" disabled> enable skill hotkeys</label>
         <label class="skill-field">enable friendly fire <select id="skill-friendly-fire" disabled></select></label>
@@ -147,20 +155,34 @@
           <label class="skill-field">token <select id="skill-token" disabled><option value="">choose a token</option></select></label>
           <button type="button" id="skill-use-selected-token" disabled>use selected token</button>
         </div>
-        <label class="skill-field">team <select id="grant-team-type" disabled></select></label>
-        <label class="discord-enabled"><input id="skill-grant-team" type="checkbox" disabled> assign selected team</label>
-        <label class="skill-field">spell <select id="grant-spell-type" disabled></select></label>
-        <label class="discord-enabled"><input id="skill-grant-spell" type="checkbox" disabled> grant selected spell</label>
-        <label id="skill-spell-parameter-row" class="skill-field" hidden>
-          <span id="skill-spell-parameter-label"></span>
-          <input id="skill-spell-parameter" type="number" step="any" title="clear to restore the default" disabled>
-        </label>
-        <label id="skill-spell-target-limit-row" class="skill-field" hidden>
-          <span id="skill-spell-target-limit-label"></span>
-          <input id="skill-spell-target-limit" type="number" step="1" title="clear to restore the default" disabled>
-        </label>
-        <label class="skill-field">weapon type <select id="grant-weapon-type" disabled></select></label>
-        <label class="discord-enabled"><input id="skill-grant-weapon" type="checkbox" disabled> grant selected weapon</label>
+        <nav class="skill-grant-views" aria-label="grant views">
+          <button type="button" id="skill-assign-tab" aria-controls="skill-assign" aria-pressed="true">assign</button>
+          <button type="button" id="skill-grant-stats-tab" aria-controls="skill-grant-stats" aria-pressed="false">stats</button>
+        </nav>
+        <section id="skill-assign" aria-label="assign grants">
+          <label class="skill-field">team <select id="grant-team-type" disabled></select></label>
+          <label class="discord-enabled"><input id="skill-grant-team" type="checkbox" disabled> assign selected team</label>
+          <label class="skill-field">spell <select id="grant-spell-type" disabled></select></label>
+          <label class="discord-enabled"><input id="skill-grant-spell" type="checkbox" disabled> grant selected spell</label>
+          <label id="skill-spell-parameter-row" class="skill-field" hidden>
+            <span id="skill-spell-parameter-label"></span>
+            <input id="skill-spell-parameter" type="number" step="any" title="clear to restore the default" disabled>
+          </label>
+          <label id="skill-spell-target-limit-row" class="skill-field" hidden>
+            <span id="skill-spell-target-limit-label"></span>
+            <input id="skill-spell-target-limit" type="number" step="1" title="clear to restore the default" disabled>
+          </label>
+          <label class="skill-field">weapon type <select id="grant-weapon-type" disabled></select></label>
+          <label class="discord-enabled"><input id="skill-grant-weapon" type="checkbox" disabled> grant selected weapon</label>
+        </section>
+        <section id="skill-grant-stats" aria-label="edit token stats" hidden>
+          <form class="stats-form">
+            <fieldset aria-label="ability scores"></fieldset>
+            <label class="discord-enabled"><input type="checkbox" name="editable"> editable stats for players</label>
+            <button type="submit">save stats</button>
+            <p class="skill-feedback" role="status"></p>
+          </form>
+        </section>
         <p id="skill-gm-status" role="status"></p>
       </section>
     </section>

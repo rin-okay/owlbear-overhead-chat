@@ -1,3 +1,4 @@
+import { setupStatsEditor } from "./stats-panel.js?v=2.7.18";
 import { isPublicToken } from "./rules.js";
 import {
   DEFAULT_WEAPON, FACINGS, FRIENDLY_FIRE_MODES, SKILLS, SKILL_CHANGED, SKILL_REQUEST, SKILL_RESULT, SPELLS, TEAMS, WEAPONS,
@@ -233,6 +234,23 @@ export function setupSkillGrants(obr) {
   const weapon = document.querySelector("#grant-weapon-type");
   const weaponGrant = document.querySelector("#skill-grant-weapon");
   const status = document.querySelector("#skill-gm-status");
+  const assignTab = document.querySelector("#skill-assign-tab");
+  const statsTab = document.querySelector("#skill-grant-stats-tab");
+  const assignPanel = document.querySelector("#skill-assign");
+  const statsPanel = document.querySelector("#skill-grant-stats");
+  const showStats = setupStatsEditor(obr, statsPanel.querySelector("form"), { gm: true });
+  let sceneTokens = new Map();
+
+  const showSelectedStats = () => showStats(allowed ? sceneTokens.get(tokens.value) : undefined);
+  function selectGrantView(stats) {
+    assignPanel.hidden = stats;
+    statsPanel.hidden = !stats;
+    assignTab.setAttribute("aria-pressed", String(!stats));
+    statsTab.setAttribute("aria-pressed", String(stats));
+    showSelectedStats();
+  }
+  assignTab.addEventListener("click", () => selectGrantView(false));
+  statsTab.addEventListener("click", () => selectGrantView(true));
   let revision = 0;
   let allowed = false;
   let saving = false;
@@ -252,6 +270,7 @@ export function setupSkillGrants(obr) {
     friendlyFire.value = friendlyFireMode(config);
     tokens.disabled = !allowed || saving || tokens.options.length <= 1;
     useSelectedToken.disabled = tokens.disabled;
+    showSelectedStats();
     const disableGrants = !allowed || saving || !tokens.value;
     spell.disabled = weapon.disabled = team.disabled = disableGrants;
     teamGrant.disabled = disableGrants || !team.value;
@@ -292,6 +311,7 @@ export function setupSkillGrants(obr) {
       allowed = self.role === "GM" && self.connectionId === gm?.connectionId;
       if (!allowed || !await obr.scene.isReady()) {
         if (requested !== revision) return;
+        sceneTokens.clear();
         tokens.replaceChildren(new Option("choose a token", ""));
         status.textContent = allowed ? "Open a scene to grant skills."
           : self.role === "GM" ? "Another connected GM is handling skills." : "";
@@ -300,6 +320,7 @@ export function setupSkillGrants(obr) {
           sceneItems ?? obr.scene.items.getItems(isPublicToken), obr.player.getSelection(),
         ]);
         if (requested !== revision) return;
+        sceneTokens = new Map(items.map((token) => [token.id, token]));
         roster = rosterKey(items);
         const choice = tokens.value || selection?.[0];
         items.sort((a, b) => characterLabel(a).localeCompare(characterLabel(b)));
@@ -427,10 +448,18 @@ export function setupSkillGrants(obr) {
   });
   const isOpen = () => !tokens.closest("[hidden]");
   const rosterKey = (items) => JSON.stringify(items.map((item) => [item.id, item.name]).sort());
-  obr.scene.onReadyChange(() => { if (isOpen()) void refresh(); });
+  obr.scene.onReadyChange((ready) => {
+    if (!ready) {
+      sceneTokens.clear();
+      showSelectedStats();
+    }
+    if (isOpen()) void refresh();
+  });
   obr.scene.items.onChange((items) => {
     if (!allowed || !isOpen()) return;
     const characters = items.filter(isPublicToken);
+    sceneTokens = new Map(characters.map((token) => [token.id, token]));
+    showSelectedStats();
     if (roster !== rosterKey(characters)) {
       roster = rosterKey(characters);
       void refresh(characters);

@@ -143,7 +143,14 @@ select { font: inherit; background: #181321; color: inherit; border: 1px solid #
 #gm-panel input[type="checkbox"] { width: auto; min-height: 0; margin: 0; accent-color: #c7b6f8; }
 .habbo-scale { display: flex; align-items: center; gap: 6px; margin-top: 6px; }
 .habbo-scale input { width: 5em; }
-#skills-views { margin-bottom: 10px; }
+#skills-views, .skill-grant-views { margin-bottom: 10px; }
+.stats-form fieldset { border: 0; margin: 0 0 10px; padding: 0; min-width: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(130px, 100%), 1fr)); gap: 6px 12px; }
+.stats-form fieldset label { display: grid; grid-template-columns: 3ch minmax(0, 1fr) 4ch; align-items: center; gap: 6px; margin: 0; }
+.stats-form input[type="number"] { min-height: 30px; padding: 0 4px; text-align: center; font-variant-numeric: tabular-nums; }
+.stats-form input[readonly] { background: transparent; border-color: transparent; appearance: textfield; }
+.stats-form input[readonly]::-webkit-inner-spin-button { appearance: none; }
+.stats-form output { color: #c8bbd5; text-align: right; font-variant-numeric: tabular-nums; }
+.stats-form button { min-height: 32px; }
 #gm-skills > p { margin: 0 0 8px; color: #ab9dbb; font-size: 11px; }
 #gm-skills > p:empty { display: none; }
 .skill-facing-controls { display: flex; align-items: center; gap: 7px; margin: 8px 0; }
