@@ -3,7 +3,7 @@ import { isPublicToken } from "./rules.js";
 import {
   DEFAULT_WEAPON, FACINGS, FRIENDLY_FIRE_MODES, SKILLS, SKILL_CHANGED, SKILL_REQUEST, SKILL_RESULT, SPELLS, TEAMS, WEAPONS,
   aimsAtLocation, availableSpells, availableWeapons, friendlyFireMode, readSkills, skillConnections, spellParameter, tokenTeams, validSpellParameter, writeSkills,
-} from "./skills.js?v=2.7.16";
+} from "./skills.js?v=2.8.3";
 
 function characterLabel(token) {
   return token.name || "unnamed character";
@@ -23,8 +23,10 @@ export function setupSkillPanel(obr, getAvatar, keyAllowed, showSpells) {
   const preview = document.querySelector("#skill-avatar-preview");
   const portrait = preview.querySelector("img");
   const arrow = preview.querySelector("span");
-  const bindInputs = Object.fromEntries(Object.keys(SKILLS).map((id) =>
-    [id, document.querySelector("#skill-bind-" + id)]));
+  // A stale popover can be missing a binding without blocking startup.
+  const bindInputs = Object.keys(SKILLS)
+    .map((id) => [id, playerPanel.querySelector("#skill-bind-" + id)])
+    .filter(([, select]) => select);
   const pending = new Map();
   let preferences = readSkills(obr, "player");
   let avatar;
@@ -61,7 +63,7 @@ export function setupSkillPanel(obr, getAvatar, keyAllowed, showSpells) {
     weapon.replaceChildren(...options.map((id) => new Option(WEAPONS[id], id)));
     weapon.value = selectedWeapon(avatar?.id);
     weapon.disabled = !enabled;
-    for (const [id, select] of Object.entries(bindInputs)) {
+    for (const [id, select] of bindInputs) {
       select.closest("label").hidden = !available.includes(id);
       select.value = binding(id);
       select.disabled = !enabled;
@@ -78,7 +80,7 @@ export function setupSkillPanel(obr, getAvatar, keyAllowed, showSpells) {
     if (!avatar || !weapons.includes(weapon.value)) return;
     savePreferences({ ...preferences, weaponsByToken: { ...preferences.weaponsByToken, [avatar.id]: weapon.value } });
   });
-  for (const [id, select] of Object.entries(bindInputs)) {
+  for (const [id, select] of bindInputs) {
     select.add(new Option("unbound", ""));
     for (const key of "abcdefghijklmnopqrstuvwxyz") {
       if (keyAllowed(key)) select.add(new Option(key.toUpperCase(), key));
