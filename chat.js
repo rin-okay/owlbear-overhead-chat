@@ -10,7 +10,8 @@ import {
 } from "./session.js?v=2.7.21";
 
 import { drawBubble, normalizeAppearance, prepareBubbleFont } from "./appearance.js?v=2.7.9";
-import { setupDiscordPanel } from "./discord-panel.js?v=2.8.7";
+import { setupDiscordPanel } from "./discord-panel.js?v=2.8.8";
+import { openCombatLog } from "./combat-log.js?v=2.8.8";
 import { setupAvatarPanel } from "./avatar-panel.js?v=2.8.6";
 import { setupSkillGrants, setupSkillPanel } from "./skill-panel.js?v=2.8.6";
 import { setupStatsEditor } from "./stats-panel.js?v=2.8.5";
@@ -1003,6 +1004,12 @@ function setupSettings() {
 OBR.onReady(() => {
   targeting = setupTargeting(OBR, updateMoveModeLabel);
   const updateFontRole = setupSettings();
+  document.querySelector("#combat-log-open")?.addEventListener("click", () => {
+    void openCombatLog(OBR).catch((error) => {
+      console.error("Overhead Chat could not open the combat log", error);
+      void OBR.notification.show("Couldn’t open the combat log.");
+    });
+  });
   setupMeleeHitTiming();
   setupRoomToggle("gm-fog-settings", ABOVE_FOG);
   setupRoomToggle("gm-rumble-settings", RUMBLE_DICE);

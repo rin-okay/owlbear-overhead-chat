@@ -40,9 +40,9 @@ export function rollMeleeDamage(weapon, token, random = Math.random) {
   const { count, sides, type, finesse } = MELEE_WEAPON_DAMAGE[weapon];
   const { str, dex } = readTokenStats(token).modifiers;
   const modifier = finesse ? Math.max(str, dex) : str;
-  let dice = 0;
-  for (let i = 0; i < count; i++) dice += 1 + Math.floor(random() * sides);
-  return { amount: Math.max(0, dice + modifier), type, maxRoll: dice === count * sides };
+  const dice = Array.from({ length: count }, () => 1 + Math.floor(random() * sides));
+  const sum = dice.reduce((total, value) => total + value, 0);
+  return { amount: Math.max(0, sum + modifier), type, maxRoll: sum === count * sides, dice, sides, modifier };
 }
 
 export function validMeleeDamage(damage) {

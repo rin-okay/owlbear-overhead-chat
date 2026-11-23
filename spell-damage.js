@@ -6,7 +6,7 @@ export const BLOCKED_MAGIC_MISSILE = { amount: 0, type: "force", maxRoll: false,
 
 export function rollMagicMissileDart(random = Math.random) {
   const amount = 2 + Math.floor(random() * 4);
-  return { amount, type: "force", maxRoll: amount === 5 };
+  return { amount, type: "force", maxRoll: amount === 5, dice: [amount - 1], sides: 4, modifier: 1 };
 }
 
 export function validMagicMissileDamage(damage) {
@@ -25,9 +25,9 @@ export function rollSpellDamage(skill, token, random = Math.random) {
   const eldritch = skill === "eldritch-blast";
   const count = eldritch ? eldritchBeamCount(token) : 3;
   const sides = eldritch ? 10 : 8;
-  let amount = 0;
-  for (let i = 0; i < count; i++) amount += 1 + Math.floor(random() * sides);
-  return { amount, type: eldritch ? "force" : "thunder", maxRoll: amount === count * sides };
+  const dice = Array.from({ length: count }, () => 1 + Math.floor(random() * sides));
+  const amount = dice.reduce((sum, value) => sum + value, 0);
+  return { amount, type: eldritch ? "force" : "thunder", maxRoll: amount === count * sides, dice, sides };
 }
 
 export function validSpellDamage(damage) {

@@ -1,15 +1,16 @@
 import { setupBless } from "./bless.js?v=2.7.11";
+import { combatDamage } from "./combat-log.js?v=2.8.8";
 import { isShieldGraphic, readShieldGraphics, setupShield } from "./shield.js?v=2.8.6";
 import { canSpeak, MELEE_HIT_TIMING, normalizeMeleeHitTiming } from "./rules.js?v=2.6.16";
 import {
   areaHits, clearSpellPath, coneHits, isProjectileToken, isProjectileWall, openMeleeDoor, projectileImpact, teleportLandingClear,
 } from "./projectile-collision.js?v=2.8.3";
 import { HIT_MARKERS, MELEE_HIT_CUE } from "./hit-markers.js?v=2.8.7";
-import { rollMeleeDamage } from "./melee-damage.js?v=2.7.19";
+import { rollMeleeDamage } from "./melee-damage.js?v=2.8.8";
 import { readTokenStats } from "./stats.js?v=2.8.5";
-import { BLOCKED_MAGIC_MISSILE, eldritchBeamCount, MAGIC_MISSILE_INTERVAL, MAGIC_MISSILE_MAX_LEVEL, rollMagicMissileDart, rollSpellDamage } from "./spell-damage.js?v=2.8.6";
+import { BLOCKED_MAGIC_MISSILE, eldritchBeamCount, MAGIC_MISSILE_INTERVAL, MAGIC_MISSILE_MAX_LEVEL, rollMagicMissileDart, rollSpellDamage } from "./spell-damage.js?v=2.8.8";
 import {
-  DEFAULT_WEAPON, EMBERS_EFFECTS, MELEE_DURATION_MS, SKILLS, SKILL_REQUEST, SKILL_RESULT,
+  DEFAULT_WEAPON, EMBERS_EFFECTS, MELEE_DURATION_MS, SKILLS, SKILL_REQUEST, SKILL_RESULT, WEAPONS,
   aimsAtLocation, availableSkills, availableWeapons, friendlyFireMode, readSkills, skillConnections, skillEffect, spellParameter, tokenTeams, turnToHeading,
 } from "./skills.js?v=2.8.6";
 
@@ -55,7 +56,7 @@ async function teleportCaster(obr, token, source, destination, sender, permissio
   return moved;
 }
 
-export function setupSkillHost(obr, buildImage) {
+export function setupSkillHost(obr, buildImage, recordCombat) {
   const castBless = setupBless(obr, buildImage);
   const toggleShield = setupShield(obr, buildImage);
   const lastCast = new Map();
@@ -126,6 +127,9 @@ export function setupSkillHost(obr, buildImage) {
         });
         return;
       }
+      const logCast = (details) => version === sceneVersion && recordCombat?.({
+        requestId: data.requestId, caster: token, skill: data.skill, level: spellLevel, ...details,
+      });
       const now = Date.now();
       if (now - (lastCast.get(sender.id) ?? -Infinity) < 650) {
         await answer({ ...result, error: "Wait a moment before casting again." });
@@ -138,6 +142,7 @@ export function setupSkillHost(obr, buildImage) {
           console.error("Overhead Chat could not update Shield", cause);
           return "Couldn’t update Shield.";
         });
+        if (!error) await logCast();
         if (current()) await answer({ ...result, error });
         return;
       }
@@ -153,6 +158,7 @@ export function setupSkillHost(obr, buildImage) {
           console.error("Overhead Chat could not update Bless", cause);
           return "Couldn’t update Bless.";
         });
+        if (!error) await logCast();
         if (current()) await answer({ ...result, error });
         return;
       }
@@ -186,6 +192,8 @@ export function setupSkillHost(obr, buildImage) {
       }
       const instructions = [instruction];
       let hitTokenIds = [];
+      let hitTokens = [];
+      let logSelected;
       let missileBlocked = false;
       let doorId;
       if (checksHit) {
@@ -204,6 +212,9 @@ export function setupSkillHost(obr, buildImage) {
         let { destination, rotation } = instruction.effectProperties;
         if (skill.location) {
           const isArea = skill.location === "area";
+          if (isArea && data.targetLocation === undefined) {
+            logSelected = items.find((item) => item.id === data.targetId && isProjectileToken(item));
+          }
           const target = await spellDestination(obr, data, items, isArea);
           if (version !== sceneVersion) return;
           if (![target?.x, target?.y].every(Number.isFinite)) {
@@ -248,6 +259,7 @@ export function setupSkillHost(obr, buildImage) {
           if (!aimed && typeof data.targetId === "string" && data.targetId !== token.id) {
             const selected = items.find((item) => item.id === data.targetId && isProjectileToken(item));
             if (selected) {
+              logSelected = selected;
               const target = await obr.scene.items.getItemBounds([selected.id]).catch(() => null);
               if (version !== sceneVersion) return;
               aimed = aimAtTarget(source, target, (skill.range ?? 0) * dpi, mode !== "enabled" && isAlly(selected), maxRange);
@@ -299,6 +311,7 @@ export function setupSkillHost(obr, buildImage) {
             doorId = impact.doorId;
           }
         }
+        hitTokens = items.filter((item) => hitTokenIds.includes(item.id) && isProjectileToken(item));
       }
       if (missile) {
         const dartCount = spellLevel + 2;
@@ -306,6 +319,7 @@ export function setupSkillHost(obr, buildImage) {
           instructions.push({ ...instruction, delay: index * MAGIC_MISSILE_INTERVAL });
         }
       }
+      let damageRolls;
       const meleeHit = Boolean(skill.meleeReach && hitTokenIds.length);
       const sendMarkers = (delay, damage, { useAnimationCue = false, missileFollowUps } = {}) => obr.broadcast.sendMessage(HIT_MARKERS, {
         requestId: data.requestId, tokenIds: hitTokenIds, delay, useAnimationCue,
@@ -324,7 +338,8 @@ export function setupSkillHost(obr, buildImage) {
         } else {
           instructions.push({ ...cue, delay: cueDelay });
         }
-        await sendMarkers(cueDelay + 750, rollMeleeDamage(weapon, token), { useAnimationCue: true });
+        damageRolls = [rollMeleeDamage(weapon, token)];
+        await sendMarkers(cueDelay + 750, damageRolls[0], { useAnimationCue: true });
         if (version !== sceneVersion) return;
       }
       await obr.broadcast.sendMessage(EMBERS_EFFECTS, {
@@ -335,15 +350,21 @@ export function setupSkillHost(obr, buildImage) {
           .catch((error) => console.error("Overhead Chat could not open the door", error));
       }
       if (version === sceneVersion && hitTokenIds.length && missile) {
-        const damages = instructions.map(() => missileBlocked ? BLOCKED_MAGIC_MISSILE : rollMagicMissileDart());
-        const [damage, ...missileFollowUps] = damages;
+        damageRolls = instructions.map(() => missileBlocked ? BLOCKED_MAGIC_MISSILE : rollMagicMissileDart());
+        const [damage, ...missileFollowUps] = damageRolls;
         await sendMarkers(skill.hitDelay, damage, { missileFollowUps });
       } else if (version === sceneVersion && hitTokenIds.length && !meleeHit) {
         const damage = data.skill === "eldritch-blast" || data.skill === "shatter"
           ? rollSpellDamage(data.skill, token) : undefined;
+        if (damage) damageRolls = [damage];
         await sendMarkers(skill.impact?.delay ?? skill.hitDelay, damage);
       }
-      await answer(result);
+      await logCast({
+        action: skill.meleeReach && weapon !== DEFAULT_WEAPON ? WEAPONS[weapon] : skill.name,
+        attack: checksHit && skill.location !== "teleport",
+        selected: logSelected, hits: hitTokens, damage: combatDamage(damageRolls),
+      });
+      if (version === sceneVersion) await answer(result);
     } catch (error) {
       console.error("Overhead Chat skills", error);
     }
