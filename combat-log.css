@@ -27,6 +27,11 @@ button:disabled { cursor: default; opacity: .6; }
 p { margin: 0; }
 #combat-empty { padding: 12px; color: #d2c4e1; }
 .outcome { margin-top: 3px; color: #d2c4e1; }
+#combat-window .save-button {
+  display: inline-block; margin-left: 6px; padding: 0 5px;
+  height: 16px; min-height: 0; line-height: 14px; font-size: 11px;
+  border-radius: 4px; vertical-align: baseline; white-space: nowrap;
+}
 .damage { margin-top: 3px; font-variant-numeric: tabular-nums; }
 .apply-row {
   display: flex; align-items: center; gap: 8px; margin: 5px 0 0;

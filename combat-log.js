@@ -1,4 +1,4 @@
-import { SKILLS, skillConnections } from "./skills.js?v=2.8.6";
+import { SKILLS, skillConnections } from "./skills.js?v=2.9.2";
 
 export const COMBAT_POPOVER = "chat.overhead.combat-log.v1";
 const COMBAT_EVENT = "chat.overhead.combat-event.v1";
@@ -14,7 +14,7 @@ export async function openCombatLog(obr) {
   const [width, height] = await Promise.all([obr.viewport.getWidth(), obr.viewport.getHeight()]);
   return obr.popover.open({
     id: COMBAT_POPOVER,
-    url: new URL("./index.html?v=2.9.1&combat-log=1", import.meta.url).href,
+    url: new URL("./index.html?v=2.9.2&combat-log=1", import.meta.url).href,
     width: Math.max(1, Math.min(380, width - 24)), height: Math.max(1, Math.min(340, height - 64)),
     anchorReference: "POSITION",
     anchorOrigin: { horizontal: "LEFT", vertical: "TOP" },
@@ -96,6 +96,7 @@ export function setupCombatLog(obr) {
           actor: name(caster.name), skill, action: action || SKILLS[skill].name, level, attack,
           selected: selected ? { id: selected.id, name: name(selected.name) } : undefined,
           hits: group,
+          saveAbility: SKILLS[skill].saveAbility,
           damage,
         };
         receive(entry);

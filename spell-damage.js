@@ -25,13 +25,21 @@ export function rollSpellDamage(skill, token, random = Math.random) {
   const eldritch = skill === "eldritch-blast";
   const count = eldritch ? eldritchBeamCount(token) : 3;
   const sides = eldritch ? 10 : 8;
+  return rollDamage(count, sides, eldritch ? "force" : "thunder", random);
+}
+
+export function rollFireSpellDamage(skill, level, random = Math.random) {
+  return rollDamage(skill.damageDice + level - skill.spellLevel, 6, "fire", random);
+}
+
+function rollDamage(count, sides, type, random) {
   const dice = Array.from({ length: count }, () => 1 + Math.floor(random() * sides));
   const amount = dice.reduce((sum, value) => sum + value, 0);
-  return { amount, type: eldritch ? "force" : "thunder", maxRoll: amount === count * sides, dice, sides };
+  return { amount, type, maxRoll: amount === count * sides, dice, sides };
 }
 
 export function validSpellDamage(damage) {
-  const max = damage?.type === "force" ? 40 : damage?.type === "thunder" ? 24 : 0;
+  const max = damage?.type === "force" ? 40 : damage?.type === "thunder" ? 24 : damage?.type === "fire" ? 84 : 0;
   return Number.isInteger(damage?.amount) && damage.amount >= 1 && damage.amount <= max &&
     typeof damage.maxRoll === "boolean";
 }

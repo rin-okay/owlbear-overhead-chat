@@ -3,7 +3,7 @@ import { isPublicToken } from "./rules.js";
 import {
   DEFAULT_WEAPON, FACINGS, FRIENDLY_FIRE_MODES, SKILLS, SKILL_CHANGED, SKILL_REQUEST, SKILL_RESULT, SPELLS, TEAMS, WEAPONS,
   aimsAtLocation, availableSpells, availableWeapons, friendlyFireMode, readSkills, skillConnections, spellParameter, tokenTeams, validSpellParameter, writeSkills,
-} from "./skills.js?v=2.8.6";
+} from "./skills.js?v=2.9.2";
 
 function characterLabel(token) {
   return token.name || "unnamed character";
@@ -144,7 +144,7 @@ export function setupSkillPanel(obr, getAvatar, keyAllowed, showSpells, showChat
         requestId, tokenId: token.id, type,
         ...(type === "cast" ? { skill: id, facing: facingFor(preferences, token) } : {}),
         ...(id === "spear" ? { weapon: selectedWeapon(token.id) } : {}),
-        ...(id === "missile" && spellLevel !== undefined ? { spellLevel } : {}),
+        ...(SKILLS[id]?.upcast && spellLevel !== undefined ? { spellLevel } : {}),
         ...(targetIds ? { targetIds } : targetId ? { targetId } : {}),
         ...(location && aimsAtLocation(id) ? { targetLocation: location } : {}),
       }, { destination: "ALL" });

@@ -10,10 +10,12 @@ import {
 } from "./session.js?v=2.7.21";
 
 import { drawBubble, normalizeAppearance, prepareBubbleFont } from "./appearance.js?v=2.7.9";
-import { setupDiscordPanel } from "./discord-panel.js?v=2.9.1";
-import { openCombatLog } from "./combat-log.js?v=2.9.1";
+import { setupDiscordPanel } from "./discord-panel.js?v=2.9.2";
+import { openCombatLog } from "./combat-log.js?v=2.9.2";
+import { MAX_CAST_LEVEL, SKILLS } from "./skills.js?v=2.9.2";
+import { ABILITIES, readTokenStats } from "./stats.js?v=2.8.5";
 import { setupAvatarPanel } from "./avatar-panel.js?v=2.8.6";
-import { setupSkillGrants, setupSkillPanel } from "./skill-panel.js?v=2.8.6";
+import { setupSkillGrants, setupSkillPanel } from "./skill-panel.js?v=2.9.2";
 import { setupStatsEditor } from "./stats-panel.js?v=2.8.5";
 import { EMOTE } from "./emotes.js?v=2.7.21";
 import { setupTargeting } from "./targeting.js?v=2.7.17";
@@ -47,9 +49,10 @@ if (combatWindow) {
   document.body.classList.add("combat-view");
   const stylesheet = document.createElement("link");
   stylesheet.rel = "stylesheet";
-  stylesheet.href = new URL("./combat-log.css?v=2.8.10", import.meta.url).href;
+  stylesheet.href = new URL("./combat-log.css?v=2.9.2", import.meta.url).href;
   document.head.append(stylesheet);
-  void import("./combat-log-panel.js?v=2.8.9").catch(console.error);
+  void import("./combat-log-panel.js?v=2.9.2")
+    .then(({ setCombatSaveRoller }) => setCombatSaveRoller(rollCombatSave)).catch(console.error);
 }
 
 let avatar = null;
@@ -98,9 +101,10 @@ function appendLine(entry, target) {
     target.append(line);
     return line;
   }
+  const save = entry.saveAbility ? entry.saveAbility.toUpperCase() + " save" : "";
   if (entry.rolling || entry.rollError) {
     line.className = "roll-status";
-    line.textContent = entry.rolling ? `${entry.name} is rolling…` : `${entry.name} couldn’t roll: ${entry.rollError}`;
+    line.textContent = entry.rolling ? `${entry.name} is rolling${save ? " a " + save : ""}…` : `${entry.name} couldn’t roll: ${entry.rollError}`;
     target.append(line);
     return line;
   }
@@ -142,7 +146,8 @@ function appendLine(entry, target) {
   if (entry.standaloneRoll) {
     line.className = "roll-message";
     heading.className = "roll-heading";
-    heading.append(` rolled ${entry.parts[0].notation}: `, message);
+    const notation = entry.parts[0].notation;
+    heading.append(save ? ` rolled a ${save} (${notation}): ` : ` rolled ${notation}: `, message);
     line.append(heading);
   } else {
     line.append(heading, message);
@@ -564,24 +569,26 @@ function useAvatarSlot(mode, key) {
 }
 
 function updateMoveModeLabel() {
+  const spell = SKILLS[tokenControl?.upcastSkill];
   moveModeLabel.textContent = controlsInactive ? "controls inactive · press F1 to chat or F2 to move"
-    : tokenControl?.missileLevelPending ? "magic missile level · 1–9, esc to cancel"
+    : spell ? `${spell.name} level · ${spell.spellLevel}–${MAX_CAST_LEVEL}, esc to cancel`
     : targeting?.editing() ? "set target · wasd, space to set"
     : targeting?.location() ? "move mode · target set" : "move mode enabled";
 }
 
-function handleMissileLevelKey(event) {
+function handleSpellLevelKey(event) {
   const mode = tokenControl;
-  if (!mode?.missileLevelPending) return false;
+  const skill = mode?.upcastSkill;
+  if (!skill) return false;
   if (event.ctrlKey || event.altKey || event.metaKey) return false;
   if (event.repeat) return true;
 
   const digit = event.code ? /^Digit([1-9])$/.exec(event.code)?.[1] : /^[1-9]$/.exec(event.key)?.[0];
   if (digit || event.key === "Escape") {
-    mode.missileLevelPending = false;
+    mode.upcastSkill = undefined;
     updateMoveModeLabel();
     if (digit && !mode.switching) {
-      queueAvatarAction(mode, { skill: "missile", targetLocation: targeting?.location(), spellLevel: Number(digit) });
+      queueAvatarAction(mode, { skill, targetLocation: targeting?.location(), spellLevel: Number(digit) });
     }
   }
   return true;
@@ -638,7 +645,7 @@ function handleControlKeyDown(event) {
     return;
   }
   if (event.isComposing || event.keyCode === 229) return;
-  if (handleMissileLevelKey(event) || handleTargetKey(event)) {
+  if (handleSpellLevelKey(event) || handleTargetKey(event)) {
     event.preventDefault();
     return;
   }
@@ -676,12 +683,12 @@ function handleControlKeyDown(event) {
       if (action.rotation) holdRotation(tokenControl, physicalKey, action);
     } else if (!event.ctrlKey && !event.altKey && !event.metaKey) {
       const skill = skillPanel?.skillForKey(key);
-      if (!skill || tokenControl.switching || (event.shiftKey && skill !== "missile")) return;
+      if (!skill || tokenControl.switching || (event.shiftKey && !SKILLS[skill].upcast)) return;
       event.preventDefault();
       if (event.repeat || tokenControl.actions.length >= 4) return;
       if (event.shiftKey) {
         stopRotation(tokenControl);
-        tokenControl.missileLevelPending = true;
+        tokenControl.upcastSkill = skill;
         updateMoveModeLabel();
       } else {
         queueAvatarAction(tokenControl, { skill, targetLocation: targeting?.location() });
@@ -727,7 +734,7 @@ combatWindow?.addEventListener("keyup", (event) => {
 combatWindow?.addEventListener("keydown", (event) => {
   if (event.target.closest("dialog") || event.isComposing || event.keyCode === 229) return;
   const pressingSpace = event.key === " " && !event.ctrlKey && !event.altKey && !event.metaKey;
-  if (pressingSpace && !targeting?.editing() && !tokenControl?.missileLevelPending) {
+  if (pressingSpace && !targeting?.editing() && !tokenControl?.upcastSkill) {
     event.preventDefault();
     if (!event.repeat) void focusChatFromCombat().catch(console.error);
     return;
@@ -768,10 +775,7 @@ form.addEventListener("submit", async (event) => {
 
     const message = { ...speech, appearance: normalizeAppearance(savedAppearance(), role ?? null), messageId: crypto.randomUUID() };
     if (spans.length) {
-      message.rollId = crypto.randomUUID();
-      await OBR.broadcast.sendMessage(SPEECH, { ...message, rollPhase: "pending" }, { destination: "ALL" });
-      rollInProgress = true;
-      void finishRoll(message, spans);
+      await sendChatRoll(message, spans);
     } else {
       await OBR.broadcast.sendMessage(SPEECH, message, { destination: "ALL" });
     }
@@ -785,6 +789,38 @@ form.addEventListener("submit", async (event) => {
     updateControls();
   }
 });
+
+async function sendChatRoll(message, spans) {
+  if (rollInProgress) throw Error("Your previous roll is still resolving.");
+  rollInProgress = true;
+  const roll = { ...message, rollId: crypto.randomUUID() };
+  try {
+    await OBR.broadcast.sendMessage(SPEECH, { ...roll, rollPhase: "pending" }, { destination: "ALL" });
+    void finishRoll(roll, spans);
+  } catch (error) {
+    rollInProgress = false;
+    throw error;
+  }
+}
+
+async function rollCombatSave(tokenId, ability) {
+  if (!Object.hasOwn(ABILITIES, ability)) throw Error("Unknown saving throw.");
+  if (!await OBR.scene.isReady()) throw Error("Open a scene to roll a save.");
+  const [[token], role, permissions] = await Promise.all([
+    OBR.scene.items.getItems([tokenId]), OBR.player.getRole(), OBR.room.getPermissions(),
+  ]);
+  if (!canSpeak({ id: OBR.player.id, role }, token, permissions)) {
+    throw Error("You can only roll a save for a token you control.");
+  }
+  const modifier = readTokenStats(token).modifiers[ability];
+  const notation = "1d20" + (modifier >= 0 ? "+" : "") + modifier;
+  const speech = parseSpeech({ tokenId, text: "/r " + notation, roomId: chatRoom.value });
+  if (!speech) throw Error("Couldn’t prepare this saving throw.");
+  await sendChatRoll({
+    ...speech, appearance: normalizeAppearance(savedAppearance(), role), messageId: crypto.randomUUID(),
+    saveAbility: ability,
+  }, rollSpans(speech.text));
+}
 
 async function finishRoll(message, spans) {
   let resolution;

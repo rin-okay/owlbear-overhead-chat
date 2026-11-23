@@ -2,6 +2,7 @@ export const SKILL_REQUEST = "chat.overhead.skills/request.v1";
 export const SKILL_RESULT = "chat.overhead.skills/result.v1";
 export const SKILL_CHANGED = "chat.overhead.skills/changed.v1";
 export const EMBERS_EFFECTS = "eu.armindo.embers/effects";
+export const MAX_CAST_LEVEL = 9;
 export const DEFAULT_WEAPON = "generic_slash";
 export const TEAMS = ["red", "blue", "green", "mob 1", "mob 2", "mob 3"];
 export const FRIENDLY_FIRE_MODES = ["enabled", "disabled", "aoe"];
@@ -55,9 +56,9 @@ export const SKILLS = {
   heart: { name: "heart", key: "p", effect: "generic.marker.heart.3" },
   // Keep the original skill ID so existing bindings and clients still work.
   spear: { name: "melee weapon attack", key: "f", meleeReach: 1 },
-  missile: { name: "magic missile", key: "g", spellLevel: 1, effect: "magic_missile", range: 8, hitDelay: 1000 },
+  missile: { name: "magic missile", key: "g", spellLevel: 1, upcast: true, effect: "magic_missile", range: 8, hitDelay: 1000 },
   "burning-hands": {
-    name: "burning hands", key: "h", spellLevel: 1, effect: "burning_hands", cone: true, hitDelay: 1000,
+    name: "burning hands", key: "h", spellLevel: 1, upcast: true, damageDice: 3, saveAbility: "dex", effect: "burning_hands", cone: true, hitDelay: 1000,
     parameter: { label: "length (in cells)", min: 1, defaultValue: 3 },
   },
   "fire-bolt": { name: "fire bolt", key: "j", spellLevel: 0, effect: "fire_bolt", range: 24, hitDelay: 800 },
@@ -72,7 +73,7 @@ export const SKILLS = {
     parameter: { label: "radius (in cells)", min: 1, defaultValue: 2 },
   },
   fireball: {
-    name: "fireball", key: "k", spellLevel: 3, effect: "fireball.beam", range: 30,
+    name: "fireball", key: "k", spellLevel: 3, upcast: true, damageDice: 8, saveAbility: "dex", effect: "fireball.beam", range: 30,
     impact: { effect: "fireball.explosion", delay: 3000 },
     parameter: { label: "radius (in cells)", min: 1, defaultValue: 4 },
   },

@@ -1,7 +1,7 @@
 import { isProjectileToken } from "./projectile-collision.js?v=2.6.13";
 import { skillConnections } from "./skills.js?v=2.6.15";
 import { validMeleeDamage } from "./melee-damage.js?v=2.7.19";
-import { MAGIC_MISSILE_INTERVAL, MAGIC_MISSILE_MAX_LEVEL, validMagicMissileDamage, validSpellDamage } from "./spell-damage.js?v=2.8.6";
+import { MAGIC_MISSILE_INTERVAL, MAGIC_MISSILE_MAX_LEVEL, validMagicMissileDamage, validSpellDamage } from "./spell-damage.js?v=2.9.2";
 
 export const HIT_MARKERS = "chat.overhead.skills/hits.v1";
 export const MELEE_HIT_CUE = "chat.overhead.skills/melee-hit-cue.v1";

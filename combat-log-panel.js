@@ -1,5 +1,5 @@
 import OBR from "./obr.js";
-import { COMBAT_POPOVER, formatCombatDamage, openCombatChannel } from "./combat-log.js?v=2.8.9";
+import { COMBAT_POPOVER, formatCombatDamage, openCombatChannel } from "./combat-log.js?v=2.9.2";
 import { appliedCombatDamage, applyForgeDamage, forgeHpKey, hasForgeHp, undoForgeDamage } from "./forge-hp.js?v=2.8.9";
 
 const entries = document.querySelector("#combat-entries");
@@ -9,6 +9,9 @@ let role;
 let hpKey;
 let tokens = new Map();
 let sceneVersion = 0;
+let rollSave;
+
+export function setCombatSaveRoller(roller) { rollSave = roller; }
 
 function paragraph(text, className) {
   const element = document.createElement("p");
@@ -131,8 +134,28 @@ function createEntry(entry) {
   if (entry.attack && !entry.hits.length) item.append(paragraph("it misses!", "outcome"));
   for (const hit of entry.hits) {
     const hitSection = document.createElement("section");
-    if (hit.id !== entry.selected?.id || !entry.attack) {
-      hitSection.append(paragraph("it hits " + hit.name + "!", "outcome"));
+    if (hit.id !== entry.selected?.id || !entry.attack || entry.saveAbility) {
+      const line = paragraph("it hits " + hit.name + "!", "outcome");
+      if (entry.saveAbility) {
+        const save = document.createElement("button");
+        save.className = "save-button";
+        save.type = "button";
+        save.textContent = entry.saveAbility + " save";
+        save.setAttribute("aria-label", "roll " + entry.saveAbility + " save for " + hit.name);
+        save.addEventListener("click", async () => {
+          if (!rollSave || save.disabled) return;
+          save.disabled = true;
+          try {
+            await rollSave(hit.id, entry.saveAbility);
+          } catch (error) {
+            void OBR.notification.show(error.message || "Couldn’t roll the save.").catch(console.error);
+          } finally {
+            save.disabled = false;
+          }
+        });
+        line.append(save);
+      }
+      hitSection.append(line);
     }
     if (entry.damage) hitSection.append(paragraph(formatCombatDamage(entry.damage), "damage"));
     if (entry.attack && !entry.damage?.blocked) controls.push(applyControls(entry, hit, hitSection));

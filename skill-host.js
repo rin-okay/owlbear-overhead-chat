@@ -1,18 +1,18 @@
 import { setupBless } from "./bless.js?v=2.7.11";
-import { combatDamage } from "./combat-log.js?v=2.8.8";
+import { combatDamage } from "./combat-log.js?v=2.9.2";
 import { isShieldGraphic, readShieldGraphics, setupShield } from "./shield.js?v=2.8.6";
 import { canSpeak, MELEE_HIT_TIMING, normalizeMeleeHitTiming } from "./rules.js?v=2.6.16";
 import {
   areaHits, clearSpellPath, coneHits, isProjectileToken, isProjectileWall, openMeleeDoor, projectileImpact, teleportLandingClear,
 } from "./projectile-collision.js?v=2.8.3";
-import { HIT_MARKERS, MELEE_HIT_CUE } from "./hit-markers.js?v=2.8.7";
+import { HIT_MARKERS, MELEE_HIT_CUE } from "./hit-markers.js?v=2.9.2";
 import { rollMeleeDamage } from "./melee-damage.js?v=2.8.8";
 import { readTokenStats } from "./stats.js?v=2.8.5";
-import { BLOCKED_MAGIC_MISSILE, eldritchBeamCount, MAGIC_MISSILE_INTERVAL, MAGIC_MISSILE_MAX_LEVEL, rollMagicMissileDart, rollSpellDamage } from "./spell-damage.js?v=2.8.8";
+import { BLOCKED_MAGIC_MISSILE, eldritchBeamCount, MAGIC_MISSILE_INTERVAL, rollFireSpellDamage, rollMagicMissileDart, rollSpellDamage } from "./spell-damage.js?v=2.9.2";
 import {
-  DEFAULT_WEAPON, EMBERS_EFFECTS, MELEE_DURATION_MS, SKILLS, SKILL_REQUEST, SKILL_RESULT, WEAPONS,
+  DEFAULT_WEAPON, EMBERS_EFFECTS, MAX_CAST_LEVEL, MELEE_DURATION_MS, SKILLS, SKILL_REQUEST, SKILL_RESULT, WEAPONS,
   aimsAtLocation, availableSkills, availableWeapons, friendlyFireMode, readSkills, skillConnections, skillEffect, spellParameter, tokenTeams, turnToHeading,
-} from "./skills.js?v=2.8.6";
+} from "./skills.js?v=2.9.2";
 
 function aimAtTarget(source, target, range = 0, passThrough = false, maxRange = Infinity) {
   if (![target?.center?.x, target?.center?.y].every(Number.isFinite)) return;
@@ -114,9 +114,9 @@ export function setupSkillHost(obr, buildImage, recordCombat) {
         return;
       }
       const missile = data.skill === "missile";
-      const spellLevel = missile && data.spellLevel !== undefined ? data.spellLevel : skill.spellLevel;
-      if (missile && (!Number.isInteger(spellLevel) || spellLevel < 1 || spellLevel > MAGIC_MISSILE_MAX_LEVEL)) {
-        await answer({ ...result, error: "Choose a Magic Missile spell level from 1 to 9." });
+      const spellLevel = skill.upcast && data.spellLevel !== undefined ? data.spellLevel : skill.spellLevel;
+      if (skill.upcast && (!Number.isInteger(spellLevel) || spellLevel < skill.spellLevel || spellLevel > MAX_CAST_LEVEL)) {
+        await answer({ ...result, error: `Choose a ${skill.name} spell level from ${skill.spellLevel} to ${MAX_CAST_LEVEL}.` });
         return;
       }
       if (spellLevel > maxSpellLevel && !removingShield) {
@@ -354,8 +354,8 @@ export function setupSkillHost(obr, buildImage, recordCombat) {
         const [damage, ...missileFollowUps] = damageRolls;
         await sendMarkers(skill.hitDelay, damage, { missileFollowUps });
       } else if (version === sceneVersion && hitTokenIds.length && !meleeHit) {
-        const damage = data.skill === "eldritch-blast" || data.skill === "shatter"
-          ? rollSpellDamage(data.skill, token) : undefined;
+        const damage = skill.damageDice ? rollFireSpellDamage(skill, spellLevel)
+          : data.skill === "eldritch-blast" || data.skill === "shatter" ? rollSpellDamage(data.skill, token) : undefined;
         if (damage) damageRolls = [damage];
         await sendMarkers(skill.impact?.delay ?? skill.hitDelay, damage);
       }

@@ -7,15 +7,16 @@ import {
 import { BUBBLE_LINE_HEIGHT, drawBubble, drawFloatingBubble, fonts, normalizeAppearance, prepareBubbleFont } from "./appearance.js?v=2.7.9";
 import { canvasPaths } from "./bubble-paths.js?v=2.5.1";
 import { FLOAT_LINE, placeFloatingBubbles } from "./floating-layout.js?v=2.5.1";
+import { ABILITIES } from "./stats.js?v=2.8.5";
 import { openSessionChannel, saveAvatar } from "./session.js?v=2.7.9";
 import { chatParts, isRollCommand, rollSpans } from "./dice.js";
 import { queueDiscord } from "./discord.js?v=2.3.9";
 import { parseTray } from "./dice-replay.js";
 import { queueDicePopup, resetDicePopups } from "./dice-popup.js";
-import { setupSkillHost } from "./skill-host.js?v=2.8.8";
-import { setupCombatLog } from "./combat-log.js?v=2.8.8";
+import { setupSkillHost } from "./skill-host.js?v=2.9.2";
+import { setupCombatLog } from "./combat-log.js?v=2.9.2";
 import { EMOTE, floatEmote, parseEmote } from "./emotes.js?v=2.7.22";
-import { setupHitMarkers } from "./hit-markers.js?v=2.8.7";
+import { setupHitMarkers } from "./hit-markers.js?v=2.9.2";
 import { requestChatShortcut } from "./chat-shortcut.js?v=2.6.4";
 import { setupChatRecovery } from "./chat-recovery.js?v=2.6.6";
 import { centerAvatar, setupCameraFollow } from "./avatar-viewport.js?v=2.7.9";
@@ -261,6 +262,7 @@ async function acceptSpeech(event, speech, version, receivedAt) {
     rollPhase: phase,
     sequence: previousRoll?.sequence ?? ++sequence,
     rolling: phase === "pending",
+    saveAbility: phase && Object.hasOwn(ABILITIES, event.data.saveAbility) ? event.data.saveAbility : undefined,
     rollError: phase === "failed" ? String(event.data.rollError || "Roll failed.").slice(0, 200) : undefined,
     standaloneRoll: isRollCommand(speech.text) && typeof parts[0] === "object",
     receivedAt: previousRoll?.receivedAt ?? receivedAt,
