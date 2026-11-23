@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>overhead chat</title>
   <link rel="stylesheet" href="./chat.css?v=2.8.10">
-  <script type="module" src="./chat.js?v=2.9.6"></script>
+  <script type="module" src="./chat.js?v=2.9.7"></script>
 </head>
 <body>
   <main>
@@ -261,7 +261,8 @@
       <dialog id="custom-damage" aria-labelledby="custom-label">
         <form method="dialog">
           <label id="custom-label" for="custom-amount">custom damage</label>
-          <input id="custom-amount" type="number" min="0" step="1" required autofocus>
+          <input id="custom-amount" type="number" step="1" aria-describedby="custom-damage-help" required autofocus>
+          <p id="custom-damage-help">use a negative amount to heal</p>
           <div>
             <button type="submit" value="apply">apply</button>
             <button type="submit" value="cancel" formnovalidate>cancel</button>

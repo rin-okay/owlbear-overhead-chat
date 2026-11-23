@@ -1,6 +1,6 @@
 import OBR from "./obr.js";
 import { COMBAT_POPOVER, damageNotation, formatCombatDamage, openCombatChannel } from "./combat-log.js?v=2.9.4";
-import { appliedCombatDamage, applyForgeDamage, forgeHpKey, hasForgeHp, undoForgeDamage } from "./forge-hp.js?v=2.8.9";
+import { appliedCombatDamage, applyForgeDamage, forgeHpKey, hasForgeHp, undoForgeDamage } from "./forge-hp.js?v=2.9.7";
 
 const combatWindow = document.querySelector("#combat-window");
 const entries = document.querySelector("#combat-entries");
@@ -69,8 +69,6 @@ function applyControls(entry, target, parent) {
   undo.type = "button";
   undo.className = "compact-button undo";
   undo.textContent = "⟲";
-  undo.title = "undo damage";
-  undo.setAttribute("aria-label", "undo damage to " + target.name);
   const feedback = paragraph("", "feedback");
   feedback.setAttribute("role", "status");
   let localReceipt;
@@ -88,14 +86,22 @@ function applyControls(entry, target, parent) {
     form.hidden = hidden;
     choices.forEach((input) => { input.disabled = pending || applied || busy || (!entry.damage && input !== custom); });
     button.disabled = pending || applied || busy;
-    button.textContent = applied ? "✓" : "apply";
+    const healing = receipt < 0;
+    const result = applied ? Math.abs(receipt) + " " + (healing ? "healing" : entry.damage?.type || "damage") : "";
+    button.textContent = result || "apply";
+    button.title = result;
     button.classList.toggle("applied", applied);
-    button.setAttribute("aria-label", applied ? "damage applied" : "apply damage to " + target.name);
+    button.classList.toggle("hp-lost", receipt > 0);
+    button.classList.toggle("hp-restored", healing);
+    button.setAttribute("aria-label", applied
+      ? result + " applied to " + target.name : "apply damage to " + target.name);
     undo.hidden = !applied;
+    undo.title = healing ? "undo healing" : "undo damage";
+    undo.setAttribute("aria-label", undo.title + " to " + target.name);
     undo.disabled = busy || !token;
     feedback.hidden = role !== "GM";
-    feedback.textContent = error || (applied ? "applied " + receipt + " damage"
-      : !token ? "target unavailable" : !ready ? "set this token’s current HP in Forge! to apply damage" : "");
+    feedback.textContent = error || (!token ? "target unavailable"
+      : !ready ? "set this token’s current HP in Forge! to apply damage" : "");
   }
 
   async function submit(kind, undoing = false) {

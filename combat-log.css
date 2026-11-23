@@ -48,7 +48,7 @@ p { margin: 0; }
 .target-line .target-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .target-line .save-button { flex-shrink: 0; }
 .target-line .apply-row { gap: 5px; margin-top: 2px; }
-.target-line .feedback:empty { display: none; }
+.feedback:empty { display: none; }
 .apply-row {
   display: flex; align-items: center; gap: 8px; margin: 5px 0 0;
   white-space: nowrap; font-size: 12px;
@@ -63,7 +63,11 @@ p { margin: 0; }
   content: ""; width: 6px; height: 6px; border-radius: 50%; background: #dac9fd;
 }
 .apply-row input:disabled { opacity: .55; }
-.apply-row .applied { min-width: 34px; color: #a6edbf; opacity: 1; }
+#combat-window .apply-button.applied {
+  inline-size: auto; min-inline-size: 0; overflow: hidden; text-overflow: ellipsis; opacity: 1;
+}
+#combat-window .apply-button.hp-lost { color: #ffa0a0; }
+#combat-window .apply-button.hp-restored { color: #a6edbf; }
 #combat-window .undo { inline-size: 26px; font-size: 14px; }
 dialog {
   width: min(260px, calc(100% - 24px)); padding: 14px;
@@ -71,6 +75,7 @@ dialog {
 }
 dialog::backdrop { background: #100b19b0; }
 dialog label, dialog input { display: block; width: 100%; margin-bottom: 8px; }
+#custom-damage-help { margin-bottom: 8px; font-size: 12px; }
 dialog form > div { display: flex; justify-content: flex-end; gap: 6px; }
 dialog button[value=cancel] { order: -1; }
 [hidden] { display: none !important; }

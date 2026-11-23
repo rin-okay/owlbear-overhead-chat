@@ -16,7 +16,7 @@ export async function openCombatLog(obr) {
   const [width, height] = await Promise.all([obr.viewport.getWidth(), obr.viewport.getHeight()]);
   return obr.popover.open({
     id: COMBAT_POPOVER,
-    url: new URL("./index.html?v=2.9.6&combat-log=1", import.meta.url).href,
+    url: new URL("./index.html?v=2.9.7&combat-log=1", import.meta.url).href,
     width: Math.max(1, Math.min(380, width - 24)), height: Math.max(1, Math.min(340, height - 64)),
     anchorReference: "POSITION",
     anchorOrigin: { horizontal: "LEFT", vertical: "TOP" },

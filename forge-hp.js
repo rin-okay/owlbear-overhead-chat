@@ -23,7 +23,7 @@ export function hasForgeHp(token, key) {
 function damageReceipt(token, entryId) {
   const stored = token?.metadata?.[APPLICATIONS]?.[entryId];
   const amount = typeof stored === "number" ? stored : stored?.amount;
-  if (!Number.isSafeInteger(amount) || amount < 0) return;
+  if (!Number.isSafeInteger(amount)) return;
   const key = stored?.hpKey;
   const hpKey = typeof key === "string" && key.startsWith(FORGE) && /^[\w-]{1,32}$/.test(key.slice(FORGE.length))
     ? key : undefined;
@@ -35,7 +35,7 @@ export function appliedCombatDamage(token, entryId) {
 }
 
 export function applyForgeDamage(obr, tokenId, entryId, amount, current) {
-  if (!Number.isSafeInteger(amount) || amount < 0) throw Error("Enter a whole damage amount of 0 or more.");
+  if (!Number.isSafeInteger(amount)) throw Error("Enter a whole number for damage or healing.");
   return changeDamage(obr, tokenId, entryId, current, amount);
 }
 
