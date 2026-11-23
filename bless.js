@@ -3,6 +3,7 @@ import { skillConnections, spellParameter, tokenTeams } from "./skills.js?v=2.7.
 
 const BLESS_CASTER = "chat.overhead.bless.caster.v1";
 const BLESS_INTRO_END = "chat.overhead.bless.intro-end.v1";
+const BLESS_LOOP_SCALE = "chat.overhead.bless.loop-scale.v1";
 const BLESS_INTRO_MS = 5000;
 // These are the paired 400 × 400 Bless clips from the Embers catalog.
 const BLESS_IMAGE = {
@@ -36,7 +37,12 @@ export function setupBless(obr, buildImage) {
             if (!blessGraphic(item) || item.image.url !== BLESS_INTRO.url ||
                 item.metadata?.[BLESS_INTRO_END] !== deadline) continue;
             item.image.url = BLESS_IMAGE.url;
+            const scale = item.metadata[BLESS_LOOP_SCALE];
+            if (typeof scale === "number" && Number.isFinite(scale) && scale > 0) {
+              item.scale = { x: scale, y: scale };
+            }
             delete item.metadata[BLESS_INTRO_END];
+            delete item.metadata[BLESS_LOOP_SCALE];
           }
         });
       } catch (error) {
@@ -90,7 +96,9 @@ export function setupBless(obr, buildImage) {
 
       const dpi = await obr.scene.grid.getDpi();
       if (!Number.isFinite(dpi) || dpi <= 0) return "Couldn’t read the scene grid for Bless.";
-      const range = spellParameter(config, caster.id, "bless") * dpi;
+      // At 200 DPI the 400 px intro spans two cells, or one cell of radius.
+      const radius = spellParameter(config, caster.id, "bless");
+      const range = radius * dpi;
       const limit = spellParameter(config, caster.id, "bless", "targetLimit");
       const teams = tokenTeams(config, caster.id);
       const allies = sceneItems.filter((item) => item.id !== caster.id && isProjectileToken(item) &&
@@ -119,11 +127,11 @@ export function setupBless(obr, buildImage) {
         const bounds = await obr.scene.items.getItemBounds([target.id]).catch(() => null);
         if (!Number.isFinite(bounds?.center?.x) || !Number.isFinite(bounds?.center?.y)) return null;
         const size = Math.max(bounds.max?.x - bounds.min?.x, bounds.max?.y - bounds.min?.y);
-        const scale = Number.isFinite(size) && size > 0 ? size / (dpi * 2) : 0.5;
+        const loopScale = Number.isFinite(size) && size > 0 ? size / (dpi * 2) : 0.5;
         const image = buildImage(BLESS_INTRO, { dpi: 200, offset: { x: 200, y: 200 } })
-          .position(bounds.center).scale({ x: scale, y: scale }).layer("ATTACHMENT")
+          .position(bounds.center).scale({ x: radius, y: radius }).layer("ATTACHMENT")
           .attachedTo(target.id).disableHit(true).locked(true)
-          .metadata({ [BLESS_CASTER]: caster.id }).build();
+          .metadata({ [BLESS_CASTER]: caster.id, [BLESS_LOOP_SCALE]: loopScale }).build();
         image.disableAttachmentBehavior = ["COPY", "ROTATION"];
         return image;
       }));
