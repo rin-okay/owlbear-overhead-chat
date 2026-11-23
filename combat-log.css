@@ -33,13 +33,14 @@ p { margin: 0; }
   white-space: nowrap; font-size: 12px;
 }
 .apply-row label { display: inline-flex; align-items: center; gap: 3px; cursor: pointer; }
-.apply-row input {
-  appearance: none; display: grid; place-items: center; margin: 0;
-  width: 13px; height: 13px; border: 1px solid #b5a4c7; border-radius: 2px;
-  color: #211c2b; cursor: pointer;
+.apply-row input[type="radio"] {
+  appearance: none; display: grid; place-items: center; flex: 0 0 12px;
+  margin: 0; padding: 0; width: 12px; height: 12px; min-height: 0;
+  border: 1px solid #b5a4c7; border-radius: 50%; background: transparent; cursor: pointer;
 }
-.apply-row input:checked { background: #dac9fd; border-color: #dac9fd; }
-.apply-row input:checked::after { content: "✓"; line-height: 1; font-weight: 700; }
+.apply-row input[type="radio"]:checked::after {
+  content: ""; width: 6px; height: 6px; border-radius: 50%; background: #dac9fd;
+}
 .apply-row input:disabled { opacity: .55; }
 .apply-row button { min-height: 25px; padding: 2px 7px; }
 .apply-row .applied { min-width: 34px; color: #a6edbf; opacity: 1; }
@@ -58,13 +59,4 @@ body.combat-view { text-transform: none; }
 #combat-window label { margin: 0; color: inherit; }
 #combat-window header { flex: none; }
 #combat-window #combat-close { padding: 2px 6px; }
-#combat-controls-status {
-  flex: none; padding: 4px 12px; border-top: 1px solid #544762;
-  color: #d2c4e1; font-size: 12px;
-}
-#combat-controls-status #move-mode-label { position: static; padding: 0; font-size: inherit; }
-#combat-controls-status #status,
-#combat-controls-status #skill-cast-status,
-#combat-controls-status #move-warning { min-height: 0; margin: 0; }
-#combat-controls-status p:empty { display: none; }
 body.combat-view > main[hidden] { display: none; }

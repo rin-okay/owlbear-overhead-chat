@@ -10,8 +10,8 @@ import {
 } from "./session.js?v=2.7.21";
 
 import { drawBubble, normalizeAppearance, prepareBubbleFont } from "./appearance.js?v=2.7.9";
-import { setupDiscordPanel } from "./discord-panel.js?v=2.8.9";
-import { openCombatLog } from "./combat-log.js?v=2.8.9";
+import { setupDiscordPanel } from "./discord-panel.js?v=2.8.10";
+import { openCombatLog } from "./combat-log.js?v=2.8.10";
 import { setupAvatarPanel } from "./avatar-panel.js?v=2.8.6";
 import { setupSkillGrants, setupSkillPanel } from "./skill-panel.js?v=2.8.6";
 import { setupStatsEditor } from "./stats-panel.js?v=2.8.5";
@@ -44,12 +44,9 @@ if (combatWindow) {
   document.querySelector("main").hidden = true;
   combatWindow.hidden = false;
   document.body.classList.add("combat-view");
-  document.querySelector("#combat-controls-status").append(
-    moveModeLabel, moveWarning, status, document.querySelector("#skill-cast-status"),
-  );
   const stylesheet = document.createElement("link");
   stylesheet.rel = "stylesheet";
-  stylesheet.href = new URL("./combat-log.css?v=2.8.9", import.meta.url).href;
+  stylesheet.href = new URL("./combat-log.css?v=2.8.10", import.meta.url).href;
   document.head.append(stylesheet);
   void import("./combat-log-panel.js?v=2.8.9").catch(console.error);
 }
@@ -63,6 +60,8 @@ let sending = false;
 let rollInProgress = false;
 let refreshVersion = 0;
 let tokenControl;
+let controlsInactive = false;
+let tokenFocusHandoff;
 let pendingChatShortcut;
 let combatAvatarId;
 let sendChatNotice;
@@ -238,9 +237,38 @@ function connectTranscript() {
 }
 
 function updateControls() {
+  const labelled = Boolean(tokenControl) || controlsInactive;
   input.disabled = !avatar;
-  send.disabled = !avatar || sending;
+  input.readOnly = labelled;
+  input.toggleAttribute("data-controls-inactive", controlsInactive);
+  input.setAttribute("aria-describedby", labelled ? "move-mode-label status" : "status");
+  moveModeLabel.hidden = !labelled;
+  if (labelled) updateMoveModeLabel();
+  send.disabled = !avatar || sending || controlsInactive;
   moveButton.disabled = !tokenControl && (!avatar || avatar.locked || sending);
+}
+
+function inactiveKey() {
+  return JSON.stringify(["chat.overhead.controls-inactive", OBR.room.id, OBR.player.id]);
+}
+
+function setControlsInactive(inactive) {
+  if (controlsInactive === inactive) return;
+  controlsInactive = inactive;
+  if (!combatWindow) {
+    try {
+      if (inactive) sessionStorage.setItem(inactiveKey(), "1");
+      else sessionStorage.removeItem(inactiveKey());
+    } catch {}
+  }
+  updateControls();
+}
+
+function suspendTokenControl(allowTokenHandoff = false) {
+  if (!tokenControl) return;
+  tokenFocusHandoff = allowTokenHandoff ? { mode: tokenControl, until: Date.now() + 350 } : undefined;
+  stopTokenControl();
+  setControlsInactive(true);
 }
 
 async function getAvatar() {
@@ -292,7 +320,7 @@ async function refresh() {
         startTokenControl();
       }
     } else if (shortcut === "move" && !moveButton.disabled) startTokenControl();
-    else if ((shortcut || shouldFocus) && !tokenControl && !input.disabled) input.focus();
+    else if ((shortcut || (shouldFocus && !controlsInactive)) && !tokenControl && !input.disabled) input.focus();
   } catch (error) {
     if (version !== refreshVersion) return;
     pendingChatShortcut = undefined;
@@ -315,24 +343,23 @@ function stopTokenControl() {
   stopRotation(tokenControl);
   tokenControl = undefined;
   if (targeting?.editing()) targeting.clear();
-  input.readOnly = false;
-  input.setAttribute("aria-describedby", "status");
-  moveModeLabel.hidden = true;
   moveButton.setAttribute("aria-pressed", "false");
   updateControls();
 }
 
 function startTokenControl() {
   if (moveButton.disabled) return;
-  if (!tokenControl) {
-    tokenControl = { tokenId: avatar.id, actions: [] };
-    input.readOnly = true;
-    input.setAttribute("aria-describedby", "move-mode-label status");
-    updateMoveModeLabel();
-    moveModeLabel.hidden = false;
-    moveButton.setAttribute("aria-pressed", "true");
+  if (!combatWindow) moveButton.focus({ preventScroll: true });
+  if (!document.hasFocus() || (!combatWindow && document.activeElement !== moveButton)) {
+    suspendTokenControl();
+    setControlsInactive(true);
+    return;
   }
-  if (!combatWindow) moveButton.focus();
+  if (!tokenControl) tokenControl = { tokenId: avatar.id, actions: [] };
+  tokenFocusHandoff = undefined;
+  setControlsInactive(false);
+  moveButton.setAttribute("aria-pressed", "true");
+  updateControls();
 }
 
 function toggleTokenControl() {
@@ -523,7 +550,8 @@ function useAvatarSlot(mode, key) {
 }
 
 function updateMoveModeLabel() {
-  moveModeLabel.textContent = tokenControl?.missileLevelPending ? "magic missile level · 1–9, esc to cancel"
+  moveModeLabel.textContent = controlsInactive ? "controls inactive · press F1 to chat or F2 to move"
+    : tokenControl?.missileLevelPending ? "magic missile level · 1–9, esc to cancel"
     : targeting?.editing() ? "set target · wasd, space to set"
     : targeting?.location() ? "move mode · target set" : "move mode enabled";
 }
@@ -567,16 +595,16 @@ function handleTargetKey(event) {
 
 moveButton.addEventListener("blur", (event) => {
   stopRotation(tokenControl);
-  if (event.relatedTarget) stopTokenControl();
+  if (event.relatedTarget && event.relatedTarget !== input) suspendTokenControl();
 });
-window.addEventListener("blur", () => {
-  stopRotation(tokenControl);
-  if (!tokenControl?.missileLevelPending) return;
-  tokenControl.missileLevelPending = false;
-  updateMoveModeLabel();
-});
+window.addEventListener("blur", () => suspendTokenControl(!combatWindow));
+window.addEventListener("pagehide", () => suspendTokenControl());
 document.addEventListener("pointerdown", (event) => {
-  if (!combatWindow && event.target !== input && !moveButton.contains(event.target)) stopTokenControl();
+  if (!combatWindow && event.target !== input && !moveButton.contains(event.target)) suspendTokenControl();
+});
+input.addEventListener("pointerdown", () => {
+  tokenFocusHandoff = undefined;
+  if (!tokenControl) setControlsInactive(false);
 });
 moveButton.addEventListener("click", toggleTokenControl);
 function handleControlKeyUp(event) {
@@ -684,7 +712,7 @@ combatWindow?.addEventListener("keydown", (event) => {
 
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
-  if (sending || !avatar || tokenControl) return;
+  if (sending || !avatar || tokenControl || controlsInactive) return;
 
   const draft = input.value;
   const intendedToken = avatar.id;
@@ -1033,7 +1061,11 @@ function setupSettings() {
   skillsTab.addEventListener("click", () => select(4));
   function openFromShortcut(mode) {
     select(0);
-    if (mode === "chat") stopTokenControl();
+    if (mode === "chat") {
+      tokenFocusHandoff = undefined;
+      stopTokenControl();
+      setControlsInactive(false);
+    }
     pendingChatShortcut = mode;
     void refresh();
   }
@@ -1062,6 +1094,10 @@ function setupSettings() {
 }
 
 OBR.onReady(() => {
+  if (!combatWindow) {
+    try { controlsInactive = sessionStorage.getItem(inactiveKey()) === "1"; } catch {}
+    updateControls();
+  }
   targeting = setupTargeting(OBR, updateMoveModeLabel);
   const updateFontRole = setupSettings();
   document.querySelector("#combat-log-open")?.addEventListener("click", () => {
@@ -1077,14 +1113,40 @@ OBR.onReady(() => {
   setupHabboScale();
   connectTranscript();
   let mapSelection;
-  OBR.player.onChange(({ metadata, role, selection }) => {
-    const nextSelection = JSON.stringify(selection ?? []);
-    if (nextSelection !== mapSelection) {
-      mapSelection = nextSelection;
-      if (!combatWindow && tokenControl && selection?.some((id) => id !== tokenControl.tokenId)) {
-        moveButton.focus({ preventScroll: true });
-      }
+  let selectionRevision = 0;
+  void OBR.player.getSelection().then((selection) => {
+    mapSelection ??= JSON.stringify(selection ?? []);
+  }).catch(console.error);
+
+  function updateMapSelection(selection) {
+    const next = JSON.stringify(selection);
+    if (next === mapSelection) return;
+    mapSelection = next;
+    const revision = ++selectionRevision;
+    const mode = tokenControl ?? tokenFocusHandoff?.mode;
+    if (combatWindow || !mode) return;
+    if (!selection.length) {
+      tokenFocusHandoff = undefined;
+      suspendTokenControl();
+      return;
     }
+    void OBR.scene.items.getItems(selection).then((items) => {
+      if (revision !== selectionRevision) return;
+      const handoff = tokenFocusHandoff;
+      if (tokenControl !== mode && !(handoff?.mode === mode && handoff.until >= Date.now())) return;
+      if (items.length !== selection.length || !items.every(isPublicToken)) {
+        tokenFocusHandoff = undefined;
+        suspendTokenControl();
+        return;
+      }
+      if (avatar?.id === mode.tokenId && !mode.switching) startTokenControl();
+    }).catch(() => {
+      if (revision === selectionRevision && tokenControl === mode) suspendTokenControl();
+    });
+  }
+
+  OBR.player.onChange(({ metadata, role, selection }) => {
+    updateMapSelection(selection ?? []);
     playerRole = role;
     updateFontRole(role);
     showSkillsForRole(role);
@@ -1107,7 +1169,8 @@ OBR.onReady(() => {
   OBR.scene.onReadyChange((ready) => {
     if (!ready) {
       combatAvatarId = undefined;
-      stopTokenControl();
+      tokenFocusHandoff = undefined;
+      suspendTokenControl();
       showPlayerStats?.();
     }
     void refresh();

@@ -4,8 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>overhead chat</title>
-  <link rel="stylesheet" href="./chat.css?v=2.7.21">
-  <script type="module" src="./chat.js?v=2.8.9"></script>
+  <link rel="stylesheet" href="./chat.css?v=2.8.10">
+  <script type="module" src="./chat.js?v=2.8.10"></script>
 </head>
 <body>
   <main>
@@ -36,7 +36,7 @@
       <div class="compose">
         <div class="message-field">
           <textarea id="message" rows="2" placeholder="message" maxlength="180" disabled aria-describedby="status"></textarea>
-          <span id="move-mode-label" hidden>move mode enabled</span>
+          <span id="move-mode-label" role="status" hidden>move mode enabled</span>
         </div>
         <button id="move-avatar" type="button" aria-pressed="false" aria-keyshortcuts="F2" title="token control (F2)" disabled>move</button>
         <button type="submit" disabled>Send</button>
@@ -262,7 +262,6 @@
           </div>
         </form>
       </dialog>
-    <footer id="combat-controls-status"></footer>
   </section>
 </body>
 </html>

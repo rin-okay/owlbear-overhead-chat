@@ -100,6 +100,8 @@ select { font: inherit; background: #181321; color: inherit; border: 1px solid #
 #message::placeholder { color: #ab9dbb; font-size: 12px; }
 #message, #entries { text-transform: none; }
 #message:disabled { opacity: .56; }
+#message[readonly][data-controls-inactive] { background: #363439; border-color: #6c6870; opacity: .78; }
+#message[data-controls-inactive] + #move-mode-label { right: 9px; color: #e1dbe6; line-height: 1.2; }
 #message[readonly] { background: #312b3c; color: transparent; caret-color: transparent; }
 #message[readonly]::placeholder, #message[readonly]::selection { color: transparent; }
 #message[readonly]::selection { background: transparent; }
