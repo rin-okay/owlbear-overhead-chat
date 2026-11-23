@@ -1,4 +1,5 @@
 import OBR from "./obr.js";
+import { parseDice } from "./dice.js";
 
 const ACTIVE = "com.battle-system.rumble/rumble_active";
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -41,7 +42,20 @@ async function showOwnDice(roll) {
   graphicTimer = setTimeout(() => OBR.popover.close(DICE_WINDOW).catch(() => {}), 6500);
 }
 
-export async function rollWithRumble(notation) {
+function damageBreakdown(notation, roll, total) {
+  const [diceTerm, modifierTerm] = parseDice(notation);
+  const dice = (roll.sets ?? []).filter((set) => set.type === "d" + diceTerm.sides)
+    .flatMap((set) => (set.rolls ?? []).map((die) => die.value));
+  const modifier = modifierTerm?.constant ?? 0;
+  if (dice.length !== diceTerm.count ||
+      !dice.every((die) => Number.isInteger(die) && die >= 1 && die <= diceTerm.sides) ||
+      dice.reduce((sum, die) => sum + die, modifier) !== total) {
+    throw Error("Rumble! did not return the individual damage dice.");
+  }
+  return modifier ? [...dice, modifier] : dice;
+}
+
+export async function rollWithRumble(notation, requireBreakdown = false) {
   const [metadata, connectionId] = await Promise.all([OBR.player.getMetadata(), OBR.player.getConnectionId()]);
   if (!metadata[ACTIVE]) throw new Error("Open Rumble! in this Owlbear room first.");
 
@@ -69,7 +83,12 @@ export async function rollWithRumble(notation) {
       if (!Number.isFinite(total)) finish(new Error("Rumble! returned a roll without a numeric total. Check its log."));
       else {
         showOwnDice(data.rollResult).catch((error) => console.warn("Rumble! dice window couldn’t open", error));
-        finish(null, { total, detail: detail.slice(0, 1200) });
+        try {
+          const breakdown = requireBreakdown ? damageBreakdown(notation, data.rollResult, total) : undefined;
+          finish(null, { total, detail: detail.slice(0, 1200), ...(breakdown ? { breakdown } : {}) });
+        } catch (error) {
+          finish(error);
+        }
       }
     });
     const timeout = setTimeout(() => {

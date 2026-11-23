@@ -1,14 +1,17 @@
 import { setupBless } from "./bless.js?v=2.7.11";
-import { combatDamage } from "./combat-log.js?v=2.9.2";
+import { combatDamage } from "./combat-log.js?v=2.9.4";
 import { isShieldGraphic, readShieldGraphics, setupShield } from "./shield.js?v=2.8.6";
-import { canSpeak, MELEE_HIT_TIMING, normalizeMeleeHitTiming } from "./rules.js?v=2.6.16";
+import { canSpeak, MELEE_HIT_TIMING, normalizeMeleeHitTiming, ROLL_DAMAGE_FROM_COMBAT_LOG } from "./rules.js?v=2.9.4";
 import {
   areaHits, clearSpellPath, coneHits, isProjectileToken, isProjectileWall, openMeleeDoor, projectileImpact, teleportLandingClear,
 } from "./projectile-collision.js?v=2.8.3";
-import { HIT_MARKERS, MELEE_HIT_CUE } from "./hit-markers.js?v=2.9.2";
-import { rollMeleeDamage } from "./melee-damage.js?v=2.8.8";
+import { HIT_MARKERS, MELEE_HIT_CUE } from "./hit-markers.js?v=2.9.4";
+import { meleeDamageFormula, rollMeleeDamage } from "./melee-damage.js?v=2.9.4";
 import { readTokenStats } from "./stats.js?v=2.8.5";
-import { BLOCKED_MAGIC_MISSILE, eldritchBeamCount, MAGIC_MISSILE_INTERVAL, rollFireSpellDamage, rollMagicMissileDart, rollSpellDamage } from "./spell-damage.js?v=2.9.2";
+import {
+  BLOCKED_MAGIC_MISSILE, eldritchBeamCount, fireSpellDamageFormula, MAGIC_MISSILE_INTERVAL,
+  rollFireSpellDamage, rollMagicMissileDart, rollSpellDamage, spellDamageFormula,
+} from "./spell-damage.js?v=2.9.4";
 import {
   DEFAULT_WEAPON, EMBERS_EFFECTS, MAX_CAST_LEVEL, MELEE_DURATION_MS, SKILLS, SKILL_REQUEST, SKILL_RESULT, WEAPONS,
   aimsAtLocation, availableSkills, availableWeapons, friendlyFireMode, readSkills, skillConnections, skillEffect, spellParameter, tokenTeams, turnToHeading,
@@ -320,15 +323,19 @@ export function setupSkillHost(obr, buildImage, recordCombat) {
         }
       }
       let damageRolls;
+      let damageFormula;
       const meleeHit = Boolean(skill.meleeReach && hitTokenIds.length);
-      const sendMarkers = (delay, damage, { useAnimationCue = false, missileFollowUps } = {}) => obr.broadcast.sendMessage(HIT_MARKERS, {
+      const metadata = hitTokenIds.length ? await obr.room.getMetadata().catch(() => ({})) : {};
+      if (version !== sceneVersion) return;
+      const manual = metadata[ROLL_DAMAGE_FROM_COMBAT_LOG] === true;
+      const sendMarkers = (delay, damage, { useAnimationCue = false, missileFollowUps, dartCount } = {}) => obr.broadcast.sendMessage(HIT_MARKERS, {
         requestId: data.requestId, tokenIds: hitTokenIds, delay, useAnimationCue,
+        splat: manual && !missileBlocked,
         ...(damage ? { damage } : {}),
         ...(missileFollowUps ? { missileFollowUps } : {}),
+        ...(dartCount ? { dartCount } : {}),
       }, { destination: "ALL" }).catch((error) => console.error("Overhead Chat hit markers", error));
       if (meleeHit) {
-        const metadata = await obr.room.getMetadata().catch(() => ({}));
-        if (version !== sceneVersion) return;
         const timing = normalizeMeleeHitTiming(metadata[MELEE_HIT_TIMING]);
         const cueDelay = Math.round(MELEE_DURATION_MS[weapon] * timing / 100);
         const cue = { type: "action", id: "message", arguments: [MELEE_HIT_CUE, data.requestId, "LOCAL"] };
@@ -338,8 +345,9 @@ export function setupSkillHost(obr, buildImage, recordCombat) {
         } else {
           instructions.push({ ...cue, delay: cueDelay });
         }
-        damageRolls = [rollMeleeDamage(weapon, token)];
-        await sendMarkers(cueDelay + 750, damageRolls[0], { useAnimationCue: true });
+        if (manual) damageFormula = meleeDamageFormula(weapon, token);
+        else damageRolls = [rollMeleeDamage(weapon, token)];
+        await sendMarkers(cueDelay + 750, damageRolls?.[0], { useAnimationCue: true });
         if (version !== sceneVersion) return;
       }
       await obr.broadcast.sendMessage(EMBERS_EFFECTS, {
@@ -350,19 +358,31 @@ export function setupSkillHost(obr, buildImage, recordCombat) {
           .catch((error) => console.error("Overhead Chat could not open the door", error));
       }
       if (version === sceneVersion && hitTokenIds.length && missile) {
-        damageRolls = instructions.map(() => missileBlocked ? BLOCKED_MAGIC_MISSILE : rollMagicMissileDart());
-        const [damage, ...missileFollowUps] = damageRolls;
-        await sendMarkers(skill.hitDelay, damage, { missileFollowUps });
+        if (manual && !missileBlocked) {
+          const count = instructions.length;
+          damageFormula = { count, sides: 4, type: "force", modifier: count };
+          await sendMarkers(skill.hitDelay, undefined, { dartCount: count });
+        } else {
+          damageRolls = instructions.map(() => missileBlocked ? BLOCKED_MAGIC_MISSILE : rollMagicMissileDart());
+          const [damage, ...missileFollowUps] = damageRolls;
+          await sendMarkers(skill.hitDelay, damage, { missileFollowUps });
+        }
       } else if (version === sceneVersion && hitTokenIds.length && !meleeHit) {
-        const damage = skill.damageDice ? rollFireSpellDamage(skill, spellLevel)
-          : data.skill === "eldritch-blast" || data.skill === "shatter" ? rollSpellDamage(data.skill, token) : undefined;
-        if (damage) damageRolls = [damage];
-        await sendMarkers(skill.impact?.delay ?? skill.hitDelay, damage);
+        const otherDamage = data.skill === "eldritch-blast" || data.skill === "shatter";
+        if (manual) {
+          damageFormula = skill.damageDice ? fireSpellDamageFormula(skill, spellLevel)
+            : otherDamage ? spellDamageFormula(data.skill, token) : undefined;
+        } else {
+          const damage = skill.damageDice ? rollFireSpellDamage(skill, spellLevel)
+            : otherDamage ? rollSpellDamage(data.skill, token) : undefined;
+          if (damage) damageRolls = [damage];
+        }
+        await sendMarkers(skill.impact?.delay ?? skill.hitDelay, damageRolls?.[0]);
       }
       await logCast({
         action: skill.meleeReach && weapon !== DEFAULT_WEAPON ? WEAPONS[weapon] : skill.name,
         attack: checksHit && skill.location !== "teleport",
-        selected: logSelected, hits: hitTokens, damage: combatDamage(damageRolls),
+        selected: logSelected, hits: hitTokens, damage: combatDamage(damageRolls), damageFormula,
       });
       if (version === sceneVersion) await answer(result);
     } catch (error) {

@@ -1,8 +1,8 @@
 import OBR from "./obr.js";
 import {
-  ABOVE_FOG, AVATAR, GENERAL_CHAT_ROOM, HABBO_MODE, HABBO_SCALE, MELEE_HIT_TIMING, RUMBLE_DICE, SPEECH,
+  ABOVE_FOG, AVATAR, GENERAL_CHAT_ROOM, HABBO_MODE, HABBO_SCALE, MELEE_HIT_TIMING, ROLL_DAMAGE_FROM_COMBAT_LOG, RUMBLE_DICE, SPEECH,
   canSpeak, isPublicToken, normalizeHabboScale, normalizeMeleeHitTiming, parseSpeech,
-} from "./rules.js?v=2.6.16";
+} from "./rules.js?v=2.9.4";
 
 import {
   openSessionChannel, savedAvatar, saveAvatar, savedAvatarSlots, savedAvatarMode, savedQuickbarSlots,
@@ -10,8 +10,8 @@ import {
 } from "./session.js?v=2.7.21";
 
 import { drawBubble, normalizeAppearance, prepareBubbleFont } from "./appearance.js?v=2.7.9";
-import { setupDiscordPanel } from "./discord-panel.js?v=2.9.3";
-import { openCombatLog } from "./combat-log.js?v=2.9.3";
+import { setupDiscordPanel } from "./discord-panel.js?v=2.9.4";
+import { damageNotation, openCombatLog, saveNotation } from "./combat-log.js?v=2.9.4";
 import { MAX_CAST_LEVEL, SKILLS } from "./skills.js?v=2.9.2";
 import { ABILITIES, readTokenStats } from "./stats.js?v=2.8.5";
 import { setupAvatarPanel } from "./avatar-panel.js?v=2.8.6";
@@ -24,7 +24,7 @@ import { cameraFollowPreference, centerAvatar, prepareKeyboardPan } from "./avat
 
 import { readMovementGrid, stepAvatar, turnAvatar } from "./movement.js?v=2.7.5";
 import { rollSpans, validateRollSpans } from "./dice.js";
-import { rollWithRumble } from "./rumble.js";
+import { rollWithRumble } from "./rumble.js?v=2.9.4";
 import { rollWithNativeDice } from "./native-dice.js";
 
 const combatView = new URLSearchParams(location.search).has("combat-log");
@@ -49,10 +49,10 @@ if (combatWindow) {
   document.body.classList.add("combat-view");
   const stylesheet = document.createElement("link");
   stylesheet.rel = "stylesheet";
-  stylesheet.href = new URL("./combat-log.css?v=2.9.3", import.meta.url).href;
+  stylesheet.href = new URL("./combat-log.css?v=2.9.4", import.meta.url).href;
   document.head.append(stylesheet);
-  void import("./combat-log-panel.js?v=2.9.3")
-    .then(({ setCombatSaveRoller }) => setCombatSaveRoller(rollCombatSave)).catch(console.error);
+  void import("./combat-log-panel.js?v=2.9.4")
+    .then(({ setCombatRollers }) => setCombatRollers(rollCombatSave, rollCombatDamage)).catch(console.error);
 }
 
 let avatar = null;
@@ -796,30 +796,44 @@ async function sendChatRoll(message, spans) {
   const roll = { ...message, rollId: crypto.randomUUID() };
   try {
     await OBR.broadcast.sendMessage(SPEECH, { ...roll, rollPhase: "pending" }, { destination: "ALL" });
-    void finishRoll(roll, spans);
+    return { completion: finishRoll(roll, spans) };
   } catch (error) {
     rollInProgress = false;
     throw error;
   }
 }
 
-async function rollCombatSave(tokenId, ability) {
+async function rollCombatSave(entryId, tokenId, ability, mode) {
   if (!Object.hasOwn(ABILITIES, ability)) throw Error("Unknown saving throw.");
-  if (!await OBR.scene.isReady()) throw Error("Open a scene to roll a save.");
+  return rollFromCombatLog(entryId, tokenId, "save", (token) => ({
+    notation: saveNotation(readTokenStats(token).modifiers[ability], mode),
+    fields: { saveAbility: ability, saveMode: mode },
+  }));
+}
+
+async function rollCombatDamage(entry) {
+  return rollFromCombatLog(entry.id, entry.casterId, "damage", () => ({
+    notation: damageNotation(entry.damageFormula),
+  }));
+}
+
+async function rollFromCombatLog(entryId, tokenId, kind, prepare) {
+  if (!await OBR.scene.isReady()) throw Error("Open a scene to roll dice.");
   const [[token], role, permissions] = await Promise.all([
     OBR.scene.items.getItems([tokenId]), OBR.player.getRole(), OBR.room.getPermissions(),
   ]);
   if (!canSpeak({ id: OBR.player.id, role }, token, permissions)) {
-    throw Error("You can only roll a save for a token you control.");
+    throw Error("You can only roll for a token you control.");
   }
-  const modifier = readTokenStats(token).modifiers[ability];
-  const notation = "1d20" + (modifier >= 0 ? "+" : "") + modifier;
+  const { notation, fields } = prepare(token);
   const speech = parseSpeech({ tokenId, text: "/r " + notation, roomId: chatRoom.value });
-  if (!speech) throw Error("Couldn’t prepare this saving throw.");
-  await sendChatRoll({
+  if (!speech) throw Error("Couldn’t prepare this roll.");
+  const { completion } = await sendChatRoll({
     ...speech, appearance: normalizeAppearance(savedAppearance(), role), messageId: crypto.randomUUID(),
-    saveAbility: ability,
+    combatRoll: { id: entryId.split(".")[0], kind }, ...fields,
   }, rollSpans(speech.text));
+  const result = await completion;
+  if (result.rollPhase !== "resolved") throw Error(result.rollError || "Couldn’t share this roll.");
 }
 
 async function finishRoll(message, spans) {
@@ -828,7 +842,7 @@ async function finishRoll(message, spans) {
     const useRumble = (await OBR.room.getMetadata())[RUMBLE_DICE] === true;
     if (useRumble) {
       const rolls = [];
-      for (const { notation } of spans) rolls.push(await rollWithRumble(notation));
+      for (const { notation } of spans) rolls.push(await rollWithRumble(notation, message.combatRoll?.kind === "damage"));
       resolution = { rolls, rollPhase: "resolved" };
     } else {
       resolution = { ...await rollWithNativeDice(spans), rollPhase: "resolved" };
@@ -839,9 +853,11 @@ async function finishRoll(message, spans) {
 
   try {
     await OBR.broadcast.sendMessage(SPEECH, { ...message, ...resolution }, { destination: "ALL" });
+    return resolution;
   } catch (error) {
     console.error("Overhead Chat roll update failed", error);
     status.textContent = "Couldn’t share the completed roll.";
+    return { rollPhase: "failed", rollError: status.textContent };
   } finally {
     rollInProgress = false;
   }
@@ -1182,6 +1198,7 @@ OBR.onReady(() => {
   setupMeleeHitTiming();
   setupRoomToggle("gm-fog-settings", ABOVE_FOG);
   setupRoomToggle("gm-rumble-settings", RUMBLE_DICE);
+  setupRoomToggle("gm-combat-damage-settings", ROLL_DAMAGE_FROM_COMBAT_LOG);
   setupRoomToggle("gm-habbo-settings", HABBO_MODE);
   setupHabboScale();
   connectTranscript();

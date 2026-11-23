@@ -1,5 +1,5 @@
 import OBR from "./obr.js";
-import { COMBAT_POPOVER, formatCombatDamage, openCombatChannel } from "./combat-log.js?v=2.9.2";
+import { COMBAT_POPOVER, damageNotation, formatCombatDamage, openCombatChannel } from "./combat-log.js?v=2.9.4";
 import { appliedCombatDamage, applyForgeDamage, forgeHpKey, hasForgeHp, undoForgeDamage } from "./forge-hp.js?v=2.8.9";
 
 const entries = document.querySelector("#combat-entries");
@@ -10,8 +10,12 @@ let hpKey;
 let tokens = new Map();
 let sceneVersion = 0;
 let rollSave;
+let rollDamage;
 
-export function setCombatSaveRoller(roller) { rollSave = roller; }
+export function setCombatRollers(saveRoller, damageRoller) {
+  rollSave = saveRoller;
+  rollDamage = damageRoller;
+}
 
 function paragraph(text, className) {
   const element = document.createElement("p");
@@ -37,6 +41,7 @@ function askCustomDamage(target) {
 }
 
 function applyControls(entry, target, parent) {
+  const pending = Boolean(entry.damageFormula && !entry.damage);
   const form = document.createElement("form");
   form.className = "apply-row";
   form.setAttribute("aria-label", "damage for " + target.name);
@@ -51,9 +56,10 @@ function applyControls(entry, target, parent) {
     return input;
   });
   const [full, , custom] = choices;
-  (entry.damage ? full : custom).checked = true;
+  (entry.damage || pending ? full : custom).checked = true;
   const button = document.createElement("button");
   button.type = "submit";
+  button.className = "compact-button apply-button";
   const undo = document.createElement("button");
   undo.type = "button";
   undo.className = "undo";
@@ -73,8 +79,8 @@ function applyControls(entry, target, parent) {
     const applied = receipt !== undefined;
     const ready = hasForgeHp(token, hpKey);
     form.hidden = role !== "GM" || (!applied && !ready);
-    choices.forEach((input) => { input.disabled = applied || busy || (!entry.damage && input !== custom); });
-    button.disabled = applied || busy;
+    choices.forEach((input) => { input.disabled = pending || applied || busy || (!entry.damage && input !== custom); });
+    button.disabled = pending || applied || busy;
     button.textContent = applied ? "✓" : "apply";
     button.classList.toggle("applied", applied);
     button.setAttribute("aria-label", applied ? "damage applied" : "apply damage to " + target.name);
@@ -86,7 +92,7 @@ function applyControls(entry, target, parent) {
   }
 
   async function submit(kind, undoing = false) {
-    if (busy || form.hidden || role !== "GM") return;
+    if (pending || busy || form.hidden || role !== "GM") return;
     const version = sceneVersion;
     const current = () => version === sceneVersion && displayed.has(entry.id);
     busy = true;
@@ -121,6 +127,96 @@ function applyControls(entry, target, parent) {
   return update;
 }
 
+const saveMenu = document.createElement("div");
+saveMenu.className = "save-menu";
+saveMenu.popover = "auto";
+document.querySelector("#combat-window").append(saveMenu);
+let menuRoll;
+for (const mode of ["advantage", "disadvantage"]) {
+  const option = document.createElement("button");
+  option.type = "button";
+  option.textContent = "roll with " + mode;
+  option.addEventListener("click", () => {
+    saveMenu.hidePopover();
+    void menuRoll?.(mode);
+  });
+  saveMenu.append(option);
+}
+
+function showRollError(error, fallback) {
+  void OBR.notification.show(error.message || fallback).catch(console.error);
+}
+
+function saveControl(entry, hit) {
+  const button = document.createElement("button");
+  const label = entry.saveAbility + " save";
+  button.className = "compact-button save-button";
+  button.type = "button";
+  button.title = "Click to roll. Right-click for advantage or disadvantage.";
+  button.setAttribute("aria-haspopup", "true");
+  const update = (total) => {
+    button.textContent = total === undefined ? label : label + ": " + total;
+    button.setAttribute("aria-label", button.textContent + " for " + hit.name);
+  };
+  update(entry.saves?.[hit.id]);
+
+  async function roll(mode) {
+    if (!rollSave || button.disabled || !button.isConnected) return;
+    button.disabled = true;
+    try {
+      await rollSave(entry.id, hit.id, entry.saveAbility, mode);
+    } catch (error) {
+      showRollError(error, "Couldn’t roll the save.");
+    } finally {
+      button.disabled = false;
+    }
+  }
+  function openMenu(event) {
+    event.preventDefault();
+    if (button.disabled) return;
+    menuRoll = roll;
+    const bounds = button.getBoundingClientRect();
+    saveMenu.showPopover();
+    const left = Math.max(4, Math.min(bounds.left, window.innerWidth - saveMenu.offsetWidth - 4));
+    const top = bounds.bottom + saveMenu.offsetHeight + 4 > window.innerHeight
+      ? Math.max(4, bounds.top - saveMenu.offsetHeight - 3) : bounds.bottom + 3;
+    saveMenu.style.left = left + "px";
+    saveMenu.style.top = top + "px";
+    saveMenu.firstElementChild.focus({ preventScroll: true });
+  }
+  button.addEventListener("click", () => roll("normal"));
+  button.addEventListener("contextmenu", openMenu);
+  button.addEventListener("keydown", (event) => {
+    if (event.altKey && event.key === "ArrowDown") {
+      event.stopPropagation();
+      openMenu(event);
+    }
+  });
+  return { button, update };
+}
+
+function damageLine(entry) {
+  if (entry.damage) return paragraph(formatCombatDamage(entry.damage), "damage");
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "damage-roll";
+  button.textContent = "(" + damageNotation(entry.damageFormula, true) + " " + entry.damageFormula.type + ")";
+  button.setAttribute("aria-label", "roll " + button.textContent);
+  button.addEventListener("click", async () => {
+    if (!rollDamage || button.disabled) return;
+    button.disabled = true;
+    try {
+      await rollDamage(entry);
+      // The GM publishes the result separately from the chat roll.
+      setTimeout(() => { if (button.isConnected) button.disabled = false; }, 2500);
+    } catch (error) {
+      button.disabled = false;
+      showRollError(error, "Couldn’t roll damage.");
+    }
+  });
+  return button;
+}
+
 function createEntry(entry) {
   const item = document.createElement("li");
   item.className = "entry";
@@ -132,8 +228,10 @@ function createEntry(entry) {
   item.append(paragraph(heading, "action"));
 
   const controls = [];
+  const saves = new Map();
+  const hasDamageLine = entry.damage || entry.damageFormula;
   if (entry.attack && !entry.hits.length) item.append(paragraph("it misses!", "outcome"));
-  if (multiple && entry.damage) item.append(paragraph(formatCombatDamage(entry.damage), "damage"));
+  if (multiple && hasDamageLine) item.append(damageLine(entry));
   for (const hit of entry.hits) {
     const hitSection = document.createElement("section");
     if (multiple) hitSection.className = "target-line";
@@ -148,31 +246,17 @@ function createEntry(entry) {
         line.append(label);
       }
       if (entry.saveAbility) {
-        const save = document.createElement("button");
-        save.className = "save-button";
-        save.type = "button";
-        save.textContent = entry.saveAbility + " save";
-        save.setAttribute("aria-label", "roll " + entry.saveAbility + " save for " + hit.name);
-        save.addEventListener("click", async () => {
-          if (!rollSave || save.disabled) return;
-          save.disabled = true;
-          try {
-            await rollSave(hit.id, entry.saveAbility);
-          } catch (error) {
-            void OBR.notification.show(error.message || "Couldn’t roll the save.").catch(console.error);
-          } finally {
-            save.disabled = false;
-          }
-        });
-        line.append(save);
+        const { button, update } = saveControl(entry, hit);
+        saves.set(hit.id, update);
+        line.append(button);
       }
       hitSection.append(line);
     }
-    if (!multiple && entry.damage) hitSection.append(paragraph(formatCombatDamage(entry.damage), "damage"));
+    if (!multiple && hasDamageLine) hitSection.append(damageLine(entry));
     if (entry.attack && !entry.damage?.blocked) controls.push(applyControls(entry, hit, hitSection));
     item.append(hitSection);
   }
-  return { item, controls };
+  return { item, controls, saves, hasDamage: Boolean(entry.damage) };
 }
 
 function render(log) {
@@ -184,10 +268,15 @@ function render(log) {
   }
   const atTop = document.querySelector("#combat-transcript").scrollTop < 12;
   for (const entry of log) {
-    if (displayed.has(entry.id)) continue;
+    const previous = displayed.get(entry.id);
+    if (previous?.hasDamage === Boolean(entry.damage)) {
+      for (const [id, update] of previous.saves) update(entry.saves?.[id]);
+      continue;
+    }
     const row = createEntry(entry);
     displayed.set(entry.id, row);
-    entries.prepend(row.item);
+    if (previous) previous.item.replaceWith(row.item);
+    else entries.prepend(row.item);
   }
   if (atTop) document.querySelector("#combat-transcript").scrollTop = 0;
   empty.hidden = displayed.size > 0;
@@ -221,6 +310,7 @@ OBR.onReady(() => {
     itemRevision++;
     sceneVersion++;
     if (customDialog.open) customDialog.close();
+    if (saveMenu.matches(":popover-open")) saveMenu.hidePopover();
     updateItems([]);
     render([]);
     if (ready) void loadItems().catch(console.error);

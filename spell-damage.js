@@ -21,18 +21,26 @@ export function eldritchBeamCount(token) {
   return 1 + Number(level >= 5) + Number(level >= 11) + Number(level >= 17);
 }
 
-export function rollSpellDamage(skill, token, random = Math.random) {
+export function spellDamageFormula(skill, token) {
   const eldritch = skill === "eldritch-blast";
   const count = eldritch ? eldritchBeamCount(token) : 3;
   const sides = eldritch ? 10 : 8;
-  return rollDamage(count, sides, eldritch ? "force" : "thunder", random);
+  return { count, sides, type: eldritch ? "force" : "thunder", modifier: 0 };
+}
+
+export function rollSpellDamage(skill, token, random = Math.random) {
+  return rollDamage(spellDamageFormula(skill, token), random);
+}
+
+export function fireSpellDamageFormula(skill, level) {
+  return { count: skill.damageDice + level - skill.spellLevel, sides: 6, type: "fire", modifier: 0 };
 }
 
 export function rollFireSpellDamage(skill, level, random = Math.random) {
-  return rollDamage(skill.damageDice + level - skill.spellLevel, 6, "fire", random);
+  return rollDamage(fireSpellDamageFormula(skill, level), random);
 }
 
-function rollDamage(count, sides, type, random) {
+function rollDamage({ count, sides, type }, random) {
   const dice = Array.from({ length: count }, () => 1 + Math.floor(random() * sides));
   const amount = dice.reduce((sum, value) => sum + value, 0);
   return { amount, type, maxRoll: amount === count * sides, dice, sides };

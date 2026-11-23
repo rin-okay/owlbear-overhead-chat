@@ -3,6 +3,8 @@ import { SKILLS, skillConnections } from "./skills.js?v=2.9.2";
 export const COMBAT_POPOVER = "chat.overhead.combat-log.v1";
 const COMBAT_EVENT = "chat.overhead.combat-event.v1";
 const LOG_LIMIT = 100;
+const ROLL_TIMEOUT = 70_000;
+const combatId = (value) => typeof value === "string" && /^[0-9a-f-]{36}$/i.test(value);
 const name = (value) => String(value || "unnamed token").slice(0, 80);
 
 export async function openCombatChannel(obr) {
@@ -14,7 +16,7 @@ export async function openCombatLog(obr) {
   const [width, height] = await Promise.all([obr.viewport.getWidth(), obr.viewport.getHeight()]);
   return obr.popover.open({
     id: COMBAT_POPOVER,
-    url: new URL("./index.html?v=2.9.3&combat-log=1", import.meta.url).href,
+    url: new URL("./index.html?v=2.9.4&combat-log=1", import.meta.url).href,
     width: Math.max(1, Math.min(380, width - 24)), height: Math.max(1, Math.min(340, height - 64)),
     anchorReference: "POSITION",
     anchorOrigin: { horizontal: "LEFT", vertical: "TOP" },
@@ -48,22 +50,74 @@ export function formatCombatDamage(damage) {
   return damage.dice.length ? damage.dice.length + "d" + damage.sides + signed + " = " + terms + result + total : total;
 }
 
+export function damageNotation({ count, sides, modifier }, spaced = false) {
+  const operator = modifier < 0 ? "-" : "+";
+  return count + "d" + sides + (modifier
+    ? (spaced ? " " + operator + " " : operator) + Math.abs(modifier) : "");
+}
+
+export function saveNotation(modifier, mode) {
+  const dice = mode === "advantage" ? "2d20kh1" : mode === "disadvantage" ? "2d20kl1" : "1d20";
+  return dice + (modifier < 0 ? "" : "+") + modifier;
+}
+
+function damageFromRoll(formula, roll) {
+  if (roll?.notation !== damageNotation(formula) || !Array.isArray(roll.breakdown)) return;
+  const { count, sides, type, modifier } = formula;
+  const dice = roll.breakdown.slice(0, count);
+  if (roll.breakdown.length !== count + Number(modifier !== 0) ||
+      (modifier !== 0 && roll.breakdown[count] !== modifier) ||
+      !dice.every((die) => Number.isInteger(die) && die >= 1 && die <= sides) ||
+      dice.reduce((sum, die) => sum + die, modifier) !== roll.total) return;
+  return { amount: Math.max(0, roll.total), type, dice, sides, modifier };
+}
+
 export function setupCombatLog(obr) {
   const log = new Map();
+  const damageClaims = new Map();
   let channel;
   let sceneVersion = 0;
+  let incoming = Promise.resolve();
   const publish = () => channel?.postMessage({ type: "entries", entries: [...log.values()] });
 
   function receive(entry) {
     if (log.has(entry.id)) return;
+    if (entry.damageFormula && !entry.damage) {
+      const previous = entriesForCast(entry.id.split(".")[0]).find(({ damage }) => damage);
+      if (previous) entry = { ...entry, damage: previous.damage };
+    }
     log.set(entry.id, entry);
-    if (log.size > LOG_LIMIT) log.delete(log.keys().next().value);
+    if (log.size > LOG_LIMIT) {
+      const oldest = log.keys().next().value;
+      log.delete(oldest);
+      if (!entriesForCast(oldest.split(".")[0]).length) damageClaims.delete(oldest.split(".")[0]);
+    }
     publish();
+  }
+
+  function entriesForCast(id) {
+    return [...log.values()].filter((entry) => entry.id.split(".")[0] === id);
+  }
+
+  function receiveResult({ id, damage, save }) {
+    let changed = false;
+    for (const entry of entriesForCast(id)) {
+      if (damage && entry.damageFormula && !entry.damage) {
+        log.set(entry.id, { ...entry, damage });
+        changed = true;
+      }
+      if (save && entry.saveAbility && entry.hits.some((hit) => hit.id === save.tokenId)) {
+        log.set(entry.id, { ...entry, saves: { ...entry.saves, [save.tokenId]: save.total } });
+        changed = true;
+      }
+    }
+    if (changed) publish();
   }
 
   obr.scene.onReadyChange(() => {
     sceneVersion++;
     log.clear();
+    damageClaims.clear();
     publish();
   });
   void openCombatChannel(obr).then((result) => {
@@ -72,17 +126,22 @@ export function setupCombatLog(obr) {
     publish();
   }).catch(console.error);
 
-  obr.broadcast.onMessage(COMBAT_EVENT, async ({ connectionId, data }) => {
+  obr.broadcast.onMessage(COMBAT_EVENT, ({ connectionId, data }) => {
     const version = sceneVersion;
-    if (typeof data?.id !== "string" || !/^[0-9a-f-]{36}(?:\.\d+)?$/i.test(data.id) ||
-        !Object.hasOwn(SKILLS, data.skill) || !Array.isArray(data.hits) || data.hits.length > 20) return;
-    try {
+    const update = data?.type === "roll";
+    const entry = typeof data?.id === "string" && /^[0-9a-f-]{36}(?:\.\d+)?$/i.test(data.id) &&
+      Object.hasOwn(SKILLS, data.skill) && Array.isArray(data.hits) && data.hits.length <= 20;
+    if (update ? !combatId(data.id) : !entry) return;
+    incoming = incoming.then(async () => {
       const [{ gm }, ready] = await Promise.all([skillConnections(obr), obr.scene.isReady()]);
-      if (version === sceneVersion && ready && gm?.connectionId === connectionId) receive(data);
-    } catch (error) { console.error("Overhead Chat combat log", error); }
+      if (version !== sceneVersion || !ready || gm?.connectionId !== connectionId) return;
+      if (update) receiveResult(data);
+      else receive(data);
+    }).catch((error) => console.error("Overhead Chat combat log", error));
+    return incoming;
   });
 
-  return async ({ requestId, caster, skill, level, selected, hits = [], damage, action, attack = false }) => {
+  async function record({ requestId, caster, skill, level, selected, hits = [], damage, damageFormula, action, attack = false }) {
     const version = sceneVersion;
     const targets = [...new Map(hits.map((token) => [token.id, { id: token.id, name: name(token.name) }])).values()];
     const groups = [];
@@ -93,15 +152,51 @@ export function setupCombatLog(obr) {
         if (version !== sceneVersion) break;
         const entry = {
           id: index ? requestId + "." + index : requestId,
-          actor: name(caster.name), skill, action: action || SKILLS[skill].name, level, attack,
+          actor: name(caster.name), casterId: caster.id, skill, action: action || SKILLS[skill].name, level, attack,
           selected: selected ? { id: selected.id, name: name(selected.name) } : undefined,
           hits: group,
           saveAbility: SKILLS[skill].saveAbility,
-          damage,
+          damage, damageFormula,
         };
         receive(entry);
         await obr.broadcast.sendMessage(COMBAT_EVENT, entry, { destination: "REMOTE" });
       }
     } catch (error) { console.error("Overhead Chat combat log", error); }
-  };
+  }
+
+  async function acceptRoll({ id, kind, tokenId, notation, roll, phase, chatId, saveAbility, modifier, mode }) {
+    if (!combatId(id) || (kind !== "damage" && kind !== "save")) return;
+    const version = sceneVersion;
+    const { gm, self } = await skillConnections(obr);
+    if (version !== sceneVersion || gm?.connectionId !== self.connectionId) return;
+    const entries = entriesForCast(id);
+    const result = { id, type: "roll" };
+    if (kind === "damage") {
+      const entry = entries[0];
+      if (!entry?.damageFormula || entry.damage || tokenId !== entry.casterId ||
+          notation !== damageNotation(entry.damageFormula)) return;
+      const claim = damageClaims.get(id);
+      const now = Date.now();
+      if (phase === "pending") {
+        if (!claim || claim.expires <= now) damageClaims.set(id, { chatId, expires: now + ROLL_TIMEOUT });
+        return;
+      }
+      if (claim?.chatId !== chatId || claim.expires <= now) return;
+      damageClaims.delete(id);
+      if (phase !== "resolved") return;
+      result.damage = damageFromRoll(entry.damageFormula, roll);
+      if (!result.damage) return;
+    } else {
+      if (phase !== "resolved" || !["normal", "advantage", "disadvantage"].includes(mode) ||
+          !Number.isInteger(modifier) || !entries.some((entry) => entry.saveAbility === saveAbility &&
+          entry.hits.some((hit) => hit.id === tokenId)) ||
+          notation !== saveNotation(modifier, mode) ||
+          !Number.isInteger(roll?.total) || roll.total < modifier + 1 || roll.total > modifier + 20) return;
+      result.save = { tokenId, total: roll.total };
+    }
+    receiveResult(result);
+    await obr.broadcast.sendMessage(COMBAT_EVENT, result, { destination: "REMOTE" });
+  }
+
+  return { record, acceptRoll };
 }

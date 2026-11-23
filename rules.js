@@ -1,4 +1,5 @@
 export const RUMBLE_DICE = "chat.overhead.rumble-dice.v1";
+export const ROLL_DAMAGE_FROM_COMBAT_LOG = "chat.overhead.roll-damage-from-combat-log.v1";
 export const AVATAR = "chat.overhead.avatar.v1";
 export const ABOVE_FOG = "chat.overhead.above-fog.v1";
 export const HABBO_MODE = "chat.overhead.habbo-mode.v1";

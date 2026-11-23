@@ -36,10 +36,15 @@ export const MELEE_WEAPON_DAMAGE = {
 };
 const types = new Set(Object.values(MELEE_WEAPON_DAMAGE).map(({ type }) => type));
 
-export function rollMeleeDamage(weapon, token, random = Math.random) {
+export function meleeDamageFormula(weapon, token) {
   const { count, sides, type, finesse } = MELEE_WEAPON_DAMAGE[weapon];
   const { str, dex } = readTokenStats(token).modifiers;
   const modifier = finesse ? Math.max(str, dex) : str;
+  return { count, sides, type, modifier };
+}
+
+export function rollMeleeDamage(weapon, token, random = Math.random) {
+  const { count, sides, type, modifier } = meleeDamageFormula(weapon, token);
   const dice = Array.from({ length: count }, () => 1 + Math.floor(random() * sides));
   const sum = dice.reduce((total, value) => total + value, 0);
   return { amount: Math.max(0, sum + modifier), type, maxRoll: sum === count * sides, dice, sides, modifier };

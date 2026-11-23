@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>overhead chat</title>
   <link rel="stylesheet" href="./chat.css?v=2.8.10">
-  <script type="module" src="./chat.js?v=2.9.3"></script>
+  <script type="module" src="./chat.js?v=2.9.4"></script>
 </head>
 <body>
   <main>
@@ -207,6 +207,12 @@
           <input type="checkbox" aria-describedby="rumble-help" disabled> Use Rumble! for dice rolls
         </label>
         <p id="rumble-help">When off, Overhead Chat shows its own 3D dice tray. When on, open Rumble! in this room before rolling.</p>
+        <p role="status"></p>
+      </section>
+      <section id="gm-combat-damage-settings" aria-label="combat damage settings" hidden>
+        <label class="discord-enabled">
+          <input type="checkbox" disabled> Roll damage from combat log
+        </label>
         <p role="status"></p>
       </section>
       <section id="gm-habbo-settings" aria-label="floating bubble settings" hidden>

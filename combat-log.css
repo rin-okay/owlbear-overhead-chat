@@ -27,12 +27,22 @@ button:disabled { cursor: default; opacity: .6; }
 p { margin: 0; }
 #combat-empty { padding: 12px; color: #d2c4e1; }
 .outcome { margin-top: 3px; color: #d2c4e1; }
-#combat-window .save-button {
-  display: inline-block; margin-left: 6px; padding: 0 5px;
-  height: 16px; min-height: 0; line-height: 14px; font-size: 11px;
+#combat-window .compact-button {
+  display: inline-block; padding: 0 5px; font: 11px/14px system-ui, sans-serif;
+  inline-size: 76px; height: 16px; min-height: 0;
   border-radius: 4px; vertical-align: baseline; white-space: nowrap;
 }
+#combat-window .save-button { margin-left: 6px; }
+.save-menu {
+  position: fixed; margin: 0; padding: 3px;
+  color: inherit; background: #211c2b; border: 1px solid #645775; border-radius: 6px;
+}
+.save-menu button {
+  display: block; width: 100%; background: transparent; border: 0;
+  min-height: 24px; text-align: left; white-space: nowrap; font-size: 12px;
+}
 .damage { margin-top: 3px; font-variant-numeric: tabular-nums; }
+#combat-window .damage-roll { margin-top: 3px; min-height: 21px; padding: 0 6px; }
 .target-line { display: flex; align-items: center; flex-wrap: wrap; gap: 0 8px; margin-top: 3px; }
 .target-line .outcome { display: flex; align-items: center; flex: 1; min-width: 0; margin: 0; }
 .target-line .target-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -57,9 +67,8 @@ p { margin: 0; }
   content: ""; width: 6px; height: 6px; border-radius: 50%; background: #dac9fd;
 }
 .apply-row input:disabled { opacity: .55; }
-.apply-row button { min-height: 25px; padding: 2px 7px; }
 .apply-row .applied { min-width: 34px; color: #a6edbf; opacity: 1; }
-.apply-row .undo { font-size: 16px; line-height: 1; }
+.apply-row .undo { font-size: 16px; line-height: 1; padding: 2px 5px; }
 dialog {
   width: min(260px, calc(100% - 24px)); padding: 14px;
   border: 1px solid #645775; border-radius: 8px; background: #211c2b; color: inherit;
