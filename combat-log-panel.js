@@ -2,6 +2,7 @@ import OBR from "./obr.js";
 import { COMBAT_POPOVER, damageNotation, formatCombatDamage, openCombatChannel } from "./combat-log.js?v=2.9.4";
 import { appliedCombatDamage, applyForgeDamage, forgeHpKey, hasForgeHp, undoForgeDamage } from "./forge-hp.js?v=2.8.9";
 
+const combatWindow = document.querySelector("#combat-window");
 const entries = document.querySelector("#combat-entries");
 const empty = document.querySelector("#combat-empty");
 const displayed = new Map();
@@ -15,6 +16,10 @@ let rollDamage;
 export function setCombatRollers(saveRoller, damageRoller) {
   rollSave = saveRoller;
   rollDamage = damageRoller;
+}
+
+function restoreMovementFocus(control) {
+  if (control.contains(document.activeElement)) combatWindow.focus({ preventScroll: true });
 }
 
 function paragraph(text, className) {
@@ -62,7 +67,7 @@ function applyControls(entry, target, parent) {
   button.className = "compact-button apply-button";
   const undo = document.createElement("button");
   undo.type = "button";
-  undo.className = "undo";
+  undo.className = "compact-button undo";
   undo.textContent = "⟲";
   undo.title = "undo damage";
   undo.setAttribute("aria-label", "undo damage to " + target.name);
@@ -78,7 +83,9 @@ function applyControls(entry, target, parent) {
     const receipt = localReceipt ? localReceipt.amount : appliedCombatDamage(token, entry.id);
     const applied = receipt !== undefined;
     const ready = hasForgeHp(token, hpKey);
-    form.hidden = role !== "GM" || (!applied && !ready);
+    const hidden = role !== "GM" || (!applied && !ready);
+    if (hidden) restoreMovementFocus(form);
+    form.hidden = hidden;
     choices.forEach((input) => { input.disabled = pending || applied || busy || (!entry.damage && input !== custom); });
     button.disabled = pending || applied || busy;
     button.textContent = applied ? "✓" : "apply";
@@ -95,6 +102,7 @@ function applyControls(entry, target, parent) {
     if (pending || busy || form.hidden || role !== "GM") return;
     const version = sceneVersion;
     const current = () => version === sceneVersion && displayed.has(entry.id);
+    restoreMovementFocus(form);
     busy = true;
     error = "";
     update();
@@ -130,7 +138,7 @@ function applyControls(entry, target, parent) {
 const saveMenu = document.createElement("div");
 saveMenu.className = "save-menu";
 saveMenu.popover = "auto";
-document.querySelector("#combat-window").append(saveMenu);
+combatWindow.append(saveMenu);
 let menuRoll;
 for (const mode of ["advantage", "disadvantage"]) {
   const option = document.createElement("button");
@@ -138,6 +146,7 @@ for (const mode of ["advantage", "disadvantage"]) {
   option.textContent = "roll with " + mode;
   option.addEventListener("click", () => {
     saveMenu.hidePopover();
+    combatWindow.focus({ preventScroll: true });
     void menuRoll?.(mode);
   });
   saveMenu.append(option);
@@ -162,6 +171,7 @@ function saveControl(entry, hit) {
 
   async function roll(mode) {
     if (!rollSave || button.disabled || !button.isConnected) return;
+    restoreMovementFocus(button);
     button.disabled = true;
     try {
       await rollSave(entry.id, hit.id, entry.saveAbility, mode);
@@ -204,6 +214,7 @@ function damageLine(entry) {
   button.setAttribute("aria-label", "roll " + button.textContent);
   button.addEventListener("click", async () => {
     if (!rollDamage || button.disabled) return;
+    restoreMovementFocus(button);
     button.disabled = true;
     try {
       await rollDamage(entry);
@@ -263,6 +274,7 @@ function render(log) {
   const ids = new Set(log.map(({ id }) => id));
   for (const [id, { item }] of displayed) {
     if (ids.has(id)) continue;
+    restoreMovementFocus(item);
     item.remove();
     displayed.delete(id);
   }
@@ -275,8 +287,10 @@ function render(log) {
     }
     const row = createEntry(entry);
     displayed.set(entry.id, row);
-    if (previous) previous.item.replaceWith(row.item);
-    else entries.prepend(row.item);
+    if (previous) {
+      restoreMovementFocus(previous.item);
+      previous.item.replaceWith(row.item);
+    } else entries.prepend(row.item);
   }
   if (atTop) document.querySelector("#combat-transcript").scrollTop = 0;
   empty.hidden = displayed.size > 0;

@@ -64,7 +64,7 @@ p { margin: 0; }
 }
 .apply-row input:disabled { opacity: .55; }
 .apply-row .applied { min-width: 34px; color: #a6edbf; opacity: 1; }
-.apply-row .undo { font-size: 16px; line-height: 1; padding: 2px 5px; }
+#combat-window .undo { inline-size: 26px; font-size: 14px; }
 dialog {
   width: min(260px, calc(100% - 24px)); padding: 14px;
   border: 1px solid #645775; border-radius: 8px; background: #211c2b; color: inherit;

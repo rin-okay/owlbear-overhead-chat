@@ -10,8 +10,8 @@ import {
 } from "./session.js?v=2.7.21";
 
 import { drawBubble, normalizeAppearance, prepareBubbleFont } from "./appearance.js?v=2.7.9";
-import { setupDiscordPanel } from "./discord-panel.js?v=2.9.5";
-import { damageNotation, openCombatLog, saveNotation } from "./combat-log.js?v=2.9.5";
+import { setupDiscordPanel } from "./discord-panel.js?v=2.9.6";
+import { damageNotation, openCombatLog, saveNotation } from "./combat-log.js?v=2.9.6";
 import { MAX_CAST_LEVEL, SKILLS } from "./skills.js?v=2.9.2";
 import { ABILITIES, readTokenStats } from "./stats.js?v=2.8.5";
 import { setupAvatarPanel } from "./avatar-panel.js?v=2.8.6";
@@ -49,9 +49,9 @@ if (combatWindow) {
   document.body.classList.add("combat-view");
   const stylesheet = document.createElement("link");
   stylesheet.rel = "stylesheet";
-  stylesheet.href = new URL("./combat-log.css?v=2.9.5", import.meta.url).href;
+  stylesheet.href = new URL("./combat-log.css?v=2.9.6", import.meta.url).href;
   document.head.append(stylesheet);
-  void import("./combat-log-panel.js?v=2.9.4")
+  void import("./combat-log-panel.js?v=2.9.6")
     .then(({ setCombatRollers }) => setCombatRollers(rollCombatSave, rollCombatDamage)).catch(console.error);
 }
 
@@ -712,15 +712,21 @@ form.addEventListener("keyup", handleControlKeyUp);
 form.addEventListener("keydown", (event) => {
   if (event.target === input || (event.target === moveButton && tokenControl)) handleControlKeyDown(event);
 });
-function resumeCombatControls() {
+function resumeCombatControls({ combatKey = false } = {}) {
   combatModePaused = false;
-  if (!tokenControl) startTokenControl();
+  if (!tokenControl) startTokenControl({ combatKey });
+}
+
+function combatKeyTarget(target) {
+  return target === document.body || target === document.documentElement ||
+    combatWindow.contains(target) && !target.closest("dialog");
 }
 
 if (combatWindow) {
   window.addEventListener("focus", resumeCombatControls);
   combatWindow.addEventListener("focusin", (event) => {
-    if (!event.target.closest("dialog")) resumeCombatControls();
+    if (event.target.closest("dialog")) stopRotation(tokenControl);
+    else resumeCombatControls();
   });
   combatWindow.addEventListener("pointerdown", (event) => {
     if (event.target.closest("dialog")) return;
@@ -728,22 +734,25 @@ if (combatWindow) {
     resumeCombatControls();
   });
 }
-combatWindow?.addEventListener("keyup", (event) => {
-  if (!event.target.closest("dialog")) handleControlKeyUp(event);
-});
-combatWindow?.addEventListener("keydown", (event) => {
-  if (event.target.closest("dialog") || event.isComposing || event.keyCode === 229) return;
-  const pressingSpace = event.key === " " && !event.ctrlKey && !event.altKey && !event.metaKey;
-  if (pressingSpace && !targeting?.editing() && !tokenControl?.upcastSkill) {
-    event.preventDefault();
-    if (!event.repeat) void focusChatFromCombat().catch(console.error);
-    return;
-  }
-  // Enter activates the focused Apply or Undo button as usual.
-  if (event.key === "Enter" && event.target.closest("button, input")) return;
-  if (!tokenControl && !combatModePaused) startTokenControl({ combatKey: true });
-  if (tokenControl) handleControlKeyDown(event);
-});
+if (combatWindow) {
+  // A disabled or replaced button can leave keyboard events on the document body.
+  document.addEventListener("keyup", (event) => {
+    if (combatKeyTarget(event.target)) handleControlKeyUp(event);
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.defaultPrevented || !combatKeyTarget(event.target) || event.isComposing || event.keyCode === 229) return;
+    const pressingSpace = event.key === " " && !event.ctrlKey && !event.altKey && !event.metaKey;
+    if (pressingSpace && !targeting?.editing() && !tokenControl?.upcastSkill) {
+      event.preventDefault();
+      if (!event.repeat) void focusChatFromCombat().catch(console.error);
+      return;
+    }
+    // Enter activates the focused Apply or Undo button as usual.
+    if (event.key === "Enter" && event.target.closest("button, input")) return;
+    if (!tokenControl && !combatModePaused) resumeCombatControls({ combatKey: true });
+    if (tokenControl) handleControlKeyDown(event);
+  });
+}
 
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
@@ -1150,7 +1159,7 @@ function setupSettings() {
     void refresh();
   }
   document.addEventListener("keydown", (event) => {
-    if (combatWindow && event.target.closest("dialog")) return;
+    if (combatWindow && event.key !== "F2" && event.target.closest?.("dialog")) return;
     if (!["F1", "F2", "F3", "F4"].includes(event.key) || event.ctrlKey || event.altKey ||
         event.metaKey || event.shiftKey || event.isComposing) return;
     event.preventDefault();
@@ -1160,7 +1169,12 @@ function setupSettings() {
     else if (event.key === "F3") void centerAvatar(OBR).catch(console.error);
     else if (!combatWindow) openFromShortcut(event.key === "F1" ? "chat" : "move");
     else if (event.key === "F1") void focusChatFromCombat().catch(console.error);
-    else resumeCombatControls();
+    else {
+      combatWindow.querySelector("dialog[open]")?.close("cancel");
+      combatWindow.querySelector(".save-menu:popover-open")?.hidePopover();
+      combatWindow.focus({ preventScroll: true });
+      resumeCombatControls({ combatKey: true });
+    }
   }, true);
   if (!welcome && !combatWindow) listenForChatShortcut(OBR, openFromShortcut);
   setupDiscordPanel(() => select(0), () => select(2));
