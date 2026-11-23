@@ -4,10 +4,10 @@ import { coneHits, isProjectileToken, isProjectileWall, openMeleeDoor, projectil
 import { HIT_MARKERS, MELEE_HIT_CUE } from "./hit-markers.js?v=2.6.16";
 import {
   DEFAULT_WEAPON, EMBERS_EFFECTS, MELEE_DURATION_MS, SKILLS, SKILL_REQUEST, SKILL_RESULT,
-  artworkFacingAngle, availableSkills, availableWeapons, friendlyFireMode, readSkills, skillConnections, skillEffect, spellParameter, tokenTeams,
-} from "./skills.js?v=2.7.15";
+  aimsAtLocation, availableSkills, availableWeapons, friendlyFireMode, readSkills, skillConnections, skillEffect, spellParameter, tokenTeams, turnToHeading,
+} from "./skills.js?v=2.7.16";
 
-function aimAtTarget(source, target, range, passThrough) {
+function aimAtTarget(source, target, range = 0, passThrough = false) {
   if (![target?.center?.x, target?.center?.y].every(Number.isFinite)) return;
   const dx = target.center.x - source.x;
   const dy = target.center.y - source.y;
@@ -94,7 +94,7 @@ export function setupSkillHost(obr, buildImage) {
       }
       const skill = SKILLS[data.skill];
       const projectile = Boolean(skill.range);
-      const checksHit = projectile || Boolean(skill.meleeReach || skill.cone);
+      const checksHit = aimsAtLocation(data.skill);
       const geometry = checksHit ? Promise.all([
         obr.scene.items.getItems((item) => isProjectileToken(item) || isProjectileWall(item)),
         obr.scene.local.getItems(isProjectileWall),
@@ -136,29 +136,30 @@ export function setupSkillHost(obr, buildImage) {
         const targets = hitsAllies ? items : items.filter((item) => !isAlly(item));
         const { source, size } = instruction.effectProperties;
         let { destination, rotation } = instruction.effectProperties;
-        const targetId = typeof data.targetId === "string" && data.targetId !== token.id ? data.targetId : undefined;
-        const selected = targetId && items.find((item) => item.id === targetId && isProjectileToken(item));
-        if (selected) {
-          const target = await obr.scene.items.getItemBounds([selected.id]).catch(() => null);
-          if (version !== sceneVersion) return;
-          const aimed = aimAtTarget(source, target, (skill.range ?? 0) * dpi, mode !== "enabled" && isAlly(selected));
-          if (aimed) {
-            let applied = false;
-            await obr.scene.items.updateItems([token.id], ([item]) => {
-              if (version !== sceneVersion || !canSpeak(sender, item, permissions) || item.locked) return;
-              const angle = aimed.heading - artworkFacingAngle(item, data.facing);
-              item.rotation = ((angle % 360) + 360) % 360;
-              applied = true;
-            });
-            if (version !== sceneVersion || !applied) {
-              if (version === sceneVersion) await answer({ ...result, error: "Couldn’t turn the avatar toward the target." });
-              return;
-            }
-            if (projectile) destination = aimed.destination;
-            else {
-              rotation = aimed.heading;
-              instruction.effectProperties.rotation = rotation;
-            }
+        let aimed = aimAtTarget(source, { center: data.targetLocation });
+        if (!aimed && typeof data.targetId === "string" && data.targetId !== token.id) {
+          const selected = items.find((item) => item.id === data.targetId && isProjectileToken(item));
+          if (selected) {
+            const target = await obr.scene.items.getItemBounds([selected.id]).catch(() => null);
+            if (version !== sceneVersion) return;
+            aimed = aimAtTarget(source, target, (skill.range ?? 0) * dpi, mode !== "enabled" && isAlly(selected));
+          }
+        }
+        if (aimed) {
+          let applied = false;
+          await obr.scene.items.updateItems([token.id], ([item]) => {
+            if (version !== sceneVersion || !canSpeak(sender, item, permissions) || item.locked) return;
+            turnToHeading(item, data.facing, aimed.heading);
+            applied = true;
+          });
+          if (version !== sceneVersion || !applied) {
+            if (version === sceneVersion) await answer({ ...result, error: "Couldn’t turn the avatar toward the target." });
+            return;
+          }
+          if (projectile) destination = aimed.destination;
+          else {
+            rotation = aimed.heading;
+            instruction.effectProperties.rotation = rotation;
           }
         }
         if (skill.cone) {

@@ -10,9 +10,10 @@ import {
 } from "./session.js?v=2.7.9";
 
 import { drawBubble, normalizeAppearance, prepareBubbleFont } from "./appearance.js?v=2.7.9";
-import { setupDiscordPanel } from "./discord-panel.js?v=2.7.15";
+import { setupDiscordPanel } from "./discord-panel.js?v=2.7.16";
 import { setupAvatarPanel } from "./avatar-panel.js?v=2.7.9";
-import { setupSkillGrants, setupSkillPanel } from "./skill-panel.js?v=2.7.15";
+import { setupSkillGrants, setupSkillPanel } from "./skill-panel.js?v=2.7.16";
+import { setupTargeting } from "./targeting.js?v=2.7.16";
 import { listenForChatShortcut } from "./chat-shortcut.js?v=2.6.4";
 import { cameraFollowPreference, centerAvatar, prepareKeyboardPan } from "./avatar-viewport.js?v=2.7.9";
 
@@ -48,6 +49,7 @@ let movingAvatar = false;
 let modeExitKey;
 let refreshAvatarPanel;
 let skillPanel;
+let targeting;
 let showSkillsForRole;
 let moveWarningTimer;
 let moveWarningFade;
@@ -267,6 +269,7 @@ function stopTokenControl() {
   if (!tokenControl) return;
   stopRotation(tokenControl);
   tokenControl = undefined;
+  if (targeting?.editing()) targeting.clear();
   input.readOnly = false;
   input.setAttribute("aria-describedby", "status");
   moveModeLabel.hidden = true;
@@ -280,6 +283,7 @@ function startTokenControl() {
     tokenControl = { tokenId: avatar.id, actions: [] };
     input.readOnly = true;
     input.setAttribute("aria-describedby", "move-mode-label status");
+    updateMoveModeLabel();
     moveModeLabel.hidden = false;
     moveButton.setAttribute("aria-pressed", "true");
   }
@@ -338,7 +342,7 @@ async function moveAvatar(mode) {
   try {
     while (mode === tokenControl && !mode.switching && mode.actions.length) {
       const tokenId = mode.tokenId;
-      const { offset, rotation, mirror, artwork, onApplied, skill } = mode.actions.shift();
+      const { offset, rotation, mirror, artwork, onApplied, skill, targetLocation } = mode.actions.shift();
       const [{ token }, grid, pan] = await Promise.all([
         getAvatar(),
         offset ? (mode.movementGrid ??= readMovementGrid(OBR.scene.grid)) : undefined,
@@ -348,7 +352,7 @@ async function moveAvatar(mode) {
       if (token?.id !== tokenId || token.locked) throw new Error("Avatar is unavailable or locked.");
       if (offset && (!Number.isFinite(grid.dpi) || grid.dpi <= 0)) throw new Error("Scene grid size unavailable.");
       if (skill) {
-        await skillPanel.cast(skill, token);
+        await skillPanel.cast(skill, token, targetLocation);
         continue;
       }
 
@@ -457,6 +461,42 @@ function useAvatarSlot(mode, key) {
   queueAvatarAction(mode, { artwork, onApplied });
 }
 
+function updateMoveModeLabel() {
+  moveModeLabel.textContent = targeting?.editing() ? "set target · wasd or click a tile"
+    : targeting?.location() ? "move mode · target set" : "move mode enabled";
+}
+
+function handleTargetKey(event) {
+  const mode = tokenControl;
+  if (!mode || mode.switching || !targeting || event.ctrlKey || event.altKey || event.metaKey) return false;
+  const key = event.key.toLowerCase();
+  if (key === "z" && !event.shiftKey) {
+    if (!event.repeat) {
+      stopRotation(mode);
+      targeting.toggle(mode.tokenId);
+    }
+    return true;
+  }
+  if (!targeting.editing()) return false;
+  const offset = movementKeys[key]?.offset;
+  if (offset) targeting.move(offset);
+  else if (!event.repeat) {
+    if (key === "escape") targeting.clear(true);
+    else if (key === "enter") void targeting.confirm();
+    else {
+      const skill = !event.shiftKey && skillPanel?.skillForKey(key);
+      if (skill) {
+        void targeting.confirm().then(() => {
+          if (mode === tokenControl && !mode.switching && mode.actions.length < 4) {
+            queueAvatarAction(mode, { skill, targetLocation: targeting.location() });
+          }
+        });
+      }
+    }
+  }
+  return true;
+}
+
 moveButton.addEventListener("blur", (event) => {
   stopRotation(tokenControl);
   if (event.relatedTarget) stopTokenControl();
@@ -482,6 +522,10 @@ form.addEventListener("keydown", (event) => {
     return;
   }
   if (event.isComposing || event.keyCode === 229) return;
+  if (handleTargetKey(event)) {
+    event.preventDefault();
+    return;
+  }
   if (event.key === modeExitKey) {
     if (event.repeat) {
       event.preventDefault();
@@ -517,7 +561,7 @@ form.addEventListener("keydown", (event) => {
       const skill = skillPanel?.skillForKey(key);
       if (skill && !tokenControl.switching) {
         event.preventDefault();
-        if (!event.repeat && tokenControl.actions.length < 4) queueAvatarAction(tokenControl, { skill });
+        if (!event.repeat && tokenControl.actions.length < 4) queueAvatarAction(tokenControl, { skill, targetLocation: targeting?.location() });
       }
     }
     return;
@@ -755,7 +799,7 @@ function setupSettings() {
   const tutorialButton = document.querySelector("#open-tutorial");
   const doneButton = document.querySelector("#tutorial-done");
   skillPanel = setupSkillPanel(OBR, () => avatar, (key) =>
-    typeof key === "string" && /^[a-z]$/.test(key) && !Object.hasOwn(movementKeys, key));
+    typeof key === "string" && /^[a-z]$/.test(key) && key !== "z" && !Object.hasOwn(movementKeys, key));
   const refreshSkillGrants = setupSkillGrants(OBR);
   const skillsViews = document.querySelector("#skills-views");
   const loadoutTab = document.querySelector("#skill-loadout-tab");
@@ -896,6 +940,11 @@ function setupSettings() {
 }
 
 OBR.onReady(() => {
+  targeting = setupTargeting(OBR, {
+    onChange: updateMoveModeLabel,
+    onKey: handleTargetKey,
+    onConfirm: () => { if (tokenControl) moveButton.focus({ preventScroll: true }); },
+  });
   const updateFontRole = setupSettings();
   setupMeleeHitTiming();
   setupRoomToggle("gm-fog-settings", ABOVE_FOG);

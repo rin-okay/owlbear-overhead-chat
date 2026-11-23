@@ -1,8 +1,8 @@
 import { isPublicToken } from "./rules.js";
 import {
   DEFAULT_WEAPON, FACINGS, FRIENDLY_FIRE_MODES, SKILLS, SKILL_CHANGED, SKILL_REQUEST, SKILL_RESULT, SPELLS, TEAMS, WEAPONS,
-  availableSpells, availableWeapons, friendlyFireMode, readSkills, skillConnections, spellParameter, tokenTeams, validSpellParameter, writeSkills,
-} from "./skills.js?v=2.7.15";
+  aimsAtLocation, availableSpells, availableWeapons, friendlyFireMode, readSkills, skillConnections, spellParameter, tokenTeams, validSpellParameter, writeSkills,
+} from "./skills.js?v=2.7.16";
 
 function characterLabel(token) {
   return token.name || "unnamed character";
@@ -111,7 +111,7 @@ export function setupSkillPanel(obr, getAvatar, keyAllowed) {
     pending.delete(type);
   }
 
-  async function request(type, token, id, revision) {
+  async function request(type, token, id, revision, location) {
     const [{ gm, self }, selection] = await Promise.all([
       skillConnections(obr), type === "cast" ? obr.player.getSelection().catch(() => undefined) : undefined,
     ]);
@@ -141,6 +141,7 @@ export function setupSkillPanel(obr, getAvatar, keyAllowed) {
         ...(type === "cast" ? { skill: id, facing: facingFor(preferences, token) } : {}),
         ...(id === "spear" ? { weapon: selectedWeapon(token.id) } : {}),
         ...(targetIds ? { targetIds } : targetId ? { targetId } : {}),
+        ...(location && aimsAtLocation(id) ? { targetLocation: location } : {}),
       }, { destination: "ALL" });
     } catch (error) {
       if (pending.get(type) === expected) clearPending(type);
@@ -199,10 +200,10 @@ export function setupSkillPanel(obr, getAvatar, keyAllowed) {
     if (!playerPanel.closest("[hidden]")) refresh(getAvatar(), true);
   });
 
-  async function cast(id, token) {
+  async function cast(id, token, location) {
     if (pending.has("cast")) return;
     try {
-      await request("cast", token, id);
+      await request("cast", token, id, undefined, location);
     } catch {
       setCastStatus("Couldn’t send the cast to the GM.");
     }

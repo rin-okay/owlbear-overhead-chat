@@ -143,6 +143,22 @@ export function artworkFacingAngle(token, facing) {
   return Math.atan2(y, x) * 180 / Math.PI;
 }
 
+export function aimsAtLocation(skillId) {
+  const skill = Object.hasOwn(SKILLS, skillId) ? SKILLS[skillId] : undefined;
+  return Boolean(skill?.range || skill?.meleeReach || skill?.cone);
+}
+
+export function turnToHeading(token, facing, heading) {
+  const horizontal = (angle) => {
+    const x = Math.cos(angle * Math.PI / 180);
+    return Math.abs(x) < 1e-7 ? 0 : Math.sign(x);
+  };
+  const current = token.rotation + artworkFacingAngle(token, facing);
+  if (horizontal(current) * horizontal(heading) === -1) token.scale.x = -token.scale.x;
+  const angle = heading - artworkFacingAngle(token, facing);
+  token.rotation = ((angle % 360) + 360) % 360;
+}
+
 export function skillEffect(skillId, token, center, dpi, facing, weapon = DEFAULT_WEAPON,
   parameter = SKILLS[skillId]?.parameter?.defaultValue) {
   if (!Object.hasOwn(SKILLS, skillId) || !FACINGS.some(([angle]) => angle === facing) ||
