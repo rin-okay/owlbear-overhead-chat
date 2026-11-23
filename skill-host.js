@@ -15,7 +15,7 @@ import {
 import {
   DEFAULT_WEAPON, EMBERS_EFFECTS, MAX_CAST_LEVEL, MELEE_DURATION_MS, SKILLS, SKILL_REQUEST, SKILL_RESULT, WEAPONS,
   aimsAtLocation, availableSkills, availableWeapons, friendlyFireMode, readSkills, skillConnections, skillEffect, spellParameter, tokenTeams, turnToHeading,
-} from "./skills.js?v=2.9.2";
+} from "./skills.js?v=2.9.9";
 
 function aimAtTarget(source, target, range = 0, passThrough = false, maxRange = Infinity) {
   if (![target?.center?.x, target?.center?.y].every(Number.isFinite)) return;
@@ -298,11 +298,10 @@ export function setupSkillHost(obr, buildImage, recordCombat) {
             missileBlocked = missile && Boolean(hitTokenIds.length) &&
               items.some((item) => item.attachedTo === hitTokenIds[0] && isShieldGraphic(item));
             if (skill.impact) {
-              const { effect, delay } = skill.impact;
+              const { effect, delay, visibleRadiusFraction } = skill.impact;
               instructions.push({
                 type: "effect", id: effect, delay, layer: instruction.layer,
-                // Embers takes the explosion width, while the GM assigns its radius.
-                effectProperties: { source: impact.destination, size: parameter * 2, disableHit: true },
+                effectProperties: { source: impact.destination, size: parameter / visibleRadiusFraction, disableHit: true },
               });
             }
           } else {

@@ -13,7 +13,7 @@ import { chatParts, isRollCommand, rollSpans } from "./dice.js";
 import { queueDiscord } from "./discord.js?v=2.3.9";
 import { parseTray } from "./dice-replay.js";
 import { queueDicePopup, resetDicePopups } from "./dice-popup.js";
-import { setupSkillHost } from "./skill-host.js?v=2.9.4";
+import { setupSkillHost } from "./skill-host.js?v=2.9.9";
 import { setupCombatLog } from "./combat-log.js?v=2.9.4";
 import { EMOTE, floatEmote, parseEmote } from "./emotes.js?v=2.7.22";
 import { setupHitMarkers } from "./hit-markers.js?v=2.9.8";

@@ -74,7 +74,8 @@ export const SKILLS = {
   },
   fireball: {
     name: "fireball", key: "k", spellLevel: 3, upcast: true, damageDice: 8, saveAbility: "dex", effect: "fireball.beam", range: 30,
-    impact: { effect: "fireball.explosion", delay: 3000 },
+    // The visible blast has a radius of roughly 320 px in the 800 px Embers frame.
+    impact: { effect: "fireball.explosion", delay: 3000, visibleRadiusFraction: 0.4 },
     parameter: { label: "radius (in cells)", min: 1, defaultValue: 4 },
   },
 };
@@ -121,9 +122,11 @@ export function friendlyFireMode(config) {
 }
 
 export function validSpellParameter(skillId, value, field = "parameter") {
-  const parameter = SKILLS[skillId]?.[field];
+  const skill = SKILLS[skillId];
+  const parameter = skill?.[field];
+  const radiusFraction = skill?.impact?.visibleRadiusFraction ?? 0.5;
   return Boolean(parameter && Number.isFinite(value) && value >= parameter.min &&
-    Number.isFinite(value * 2) && (!parameter.integer || Number.isSafeInteger(value)));
+    Number.isFinite(value / radiusFraction) && (!parameter.integer || Number.isSafeInteger(value)));
 }
 
 export function spellParameter(config, tokenId, skillId, field = "parameter") {
