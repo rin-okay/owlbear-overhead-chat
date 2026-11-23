@@ -1,8 +1,10 @@
 import { isProjectileToken } from "./projectile-collision.js?v=2.7.3";
-import { spellParameter, tokenTeams } from "./skills.js?v=2.7.7";
+import { skillConnections, spellParameter, tokenTeams } from "./skills.js?v=2.7.7";
 
 const BLESS_CASTER = "chat.overhead.bless.caster.v1";
-// The JB2A loop used by Embers' Bless. Overhead Chat owns the attachment lifecycle.
+const BLESS_INTRO_END = "chat.overhead.bless.intro-end.v1";
+const BLESS_INTRO_MS = 5000;
+// These are the paired 400 × 400 Bless clips from the Embers catalog.
 const BLESS_IMAGE = {
   url: "https://jb2a-free.s3.eu-west-3.amazonaws.com/1st_Level/Bless/Bless_01_Regular_Yellow_Loop_400x400.webm",
   width: 400,
@@ -10,15 +12,74 @@ const BLESS_IMAGE = {
   mime: "video/webm",
 };
 
+const BLESS_INTRO = {
+  ...BLESS_IMAGE,
+  url: BLESS_IMAGE.url.replace("_Loop_", "_Intro_"),
+};
+
+function blessGraphic(item) {
+  return item.type === "IMAGE" && item.layer === "ATTACHMENT" &&
+    (item.image?.url === BLESS_INTRO.url || item.image?.url === BLESS_IMAGE.url);
+}
+
 export function setupBless(obr, buildImage) {
   const casting = new Set();
+  let sceneVersion = 0;
 
-  return async (caster, selectedIds, config, current) => {
+  function finishIntro(ids, deadline, current) {
+    setTimeout(async () => {
+      if (!current()) return;
+      try {
+        await obr.scene.items.updateItems(ids, (items) => {
+          if (!current()) return;
+          for (const item of items) {
+            if (!blessGraphic(item) || item.image.url !== BLESS_INTRO.url ||
+                item.metadata?.[BLESS_INTRO_END] !== deadline) continue;
+            item.image.url = BLESS_IMAGE.url;
+            delete item.metadata[BLESS_INTRO_END];
+          }
+        });
+      } catch (error) {
+        console.error("Overhead Chat could not finish the Bless intro", error);
+      }
+    }, Math.max(0, deadline - Date.now()));
+  }
+
+  async function resumeIntros() {
+    const version = sceneVersion;
+    const current = () => version === sceneVersion;
+    try {
+      if (!await obr.scene.isReady() || await obr.player.getRole() !== "GM") return;
+      const { self, gm } = await skillConnections(obr);
+      if (!current() || self.connectionId !== gm?.connectionId) return;
+      const items = await obr.scene.items.getItems((item) => blessGraphic(item) &&
+        item.image.url === BLESS_INTRO.url && Number.isFinite(item.metadata?.[BLESS_INTRO_END]));
+      if (!current()) return;
+      const groups = new Map();
+      for (const item of items) {
+        const deadline = item.metadata[BLESS_INTRO_END];
+        if (!groups.has(deadline)) groups.set(deadline, []);
+        groups.get(deadline).push(item.id);
+      }
+      for (const [deadline, ids] of groups) finishIntro(ids, deadline, current);
+    } catch (error) {
+      console.error("Overhead Chat could not resume Bless intros", error);
+    }
+  }
+
+  obr.scene.onReadyChange((ready) => {
+    sceneVersion++;
+    if (ready) void resumeIntros();
+  });
+  void resumeIntros();
+
+  return async (caster, selectedIds, config, hostCurrent) => {
+    const version = sceneVersion;
+    const current = () => version === sceneVersion && hostCurrent();
     if (casting.has(caster.id)) return "Bless is still updating.";
     casting.add(caster.id);
     try {
-      const isActiveGraphic = (item) => item.type === "IMAGE" && item.layer === "ATTACHMENT" &&
-        item.image?.url === BLESS_IMAGE.url && item.metadata?.[BLESS_CASTER] === caster.id;
+      const isActiveGraphic = (item) => blessGraphic(item) && item.metadata?.[BLESS_CASTER] === caster.id;
       const sceneItems = await obr.scene.items.getItems((item) => isActiveGraphic(item) || isProjectileToken(item));
       if (!current()) return;
       const active = sceneItems.filter(isActiveGraphic);
@@ -59,7 +120,7 @@ export function setupBless(obr, buildImage) {
         if (!Number.isFinite(bounds?.center?.x) || !Number.isFinite(bounds?.center?.y)) return null;
         const size = Math.max(bounds.max?.x - bounds.min?.x, bounds.max?.y - bounds.min?.y);
         const scale = Number.isFinite(size) && size > 0 ? size / (dpi * 2) : 0.5;
-        const image = buildImage(BLESS_IMAGE, { dpi: 200, offset: { x: 200, y: 200 } })
+        const image = buildImage(BLESS_INTRO, { dpi: 200, offset: { x: 200, y: 200 } })
           .position(bounds.center).scale({ x: scale, y: scale }).layer("ATTACHMENT")
           .attachedTo(target.id).disableHit(true).locked(true)
           .metadata({ [BLESS_CASTER]: caster.id }).build();
@@ -69,7 +130,10 @@ export function setupBless(obr, buildImage) {
       if (!current()) return;
       const items = graphics.filter(Boolean);
       if (!items.length) return "Couldn’t attach Bless to the selected tokens.";
+      const deadline = Date.now() + BLESS_INTRO_MS;
+      for (const item of items) item.metadata[BLESS_INTRO_END] = deadline;
       await obr.scene.items.addItems(items);
+      if (current()) finishIntro(items.map(({ id }) => id), deadline, current);
       return "";
     } finally {
       casting.delete(caster.id);

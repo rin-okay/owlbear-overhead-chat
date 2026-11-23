@@ -1,4 +1,4 @@
-import { setupBless } from "./bless.js?v=2.7.7";
+import { setupBless } from "./bless.js?v=2.7.10";
 import { canSpeak, MELEE_HIT_TIMING, normalizeMeleeHitTiming } from "./rules.js?v=2.6.16";
 import { coneHits, isProjectileToken, isProjectileWall, openMeleeDoor, projectileImpact } from "./projectile-collision.js?v=2.7.3";
 import { HIT_MARKERS, MELEE_HIT_CUE } from "./hit-markers.js?v=2.6.16";
