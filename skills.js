@@ -47,31 +47,31 @@ export const MELEE_DURATION_MS = {
 
 export const SKILLS = {
   bless: {
-    name: "bless", key: "b",
+    name: "bless", key: "b", spellLevel: 1,
     parameter: { label: "range (in cells)", min: 1, defaultValue: 6 },
     targetLimit: { label: "maximum targets", min: 1, defaultValue: 3, integer: true },
   },
   heart: { name: "heart", key: "p", effect: "generic.marker.heart.3" },
   // Keep the original skill ID so existing bindings and clients still work.
   spear: { name: "melee weapon attack", key: "f", meleeReach: 1 },
-  missile: { name: "magic missile", key: "g", effect: "magic_missile", range: 8, hitDelay: 1000 },
+  missile: { name: "magic missile", key: "g", spellLevel: 1, effect: "magic_missile", range: 8, hitDelay: 1000 },
   "burning-hands": {
-    name: "burning hands", key: "h", effect: "burning_hands", cone: true, hitDelay: 1000,
+    name: "burning hands", key: "h", spellLevel: 1, effect: "burning_hands", cone: true, hitDelay: 1000,
     parameter: { label: "length (in cells)", min: 1, defaultValue: 3 },
   },
-  "fire-bolt": { name: "fire bolt", key: "j", effect: "fire_bolt", range: 24, hitDelay: 800 },
+  "fire-bolt": { name: "fire bolt", key: "j", spellLevel: 0, effect: "fire_bolt", range: 24, hitDelay: 800 },
   "eldritch-blast": {
-    name: "eldritch blast", key: "u", effect: "eldritch_blast", range: 24, hitDelay: 1000,
+    name: "eldritch blast", key: "u", spellLevel: 0, effect: "eldritch_blast", range: 24, hitDelay: 1000,
   },
   "misty-step": {
-    name: "misty step", key: "i", effect: "misty_step.out", location: "teleport", range: 6,
+    name: "misty step", key: "i", spellLevel: 2, effect: "misty_step.out", location: "teleport", range: 6,
   },
   shatter: {
-    name: "shatter", key: "o", effect: "shatter", location: "area", range: 12, hitDelay: 650,
+    name: "shatter", key: "o", spellLevel: 2, effect: "shatter", location: "area", range: 12, hitDelay: 650,
     parameter: { label: "radius (in cells)", min: 1, defaultValue: 2 },
   },
   fireball: {
-    name: "fireball", key: "k", effect: "fireball.beam", range: 30,
+    name: "fireball", key: "k", spellLevel: 3, effect: "fireball.beam", range: 30,
     impact: { effect: "fireball.explosion", delay: 3000 },
     parameter: { label: "radius (in cells)", min: 1, defaultValue: 4 },
   },

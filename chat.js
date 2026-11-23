@@ -10,10 +10,10 @@ import {
 } from "./session.js?v=2.7.21";
 
 import { drawBubble, normalizeAppearance, prepareBubbleFont } from "./appearance.js?v=2.7.9";
-import { setupDiscordPanel } from "./discord-panel.js?v=2.8.4";
+import { setupDiscordPanel } from "./discord-panel.js?v=2.8.5";
 import { setupAvatarPanel } from "./avatar-panel.js?v=2.8.3";
-import { setupSkillGrants, setupSkillPanel } from "./skill-panel.js?v=2.8.4";
-import { setupStatsEditor } from "./stats-panel.js?v=2.7.21";
+import { setupSkillGrants, setupSkillPanel } from "./skill-panel.js?v=2.8.5";
+import { setupStatsEditor } from "./stats-panel.js?v=2.8.5";
 import { EMOTE } from "./emotes.js?v=2.7.21";
 import { setupTargeting } from "./targeting.js?v=2.7.17";
 import { listenForChatShortcut } from "./chat-shortcut.js?v=2.6.4";
@@ -47,6 +47,7 @@ let rollInProgress = false;
 let refreshVersion = 0;
 let tokenControl;
 let pendingChatShortcut;
+let sendChatNotice;
 let movingAvatar = false;
 let modeExitKey;
 let refreshAvatarPanel;
@@ -72,6 +73,12 @@ function appendLine(entry, target) {
   const line = document.createElement("li");
   if (entry.id) line.dataset.entryId = entry.id;
   line.dataset.sequence = entry.sequence;
+  if (entry.localNotice) {
+    line.className = "roll-status";
+    line.textContent = entry.text;
+    target.append(line);
+    return line;
+  }
   if (entry.rolling || entry.rollError) {
     line.className = "roll-status";
     line.textContent = entry.rolling ? `${entry.name} is rolling…` : `${entry.name} couldn’t roll: ${entry.rollError}`;
@@ -200,7 +207,14 @@ function connectTranscript() {
         if (inSelectedRoom && (nearBottom || (entry.own && data.type === "line"))) scrollToLatest();
       }
     };
-    window.addEventListener("pagehide", () => channel.close(), { once: true });
+    sendChatNotice = (text) => {
+      channel.postMessage({ type: "local-notice", roomId: chatRoom.value, text });
+      return true;
+    };
+    window.addEventListener("pagehide", () => {
+      sendChatNotice = undefined;
+      channel.close();
+    }, { once: true });
     requestHistory();
   }).catch((error) => console.error("Overhead Chat transcript unavailable", error));
 }
@@ -840,7 +854,8 @@ function setupSettings() {
   const { refresh: updateAvatarPanel, showSpells } = setupAvatarPanel(avatarPanel);
   refreshAvatarPanel = (items) => updateAvatarPanel(items, playerRole);
   skillPanel = setupSkillPanel(OBR, () => avatar, (key) =>
-    typeof key === "string" && /^[a-z]$/.test(key) && key !== "z" && !Object.hasOwn(movementKeys, key), showSpells);
+    typeof key === "string" && /^[a-z]$/.test(key) && key !== "z" && !Object.hasOwn(movementKeys, key),
+    showSpells, (text) => sendChatNotice?.(text));
   const refreshSkillGrants = setupSkillGrants(OBR);
   const loadoutTab = document.querySelector("#skill-loadout-tab");
   const statsTab = document.querySelector("#skill-stats-tab");

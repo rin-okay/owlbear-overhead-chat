@@ -12,7 +12,7 @@ import { chatParts, isRollCommand, rollSpans } from "./dice.js";
 import { queueDiscord } from "./discord.js?v=2.3.9";
 import { parseTray } from "./dice-replay.js";
 import { queueDicePopup, resetDicePopups } from "./dice-popup.js";
-import { setupSkillHost } from "./skill-host.js?v=2.8.4";
+import { setupSkillHost } from "./skill-host.js?v=2.8.5";
 import { EMOTE, floatEmote, parseEmote } from "./emotes.js?v=2.7.22";
 import { setupHitMarkers } from "./hit-markers.js?v=2.8.4";
 import { requestChatShortcut } from "./chat-shortcut.js?v=2.6.4";
@@ -386,11 +386,22 @@ OBR.onReady(() => {
     }).catch(report);
   }
   setupSkillHost(OBR, buildImage);
-  setupChatRecovery(OBR, () => transcript.values(), mergeRecoveredEntries);
+  setupChatRecovery(OBR, function* () {
+    for (const entry of transcript.values()) {
+      if (!entry.localNotice) yield entry;
+    }
+  }, mergeRecoveredEntries);
   openSessionChannel().then((channel) => {
     transcriptChannel = channel;
     channel.onmessage = ({ data }) => {
       if (data?.type === "request" && typeof data.requestId === "string") publishHistory(data);
+      if (data?.type === "local-notice" && isChatRoom(data.roomId) && typeof data.text === "string" &&
+          data.text.length > 0 && data.text.length <= 200) {
+        storeEntry({
+          id: crypto.randomUUID(), sequence: ++sequence, roomId: data.roomId,
+          receivedAt: Date.now(), text: data.text, own: true, localNotice: true,
+        }, "line");
+      }
     };
     channel.postMessage({ type: "ready" });
   }).catch(report);

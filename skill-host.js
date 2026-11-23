@@ -5,11 +5,12 @@ import {
 } from "./projectile-collision.js?v=2.8.3";
 import { HIT_MARKERS, MELEE_HIT_CUE } from "./hit-markers.js?v=2.8.4";
 import { rollMeleeDamage } from "./melee-damage.js?v=2.7.19";
+import { readTokenStats } from "./stats.js?v=2.8.5";
 import { eldritchBeamCount, MAGIC_MISSILE_INTERVAL, MAGIC_MISSILE_MAX_LEVEL, rollMagicMissileDart, rollSpellDamage } from "./spell-damage.js?v=2.8.4";
 import {
   DEFAULT_WEAPON, EMBERS_EFFECTS, MELEE_DURATION_MS, SKILLS, SKILL_REQUEST, SKILL_RESULT,
   aimsAtLocation, availableSkills, availableWeapons, friendlyFireMode, readSkills, skillConnections, skillEffect, spellParameter, tokenTeams, turnToHeading,
-} from "./skills.js?v=2.8.3";
+} from "./skills.js?v=2.8.5";
 
 function aimAtTarget(source, target, range = 0, passThrough = false, maxRange = Infinity) {
   if (![target?.center?.x, target?.center?.y].every(Number.isFinite)) return;
@@ -101,10 +102,20 @@ export function setupSkillHost(obr, buildImage) {
         await answer({ ...result, error: "This avatar hasn’t been granted that weapon." });
         return;
       }
+      const skill = SKILLS[data.skill];
       const missile = data.skill === "missile";
-      const spellLevel = data.spellLevel === undefined ? 1 : data.spellLevel;
+      const spellLevel = missile && data.spellLevel !== undefined ? data.spellLevel : skill.spellLevel;
       if (missile && (!Number.isInteger(spellLevel) || spellLevel < 1 || spellLevel > MAGIC_MISSILE_MAX_LEVEL)) {
         await answer({ ...result, error: "Choose a Magic Missile spell level from 1 to 9." });
+        return;
+      }
+      const maxSpellLevel = readTokenStats(token).details.spellLevel;
+      if (spellLevel > maxSpellLevel) {
+        await answer({
+          ...result,
+          errorCode: "spell-level",
+          error: `You can’t cast ${skill.name} at level ${spellLevel}. This token’s spell level is ${maxSpellLevel}.`,
+        });
         return;
       }
       const now = Date.now();
@@ -128,7 +139,6 @@ export function setupSkillHost(obr, buildImage) {
         if (current()) await answer({ ...result, error });
         return;
       }
-      const skill = SKILLS[data.skill];
       const projectile = Boolean(skill.range);
       const checksHit = aimsAtLocation(data.skill);
       const geometry = checksHit ? Promise.all([

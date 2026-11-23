@@ -1,4 +1,4 @@
-import { ABILITIES, COMBAT_STATS, abilityModifier, readTokenStats, validAbilityScore, writeTokenStats } from "./stats.js?v=2.7.21";
+import { ABILITIES, COMBAT_STATS, abilityModifier, readTokenStats, validAbilityScore, writeTokenStats } from "./stats.js?v=2.8.5";
 
 export function setupStatsEditor(obr, form, { gm = false } = {}) {
   const fields = form.querySelector("fieldset");

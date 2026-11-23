@@ -10,6 +10,7 @@ export const COMBAT_STATS = {
   ac: { label: "armor class", minimum: 0, initial: 10 },
   level: { label: "level", minimum: 1, maximum: 20, initial: 1 },
   proficiency: { label: "proficiency bonus", minimum: 0, initial: 2 },
+  spellLevel: { label: "spell level", minimum: 0, maximum: 9, initial: 9 },
 };
 const keys = Object.keys(ABILITIES);
 const validDetail = (key, value) => {
@@ -39,7 +40,7 @@ export async function writeTokenStats(obr, tokenId, scores, { gm, editable, expe
     throw Error("Enter whole scores from 1 to 30.");
   }
   if (details && !Object.keys(COMBAT_STATS).every((key) => validDetail(key, details[key]))) {
-    throw Error("Enter valid whole numbers for AC, level, and proficiency bonus.");
+    throw Error("Enter valid whole numbers for the combat stats. Spell level must be 0 to 9.");
   }
   const [role, permissions, ready] = await Promise.all([
     obr.player.getRole(), obr.room.getPermissions(), obr.scene.isReady(),

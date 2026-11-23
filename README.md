@@ -41,6 +41,8 @@ Enable [Embers](https://extensions.owlbear.rodeo/embers) in the room, then turn 
 
 Open **skills** to set your avatar’s facing at zero rotation, pick a granted weapon, and rebind available skills. Facing is saved per artwork, and weapon choice is saved per token. The default move-mode keys are **F** for melee weapon attack, **G** for Magic Missile, **H** for Burning Hands, **J** for Fire Bolt, and **K** for Fireball. The GM grants the spells independently. After granting Fireball or Burning Hands, set its radius or cone length for that token in cells. Clear the field to restore the default.
 
+A token’s **Spell Level** sets the highest level it can cast, from 0 (cantrips only) to 9. Existing tokens start at 9 until a cap is saved. Players can see the cap under **skills → stats**. GMs edit it under **skills → grants → stats**, and **editable stats for players** also lets eligible players edit it. Attempts above the cap show a private notice in the player’s chat.
+
 Magic Missile (**G**) fires three staggered darts at level 1. Hold **Shift** and press its bound hotkey, then press **1–9** on the number row to choose the spell level, or **Escape** to cancel. Each level above 1 adds another dart. The darts share the current aim, and each hit rolls and displays its own 1d4 + 1 force damage.
 
 Eldritch Blast (**U**) fires along your facing, toward the selected target, or toward your map marker. It reaches up to 24 cells and stops at the first eligible token or blocking wall. It rolls 1d10 force damage per beam, with extra beams at token levels 5, 11, and 17. The beams share one aim point and the hit marker shows their combined damage.

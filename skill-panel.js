@@ -1,9 +1,9 @@
-import { setupStatsEditor } from "./stats-panel.js?v=2.7.21";
+import { setupStatsEditor } from "./stats-panel.js?v=2.8.5";
 import { isPublicToken } from "./rules.js";
 import {
   DEFAULT_WEAPON, FACINGS, FRIENDLY_FIRE_MODES, SKILLS, SKILL_CHANGED, SKILL_REQUEST, SKILL_RESULT, SPELLS, TEAMS, WEAPONS,
   aimsAtLocation, availableSpells, availableWeapons, friendlyFireMode, readSkills, skillConnections, spellParameter, tokenTeams, validSpellParameter, writeSkills,
-} from "./skills.js?v=2.8.3";
+} from "./skills.js?v=2.8.5";
 
 function characterLabel(token) {
   return token.name || "unnamed character";
@@ -14,7 +14,7 @@ function facingFor(settings, token) {
   return FACINGS.some(([angle]) => angle === facing) ? facing : 0;
 }
 
-export function setupSkillPanel(obr, getAvatar, keyAllowed, showSpells) {
+export function setupSkillPanel(obr, getAvatar, keyAllowed, showSpells, showChatNotice) {
   const playerPanel = document.querySelector("#player-skills");
   const playerStatus = document.querySelector("#skill-settings-status");
   const castStatus = document.querySelector("#skill-cast-status");
@@ -185,7 +185,13 @@ export function setupSkillPanel(obr, getAvatar, keyAllowed, showSpells) {
       if (connectionId !== expected.gm || data?.requestId !== expected.requestId ||
           data.connectionId !== expected.target || data.tokenId !== expected.tokenId) continue;
       clearPending(type);
-      if (type === "cast") setCastStatus(data.error || "");
+      if (type === "cast") {
+        if (data.errorCode === "spell-level" && typeof data.error === "string" && showChatNotice?.(data.error)) {
+          setCastStatus("");
+        } else {
+          setCastStatus(data.error || "");
+        }
+      }
       if (data.tokenId !== avatar?.id || !Array.isArray(data.skills)) return;
       available = data.skills.filter((id) => Object.hasOwn(SKILLS, id));
       enabled = data.enabled === true;
