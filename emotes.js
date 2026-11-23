@@ -26,7 +26,7 @@ export async function floatEmote(obr, buildImage, buildLabel, tokenId, emote, cu
   if (!current() || ![bounds?.center?.x, bounds?.min?.y, scale, dpi].every(Number.isFinite) || scale <= 0 || dpi <= 0) return;
   const image = emote.image;
   const position = { x: bounds.center.x, y: bounds.min.y - 16 / scale };
-  const factor = 28 / (dpi * scale);
+  const factor = 42 / (dpi * scale);
   const builder = image
     ? buildImage(image, { dpi: Math.max(image.width, image.height), offset: { x: image.width / 2, y: image.height / 2 } })
       .scale({ x: factor, y: factor })
