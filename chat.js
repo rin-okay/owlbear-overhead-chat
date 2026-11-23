@@ -10,7 +10,7 @@ import {
 } from "./session.js?v=2.7.9";
 
 import { drawBubble, normalizeAppearance, prepareBubbleFont } from "./appearance.js?v=2.7.9";
-import { setupDiscordPanel } from "./discord-panel.js?v=2.7.18";
+import { setupDiscordPanel } from "./discord-panel.js?v=2.7.19";
 import { setupAvatarPanel } from "./avatar-panel.js?v=2.7.9";
 import { setupSkillGrants, setupSkillPanel } from "./skill-panel.js?v=2.7.18";
 import { setupStatsEditor } from "./stats-panel.js?v=2.7.18";

@@ -1,5 +1,6 @@
 import { isProjectileToken } from "./projectile-collision.js?v=2.6.13";
 import { skillConnections } from "./skills.js?v=2.6.15";
+import { validMeleeDamage } from "./melee-damage.js?v=2.7.19";
 
 export const HIT_MARKERS = "chat.overhead.skills/hits.v1";
 export const MELEE_HIT_CUE = "chat.overhead.skills/melee-hit-cue.v1";
@@ -48,20 +49,24 @@ export function setupHitMarkers(obr, buildLabel) {
     });
   }
 
-  async function show(tokenIds, current) {
+  async function show(tokenIds, current, damage) {
     const [targets, scale] = await Promise.all([
       obr.scene.items.getItems(tokenIds), obr.viewport.getScale(),
     ]);
     if (!Number.isFinite(scale) || scale <= 0 || !current()) return;
-    const step = 4 / scale;
+    const maxRoll = damage?.maxRoll === true;
+    const amount = damage?.amount ?? 1;
+    const text = amount > 0 ? `-${amount}` : "0";
+    const step = (maxRoll ? 6 : 4) / scale;
     const labels = (await Promise.all(targets.filter(isProjectileToken).map(async (target) => {
       // A target may be deleted between fetching the items and getting its bounds.
       const bounds = await obr.scene.items.getItemBounds([target.id]).catch(() => null);
       if (!Number.isFinite(bounds?.center?.x) || !Number.isFinite(bounds?.min?.y)) return null;
-      const label = buildLabel().plainText("-1").padding(0).backgroundOpacity(0)
+      const label = buildLabel().plainText(text).padding(0).backgroundOpacity(0)
         .pointerWidth(0).pointerHeight(0).textAlign("CENTER")
-        .fontSize(21).fontWeight(700).fillColor("#ff4d61")
-        .strokeColor("#26070d").strokeWidth(1).strokeOpacity(1)
+        .fontSize(maxRoll ? 32 : 21).fontWeight(maxRoll ? 900 : 700)
+        .fillColor(maxRoll ? "#ffc278" : "#ff4d61")
+        .strokeColor(maxRoll ? "#78142b" : "#26070d").strokeWidth(maxRoll ? 2 : 1).strokeOpacity(1)
         .position({ x: bounds.center.x, y: bounds.min.y - 12 / scale })
         .layer("ATTACHMENT").locked(true).attachedTo(target.id).build();
       label.disableHit = true;
@@ -73,12 +78,12 @@ export function setupHitMarkers(obr, buildLabel) {
     try {
       await obr.scene.local.addItems(labels);
       for (let frame = 1; frame <= 6; frame++) {
-        await wait(130);
+        await wait(maxRoll && frame === 1 ? 65 : 130);
         if (!current()) return;
         const opacity = (6 - frame) / 6;
         await obr.scene.local.updateItems(ids, (items) => {
           for (const item of items) {
-            item.position.y -= step;
+            item.position.y -= maxRoll && frame === 1 ? step * 2 : step;
             item.text.style.fillOpacity = opacity;
             item.text.style.strokeOpacity = opacity;
           }
@@ -93,7 +98,8 @@ export function setupHitMarkers(obr, buildLabel) {
     if (typeof data?.requestId !== "string" || !/^[a-f0-9-]{36}$/i.test(data.requestId) ||
         !Array.isArray(data.tokenIds) || !data.tokenIds.length ||
         !data.tokenIds.every((id) => typeof id === "string" && id.length && id.length <= 128) ||
-        !Number.isFinite(data.delay) || data.delay < 0 || data.delay > 6000) return;
+        !Number.isFinite(data.delay) || data.delay < 0 || data.delay > 6000 ||
+        (data.damage !== undefined && !validMeleeDamage(data.damage))) return;
     const version = sceneVersion;
     const current = () => version === sceneVersion;
     try {
@@ -108,7 +114,7 @@ export function setupHitMarkers(obr, buildLabel) {
       } else {
         await wait(data.delay);
       }
-      if (current()) await show([...new Set(data.tokenIds)], current);
+      if (current()) await show([...new Set(data.tokenIds)], current, data.damage);
     } catch (error) {
       console.error("Overhead Chat could not draw a hit marker", error);
     }

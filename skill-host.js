@@ -1,7 +1,8 @@
 import { setupBless } from "./bless.js?v=2.7.11";
 import { canSpeak, MELEE_HIT_TIMING, normalizeMeleeHitTiming } from "./rules.js?v=2.6.16";
 import { coneHits, isProjectileToken, isProjectileWall, openMeleeDoor, projectileImpact } from "./projectile-collision.js?v=2.7.3";
-import { HIT_MARKERS, MELEE_HIT_CUE } from "./hit-markers.js?v=2.6.16";
+import { HIT_MARKERS, MELEE_HIT_CUE } from "./hit-markers.js?v=2.7.19";
+import { rollMeleeDamage } from "./melee-damage.js?v=2.7.19";
 import {
   DEFAULT_WEAPON, EMBERS_EFFECTS, MELEE_DURATION_MS, SKILLS, SKILL_REQUEST, SKILL_RESULT,
   aimsAtLocation, availableSkills, availableWeapons, friendlyFireMode, readSkills, skillConnections, skillEffect, spellParameter, tokenTeams, turnToHeading,
@@ -189,8 +190,9 @@ export function setupSkillHost(obr, buildImage) {
         }
       }
       const meleeHit = Boolean(skill.meleeReach && hitTokenIds.length);
-      const sendMarkers = (delay, useAnimationCue = false) => obr.broadcast.sendMessage(HIT_MARKERS, {
-        requestId: data.requestId, tokenIds: hitTokenIds, delay, useAnimationCue,
+      const sendMarkers = (delay, damage) => obr.broadcast.sendMessage(HIT_MARKERS, {
+        requestId: data.requestId, tokenIds: hitTokenIds, delay,
+        ...(damage ? { useAnimationCue: true, damage } : {}),
       }, { destination: "ALL" }).catch((error) => console.error("Overhead Chat hit markers", error));
       if (meleeHit) {
         const metadata = await obr.room.getMetadata().catch(() => ({}));
@@ -204,7 +206,7 @@ export function setupSkillHost(obr, buildImage) {
         } else {
           instructions.push({ ...cue, delay: cueDelay });
         }
-        await sendMarkers(cueDelay + 750, true);
+        await sendMarkers(cueDelay + 750, rollMeleeDamage(weapon, token));
         if (version !== sceneVersion) return;
       }
       await obr.broadcast.sendMessage(EMBERS_EFFECTS, {
