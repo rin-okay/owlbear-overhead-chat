@@ -55,7 +55,7 @@ Burning Hands (**H**) rolls 3d6 fire damage at level 1. Fireball (**K**) rolls 8
 
 Eldritch Blast (**U**) fires along your facing, toward the selected target, or toward your map marker. It reaches up to 24 cells and stops at the first eligible token or blocking wall. It rolls 1d10 force damage per beam, with extra beams at token levels 5, 11, and 17. The beams share one aim point and the hit marker shows their combined damage.
 
-Misty Step (**I**) moves your avatar to an open map target within six cells and plays mist at both ends. Press **Z**, position the marker with **WASD**, then press **Space** to set it. The landing space must be clear of tokens and blocking walls.
+Misty Step (**I**) moves your avatar to a map target within six cells and plays mist at both ends. Press **Z**, position the marker with **WASD**, then press **Space** to set it. You can land on an occupied space. Blocking walls still stop the cast if they cross the path or overlap the landing space.
 
 Shatter (**O**) uses the map marker or a single selected token within 12 cells. Its radius defaults to two cells and can be changed per token in **skills → grants**. The blast rolls 3d8 thunder damage once and shows that amount on eligible tokens in the area. Resolve spell attacks, saves, and HP changes at the table.
 

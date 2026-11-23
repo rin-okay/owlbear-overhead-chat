@@ -168,15 +168,9 @@ export function areaHits(source, radius, items, dpi) {
 export function teleportLandingClear(source, destination, caster, items, dpi) {
   const { radius } = tokenCircle(caster, dpi) ?? { radius: dpi / 2 };
   const walls = collectWalls(items);
-  if (!hasClearPath(source, destination, walls) ||
-      walls.some(({ a, b }) => Math.hypot(b.x - a.x, b.y - a.y) > EPSILON &&
-        distanceToSegment(destination, a, b) < radius - EPSILON)) return false;
-  return !items.some((item) => {
-    if (item.id === caster.id || item.type !== "IMAGE" || item.layer !== "CHARACTER") return false;
-    const circle = tokenCircle(item, dpi);
-    return circle && Math.hypot(destination.x - circle.center.x, destination.y - circle.center.y) <
-      radius + circle.radius - EPSILON;
-  });
+  return hasClearPath(source, destination, walls) &&
+    !walls.some(({ a, b }) => Math.hypot(b.x - a.x, b.y - a.y) > EPSILON &&
+      distanceToSegment(destination, a, b) < radius - EPSILON);
 }
 
 function distanceToSegment(point, start, end) {

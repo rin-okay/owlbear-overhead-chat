@@ -4,7 +4,7 @@ import { isShieldGraphic, readShieldGraphics, setupShield } from "./shield.js?v=
 import { canSpeak, MELEE_HIT_TIMING, normalizeMeleeHitTiming, ROLL_DAMAGE_FROM_COMBAT_LOG } from "./rules.js?v=2.9.4";
 import {
   areaHits, clearSpellPath, coneHits, isProjectileToken, isProjectileWall, openMeleeDoor, projectileImpact, teleportLandingClear,
-} from "./projectile-collision.js?v=2.8.3";
+} from "./projectile-collision.js?v=2.9.10";
 import { HIT_MARKERS, MELEE_HIT_CUE } from "./hit-markers.js?v=2.9.4";
 import { meleeDamageFormula, rollMeleeDamage } from "./melee-damage.js?v=2.9.4";
 import { readTokenStats } from "./stats.js?v=2.8.5";
@@ -168,9 +168,9 @@ export function setupSkillHost(obr, buildImage, recordCombat) {
       const projectile = Boolean(skill.range);
       const checksHit = aimsAtLocation(data.skill);
       const geometry = checksHit ? Promise.all([
-        obr.scene.items.getItems((item) => isProjectileToken(item) || isProjectileWall(item) ||
-          (missile && isShieldGraphic(item)) ||
-          (skill.location === "teleport" && item.type === "IMAGE" && item.layer === "CHARACTER")),
+        obr.scene.items.getItems((item) => isProjectileWall(item) ||
+          (skill.location !== "teleport" && isProjectileToken(item)) ||
+          (missile && isShieldGraphic(item))),
         obr.scene.local.getItems(isProjectileWall),
       ]).catch(() => null) : [];
       const [dpi, bounds, currentRole, obstacles] = await Promise.all([

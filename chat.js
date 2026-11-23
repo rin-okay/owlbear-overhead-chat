@@ -10,8 +10,8 @@ import {
 } from "./session.js?v=2.7.21";
 
 import { drawBubble, normalizeAppearance, prepareBubbleFont } from "./appearance.js?v=2.7.9";
-import { setupDiscordPanel } from "./discord-panel.js?v=2.9.9";
-import { damageNotation, openCombatLog, saveNotation } from "./combat-log.js?v=2.9.9";
+import { setupDiscordPanel } from "./discord-panel.js?v=2.9.10";
+import { damageNotation, openCombatLog, saveNotation } from "./combat-log.js?v=2.9.10";
 import { MAX_CAST_LEVEL, SKILLS } from "./skills.js?v=2.9.2";
 import { ABILITIES, readTokenStats } from "./stats.js?v=2.8.5";
 import { setupAvatarPanel } from "./avatar-panel.js?v=2.8.6";
@@ -49,9 +49,9 @@ if (combatWindow) {
   document.body.classList.add("combat-view");
   const stylesheet = document.createElement("link");
   stylesheet.rel = "stylesheet";
-  stylesheet.href = new URL("./combat-log.css?v=2.9.9", import.meta.url).href;
+  stylesheet.href = new URL("./combat-log.css?v=2.9.10", import.meta.url).href;
   document.head.append(stylesheet);
-  void import("./combat-log-panel.js?v=2.9.9")
+  void import("./combat-log-panel.js?v=2.9.10")
     .then(({ setCombatRollers }) => setCombatRollers(rollCombatSave, rollCombatDamage)).catch(console.error);
 }
 
