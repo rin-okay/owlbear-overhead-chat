@@ -51,6 +51,8 @@ A token’s **Spell Level** sets the highest level it can cast, from 0 (cantrips
 
 Magic Missile (**G**) fires three staggered darts at level 1. Hold **Shift** and press its bound hotkey, then press **1–9** on the number row to choose the spell level, or **Escape** to cancel. Each level above 1 adds another dart. The darts share the current aim, and each hit rolls and displays its own 1d4 + 1 force damage.
 
+Ranged Weapon Attack (**N**) is available after the GM grants at least one ranged weapon variant under Skills → Grants → Assign. Pick a granted variant in your avatar’s skill loadout. All Embers variants use the same longbow damage (1d8 + Dexterity modifier, piercing) and a 30-cell range. The attack stops at an eligible token or a blocking wall and uses the room’s existing damage roll setting.
+
 Burning Hands (**H**) rolls 3d6 fire damage at level 1. Fireball (**K**) rolls 8d6 fire damage at level 3. To upcast either spell, hold **Shift** and press its hotkey, then choose a level on the number row. Each level above the spell’s base level adds 1d6. Each hit uses the same damage roll. The combat log offers a Dex save for each hit token. The player or GM rolls it through chat, and the GM can apply full or half damage after resolving the save.
 
 Eldritch Blast (**U**) fires along your facing, toward the selected target, or toward your map marker. It reaches up to 24 cells and stops at the first eligible token or blocking wall. It rolls 1d10 force damage per beam, with extra beams at token levels 5, 11, and 17. The beams share one aim point and the hit marker shows their combined damage.

@@ -1,9 +1,9 @@
 import { setupStatsEditor } from "./stats-panel.js?v=2.8.5";
 import { isPublicToken } from "./rules.js";
 import {
-  DEFAULT_WEAPON, FACINGS, FRIENDLY_FIRE_MODES, SKILLS, SKILL_CHANGED, SKILL_REQUEST, SKILL_RESULT, SPELLS, TEAMS, WEAPONS,
-  aimsAtLocation, availableSpells, availableWeapons, friendlyFireMode, readSkills, skillConnections, spellParameter, tokenTeams, validSpellParameter, writeSkills,
-} from "./skills.js?v=2.9.2";
+  DEFAULT_WEAPON, FACINGS, FRIENDLY_FIRE_MODES, RANGED_WEAPONS, SKILLS, SKILL_CHANGED, SKILL_REQUEST, SKILL_RESULT, SPELLS, TEAMS, WEAPONS,
+  aimsAtLocation, availableRangedWeapons, availableSpells, availableWeapons, friendlyFireMode, readSkills, skillConnections, spellParameter, tokenTeams, validSpellParameter, writeSkills,
+} from "./skills.js?v=2.9.11";
 
 function characterLabel(token) {
   return token.name || "unnamed character";
@@ -20,6 +20,7 @@ export function setupSkillPanel(obr, getAvatar, keyAllowed, showSpells, showChat
   const castStatus = document.querySelector("#skill-cast-status");
   const facing = document.querySelector("#skill-facing");
   const weapon = document.querySelector("#skill-weapon");
+  const rangedWeapon = document.querySelector("#skill-ranged-weapon");
   const preview = document.querySelector("#skill-avatar-preview");
   const portrait = preview.querySelector("img");
   const arrow = preview.querySelector("span");
@@ -32,6 +33,7 @@ export function setupSkillPanel(obr, getAvatar, keyAllowed, showSpells, showChat
   let avatar;
   let available = [];
   let weapons = [];
+  let rangedWeapons = [];
   let enabled = false;
   let castStatusTimer;
   let listRevision = 0;
@@ -46,6 +48,12 @@ export function setupSkillPanel(obr, getAvatar, keyAllowed, showSpells, showChat
   function selectedWeapon(tokenId) {
     const selected = preferences.weaponsByToken?.[tokenId];
     return tokenId === avatar?.id && weapons.includes(selected) ? selected : DEFAULT_WEAPON;
+  }
+
+  function selectedRangedWeapon(tokenId) {
+    if (tokenId !== avatar?.id) return;
+    const selected = preferences.rangedWeaponsByToken?.[tokenId];
+    return rangedWeapons.includes(selected) ? selected : rangedWeapons[0];
   }
 
   function setCastStatus(text) {
@@ -63,6 +71,10 @@ export function setupSkillPanel(obr, getAvatar, keyAllowed, showSpells, showChat
     weapon.replaceChildren(...options.map((id) => new Option(WEAPONS[id], id)));
     weapon.value = selectedWeapon(avatar?.id);
     weapon.disabled = !enabled;
+    rangedWeapon.replaceChildren(...rangedWeapons.map((id) => new Option(RANGED_WEAPONS[id], id)));
+    rangedWeapon.value = selectedRangedWeapon(avatar?.id) ?? "";
+    rangedWeapon.closest("label").hidden = !available.includes("ranged");
+    rangedWeapon.disabled = !enabled || !rangedWeapons.length;
     for (const [id, select] of bindInputs) {
       select.closest("label").hidden = !available.includes(id);
       select.value = binding(id);
@@ -79,6 +91,12 @@ export function setupSkillPanel(obr, getAvatar, keyAllowed, showSpells, showChat
   weapon.addEventListener("change", () => {
     if (!avatar || !weapons.includes(weapon.value)) return;
     savePreferences({ ...preferences, weaponsByToken: { ...preferences.weaponsByToken, [avatar.id]: weapon.value } });
+  });
+  rangedWeapon.addEventListener("change", () => {
+    if (!avatar || !rangedWeapons.includes(rangedWeapon.value)) return;
+    savePreferences({
+      ...preferences, rangedWeaponsByToken: { ...preferences.rangedWeaponsByToken, [avatar.id]: rangedWeapon.value },
+    });
   });
   for (const [id, select] of bindInputs) {
     select.add(new Option("unbound", ""));
@@ -144,6 +162,7 @@ export function setupSkillPanel(obr, getAvatar, keyAllowed, showSpells, showChat
         requestId, tokenId: token.id, type,
         ...(type === "cast" ? { skill: id, facing: facingFor(preferences, token) } : {}),
         ...(id === "spear" ? { weapon: selectedWeapon(token.id) } : {}),
+        ...(id === "ranged" ? { weapon: selectedRangedWeapon(token.id) } : {}),
         ...(SKILLS[id]?.upcast && spellLevel !== undefined ? { spellLevel } : {}),
         ...(targetIds ? { targetIds } : targetId ? { targetId } : {}),
         ...(location && aimsAtLocation(id) ? { targetLocation: location } : {}),
@@ -163,6 +182,7 @@ export function setupSkillPanel(obr, getAvatar, keyAllowed, showSpells, showChat
     if (changed) {
       available = [];
       weapons = [];
+      rangedWeapons = [];
       enabled = false;
     }
     const url = avatar?.image?.url;
@@ -196,6 +216,7 @@ export function setupSkillPanel(obr, getAvatar, keyAllowed, showSpells, showChat
       available = data.skills.filter((id) => Object.hasOwn(SKILLS, id));
       enabled = data.enabled === true;
       weapons = availableWeapons(data.weapons);
+      rangedWeapons = availableRangedWeapons(data.rangedWeapons);
       playerStatus.textContent = data.error || (enabled ? "" : "The GM hasn’t enabled skill hotkeys.");
       render();
     }
@@ -220,7 +241,10 @@ export function setupSkillPanel(obr, getAvatar, keyAllowed, showSpells, showChat
     }
   }
 
-  return { refresh, cast, skillForKey: (key) => Object.keys(SKILLS).find((id) => binding(id) === key) };
+  return {
+    refresh, cast,
+    skillForKey: (key) => Object.keys(SKILLS).find((id) => binding(id) === key && (id !== "ranged" || available.includes(id))),
+  };
 }
 
 export function setupSkillGrants(obr) {
@@ -241,8 +265,14 @@ export function setupSkillGrants(obr) {
     label: document.querySelector("#" + id + "-label"),
     input: document.querySelector("#" + id),
   }));
-  const weapon = document.querySelector("#grant-weapon-type");
-  const weaponGrant = document.querySelector("#skill-grant-weapon");
+  const weaponGrants = [
+    { id: "weapon", field: "weaponsByToken", catalog: WEAPONS, available: availableWeapons, defaultId: DEFAULT_WEAPON },
+    { id: "ranged-weapon", field: "rangedWeaponsByToken", catalog: RANGED_WEAPONS, available: availableRangedWeapons },
+  ].map((definition) => ({
+    ...definition,
+    select: document.querySelector("#grant-" + definition.id + "-type"),
+    checkbox: document.querySelector("#skill-grant-" + definition.id),
+  }));
   const status = document.querySelector("#skill-gm-status");
   const assignTab = document.querySelector("#skill-assign-tab");
   const statsTab = document.querySelector("#skill-grant-stats-tab");
@@ -266,8 +296,10 @@ export function setupSkillGrants(obr) {
   let saving = false;
   let roster;
 
-  for (const [id, name] of Object.entries(WEAPONS)) {
-    if (id !== DEFAULT_WEAPON) weapon.add(new Option(name, id));
+  for (const { select, catalog, defaultId } of weaponGrants) {
+    for (const [id, name] of Object.entries(catalog)) {
+      if (id !== defaultId) select.add(new Option(name, id));
+    }
   }
   for (const id of SPELLS) spell.add(new Option(SKILLS[id].name, id));
   for (const name of TEAMS) team.add(new Option(name, name));
@@ -282,7 +314,7 @@ export function setupSkillGrants(obr) {
     useSelectedToken.disabled = tokens.disabled;
     showSelectedStats();
     const disableGrants = !allowed || saving || !tokens.value;
-    spell.disabled = weapon.disabled = team.disabled = disableGrants;
+    spell.disabled = team.disabled = disableGrants;
     teamGrant.disabled = disableGrants || !team.value;
     const assignedTeams = tokenTeams(config, tokens.value);
     teamGrant.checked = assignedTeams.includes(team.value);
@@ -290,7 +322,6 @@ export function setupSkillGrants(obr) {
       option.text = option.value + (assignedTeams.includes(option.value) ? " (assigned)" : "");
     }
     spellGrant.disabled = disableGrants || !spell.value;
-    weaponGrant.disabled = disableGrants || !weapon.value;
     const grantedSpells = availableSpells(config, tokens.value);
     spellGrant.checked = grantedSpells.includes(spell.value);
     for (const { field, row, label, input } of parameterControls) {
@@ -306,10 +337,14 @@ export function setupSkillGrants(obr) {
     for (const option of spell.options) {
       option.text = SKILLS[option.value].name + (grantedSpells.includes(option.value) ? " (granted)" : "");
     }
-    const grantedWeapons = availableWeapons(config.weaponsByToken?.[tokens.value]);
-    weaponGrant.checked = grantedWeapons.includes(weapon.value);
-    for (const option of weapon.options) {
-      option.text = WEAPONS[option.value] + (grantedWeapons.includes(option.value) ? " (granted)" : "");
+    for (const { select, checkbox, catalog, field, available } of weaponGrants) {
+      select.disabled = disableGrants;
+      checkbox.disabled = disableGrants || !select.value;
+      const grantedWeapons = available(config[field]?.[tokens.value]);
+      checkbox.checked = grantedWeapons.includes(select.value);
+      for (const option of select.options) {
+        option.text = catalog[option.value] + (grantedWeapons.includes(option.value) ? " (granted)" : "");
+      }
     }
   }
 
@@ -349,8 +384,8 @@ export function setupSkillGrants(obr) {
     if (saving) return;
     saving = true;
     enabled.disabled = tokens.disabled = useSelectedToken.disabled = spell.disabled = spellGrant.disabled =
-      weapon.disabled = weaponGrant.disabled =
       friendlyFire.disabled = team.disabled = teamGrant.disabled = true;
+    for (const { select, checkbox } of weaponGrants) select.disabled = checkbox.disabled = true;
     for (const { input } of parameterControls) input.disabled = true;
     try {
       const { self, gm } = await skillConnections(obr);
@@ -366,11 +401,12 @@ export function setupSkillGrants(obr) {
           else assigned.delete(change.team);
           config.teamsByToken = { ...config.teamsByToken, [token.id]: [...assigned] };
         } else if (change.weapon) {
-          if (!Object.hasOwn(WEAPONS, change.weapon) || change.weapon === DEFAULT_WEAPON) return;
-          const granted = new Set(availableWeapons(config.weaponsByToken?.[token.id]).filter((id) => id !== DEFAULT_WEAPON));
+          const { field, catalog, available, defaultId } = change.weaponGrant;
+          if (!Object.hasOwn(catalog, change.weapon) || change.weapon === defaultId) return;
+          const granted = new Set(available(config[field]?.[token.id]).filter((id) => id !== defaultId));
           if (change.grant) granted.add(change.weapon);
           else granted.delete(change.weapon);
-          config.weaponsByToken = { ...config.weaponsByToken, [token.id]: [...granted] };
+          config[field] = { ...config[field], [token.id]: [...granted] };
         } else {
           if (!SPELLS.includes(change.spell)) return;
           const ids = new Set(availableSpells(config, token.id));
@@ -452,10 +488,15 @@ export function setupSkillGrants(obr) {
       void save({ tokenId: tokens.value, spell: spell.value, field, parameter });
     });
   }
-  weapon.addEventListener("change", () => render(readSkills(obr, "gm")));
-  weaponGrant.addEventListener("change", () => {
-    if (tokens.value && weapon.value) void save({ tokenId: tokens.value, weapon: weapon.value, grant: weaponGrant.checked });
-  });
+  for (const weaponGrant of weaponGrants) {
+    const { select, checkbox } = weaponGrant;
+    select.addEventListener("change", () => render(readSkills(obr, "gm")));
+    checkbox.addEventListener("change", () => {
+      if (tokens.value && select.value) {
+        void save({ tokenId: tokens.value, weapon: select.value, weaponGrant, grant: checkbox.checked });
+      }
+    });
+  }
   const isOpen = () => !tokens.closest("[hidden]");
   const rosterKey = (items) => JSON.stringify(items.map((item) => [item.id, item.name]).sort());
   obr.scene.onReadyChange((ready) => {

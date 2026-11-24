@@ -18,6 +18,38 @@ export const WEAPONS = {
   warhammer: "warhammer", wrench: "wrench",
 };
 
+// Keep these variants in the same order as Embers' Ranged Weapon Attack grant choices.
+export const RANGED_WEAPONS = {
+  "arrow.green": "green arrow",
+  "arrow.white": "white arrow",
+  "arrow.blue": "blue arrow",
+  "bolt": "bolt",
+  "boulder_toss": "boulder",
+  "bullet.orange": "orange bullet",
+  "bullet.large_orange": "large orange bullet",
+  "bullet.blue": "blue bullet",
+  "dagger.throw": "dagger",
+  "laser_shot.blue": "blue laser",
+  "laser_shot.green": "green laser",
+  "laser_shot.orange": "orange laser",
+  "laser_shot.red": "red laser",
+  "laser_sword.blue": "blue laser sword",
+  "laser_sword.red": "red laser sword",
+  "cannon_ball": "cannon ball",
+  "barrel_toss.metal": "metal barrel",
+  "barrel_toss.wooden": "wooden barrel",
+  "missile.blue": "blue missile",
+  "missile.white": "white missile",
+  "missile.wide_white": "wide white missile",
+  "missile.purple_pink": "purple/pink missile",
+  "shield.throw": "shield",
+  "shield.complete": "shield (returning)",
+  "snipe": "snipe",
+  "snowball": "snowball",
+  "throw.bomb": "thrown bomb",
+  "throw.flask": "thrown flask",
+};
+
 // Embers effect_record.json, generic.weapon_attacks.melee.single.
 // Melee uses the first clip of each weapon at the 600px resolution.
 export const MELEE_DURATION_MS = {
@@ -56,6 +88,7 @@ export const SKILLS = {
   heart: { name: "heart", key: "p", effect: "generic.marker.heart.3" },
   // Keep the original skill ID so existing bindings and clients still work.
   spear: { name: "melee weapon attack", key: "f", meleeReach: 1 },
+  ranged: { name: "ranged weapon attack", key: "n", range: 30, hitDelay: 800 },
   missile: { name: "magic missile", key: "g", spellLevel: 1, upcast: true, effect: "magic_missile", range: 8, hitDelay: 1000 },
   "burning-hands": {
     name: "burning hands", key: "h", spellLevel: 1, upcast: true, damageDice: 3, saveAbility: "dex", effect: "burning_hands", cone: true, hitDelay: 1000,
@@ -79,7 +112,7 @@ export const SKILLS = {
     parameter: { label: "radius (in cells)", min: 1, defaultValue: 4 },
   },
 };
-export const SPELLS = Object.keys(SKILLS).filter((id) => id !== "spear");
+export const SPELLS = Object.keys(SKILLS).filter((id) => id !== "spear" && id !== "ranged");
 export const FACINGS = [
   [0, "right"], [45, "down-right"], [90, "down"], [135, "down-left"],
   [180, "left"], [225, "up-left"], [270, "up"], [315, "up-right"],
@@ -103,7 +136,8 @@ export function writeSkills(obr, type, settings) {
 
 export function availableSkills(config, tokenId) {
   if (config.enabled !== true) return [];
-  return ["spear", ...availableSpells(config, tokenId)];
+  const ranged = availableRangedWeapons(config.rangedWeaponsByToken?.[tokenId]);
+  return ["spear", ...(ranged.length ? ["ranged"] : []), ...availableSpells(config, tokenId)];
 }
 
 export function availableSpells(config, tokenId) {
@@ -137,6 +171,10 @@ export function spellParameter(config, tokenId, skillId, field = "parameter") {
 
 export function availableWeapons(grants) {
   return Object.keys(WEAPONS).filter((id) => id === DEFAULT_WEAPON || (Array.isArray(grants) && grants.includes(id)));
+}
+
+export function availableRangedWeapons(grants) {
+  return Array.isArray(grants) ? Object.keys(RANGED_WEAPONS).filter((id) => grants.includes(id)) : [];
 }
 
 export async function skillConnections(obr) {
@@ -179,7 +217,9 @@ export function skillEffect(skillId, token, center, dpi, facing, weapon = DEFAUL
   if (!Object.hasOwn(SKILLS, skillId) || !FACINGS.some(([angle]) => angle === facing) ||
       ![center?.x, center?.y, token.rotation, dpi].every(Number.isFinite) || dpi <= 0) return;
   const skill = SKILLS[skillId];
-  const effect = skill.effect ?? (Object.hasOwn(WEAPONS, weapon) && "generic.weapon_attacks.melee.single." + weapon);
+  let effect = skill.effect;
+  if (skillId === "spear" && Object.hasOwn(WEAPONS, weapon)) effect = "generic.weapon_attacks.melee.single." + weapon;
+  if (skillId === "ranged" && Object.hasOwn(RANGED_WEAPONS, weapon)) effect = "generic.weapon_attacks.ranged." + weapon;
   if (!effect) return;
   if (skillId === "heart") {
     // The heart travels vertically around the center of the clip over one loop.

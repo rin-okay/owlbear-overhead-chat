@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>overhead chat</title>
   <link rel="stylesheet" href="./chat.css?v=2.8.10">
-  <script type="module" src="./chat.js?v=2.9.10"></script>
+  <script type="module" src="./chat.js?v=2.9.11"></script>
 </head>
 <body>
   <main>
@@ -133,7 +133,9 @@
           <label>forward at zero rotation <select id="skill-facing" disabled></select></label>
         </div>
         <label class="skill-field">melee weapon <select id="skill-weapon" disabled></select></label>
+        <label class="skill-field" hidden>ranged weapon <select id="skill-ranged-weapon" disabled></select></label>
         <label class="skill-field" hidden>melee weapon attack <select id="skill-bind-spear" aria-label="melee weapon attack key"></select></label>
+        <label class="skill-field" hidden>ranged weapon attack <select id="skill-bind-ranged" aria-label="ranged weapon attack key"></select></label>
         <label class="skill-field" hidden>magic missile <select id="skill-bind-missile" aria-label="magic missile key"></select></label>
         <label class="skill-field" hidden>burning hands <select id="skill-bind-burning-hands" aria-label="burning hands key"></select></label>
         <label class="skill-field" hidden>fire bolt <select id="skill-bind-fire-bolt" aria-label="fire bolt key"></select></label>
@@ -181,6 +183,8 @@
           </label>
           <label class="skill-field">weapon type <select id="grant-weapon-type" disabled></select></label>
           <label class="discord-enabled"><input id="skill-grant-weapon" type="checkbox" disabled> grant selected weapon</label>
+          <label class="skill-field">ranged weapon type <select id="grant-ranged-weapon-type" disabled></select></label>
+          <label class="discord-enabled"><input id="skill-grant-ranged-weapon" type="checkbox" disabled> grant selected ranged weapon</label>
         </section>
         <section id="skill-grant-stats" aria-label="edit token stats" hidden>
           <form class="stats-form">

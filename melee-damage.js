@@ -43,8 +43,19 @@ export function meleeDamageFormula(weapon, token) {
   return { count, sides, type, modifier };
 }
 
+export function rangedDamageFormula(token) {
+  return { count: 1, sides: 8, type: piercing, modifier: readTokenStats(token).modifiers.dex };
+}
+
 export function rollMeleeDamage(weapon, token, random = Math.random) {
-  const { count, sides, type, modifier } = meleeDamageFormula(weapon, token);
+  return rollWeaponDamage(meleeDamageFormula(weapon, token), random);
+}
+
+export function rollRangedDamage(token, random = Math.random) {
+  return rollWeaponDamage(rangedDamageFormula(token), random);
+}
+
+function rollWeaponDamage({ count, sides, type, modifier }, random) {
   const dice = Array.from({ length: count }, () => 1 + Math.floor(random() * sides));
   const sum = dice.reduce((total, value) => total + value, 0);
   return { amount: Math.max(0, sum + modifier), type, maxRoll: sum === count * sides, dice, sides, modifier };

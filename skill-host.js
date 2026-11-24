@@ -6,16 +6,16 @@ import {
   areaHits, clearSpellPath, coneHits, isProjectileToken, isProjectileWall, openMeleeDoor, projectileImpact, teleportLandingClear,
 } from "./projectile-collision.js?v=2.9.10";
 import { HIT_MARKERS, MELEE_HIT_CUE } from "./hit-markers.js?v=2.9.4";
-import { meleeDamageFormula, rollMeleeDamage } from "./melee-damage.js?v=2.9.4";
+import { meleeDamageFormula, rangedDamageFormula, rollMeleeDamage, rollRangedDamage } from "./melee-damage.js?v=2.9.11";
 import { readTokenStats } from "./stats.js?v=2.8.5";
 import {
   BLOCKED_MAGIC_MISSILE, eldritchBeamCount, fireSpellDamageFormula, MAGIC_MISSILE_INTERVAL,
   rollFireSpellDamage, rollMagicMissileDart, rollSpellDamage, spellDamageFormula,
 } from "./spell-damage.js?v=2.9.4";
 import {
-  DEFAULT_WEAPON, EMBERS_EFFECTS, MAX_CAST_LEVEL, MELEE_DURATION_MS, SKILLS, SKILL_REQUEST, SKILL_RESULT, WEAPONS,
-  aimsAtLocation, availableSkills, availableWeapons, friendlyFireMode, readSkills, skillConnections, skillEffect, spellParameter, tokenTeams, turnToHeading,
-} from "./skills.js?v=2.9.9";
+  DEFAULT_WEAPON, EMBERS_EFFECTS, MAX_CAST_LEVEL, MELEE_DURATION_MS, RANGED_WEAPONS, SKILLS, SKILL_REQUEST, SKILL_RESULT, WEAPONS,
+  aimsAtLocation, availableRangedWeapons, availableSkills, availableWeapons, friendlyFireMode, readSkills, skillConnections, skillEffect, spellParameter, tokenTeams, turnToHeading,
+} from "./skills.js?v=2.9.11";
 
 function aimAtTarget(source, target, range = 0, passThrough = false, maxRange = Infinity) {
   if (![target?.center?.x, target?.center?.y].every(Number.isFinite)) return;
@@ -91,16 +91,22 @@ export function setupSkillHost(obr, buildImage, recordCombat) {
         await answer({ enabled: false, skills: [], error: "You can’t use skills with that token." });
         return;
       }
+      const getLoadout = (config) => {
+        const enabled = config.enabled === true;
+        return {
+          enabled, skills: availableSkills(config, token.id),
+          weapons: enabled ? availableWeapons(config.weaponsByToken?.[token.id]) : [],
+          rangedWeapons: enabled ? availableRangedWeapons(config.rangedWeaponsByToken?.[token.id]) : [],
+        };
+      };
       const config = readSkills(obr, "gm");
-      const skills = availableSkills(config, token.id);
-      const weapons = config.enabled === true ? availableWeapons(config.weaponsByToken?.[token.id]) : [];
-      const result = { enabled: config.enabled === true, skills, weapons };
+      const result = getLoadout(config);
       if (data.type === "list") {
         await answer(result);
         return;
       }
       const skill = SKILLS[data.skill];
-      const granted = skills.includes(data.skill);
+      const granted = result.skills.includes(data.skill);
       const maxSpellLevel = readTokenStats(token).details.spellLevel;
       const canActivateShield = granted && maxSpellLevel >= skill.spellLevel;
       // A shield can still be removed after the grant is revoked or the cap is lowered.
@@ -111,8 +117,11 @@ export function setupSkillHost(obr, buildImage, recordCombat) {
         await answer({ ...result, error: config.enabled ? "This avatar hasn’t been granted that skill." : "The GM hasn’t enabled skill hotkeys." });
         return;
       }
-      const weapon = data.weapon ?? DEFAULT_WEAPON;
-      if (data.skill === "spear" && !weapons.includes(weapon)) {
+      const ranged = data.skill === "ranged";
+      const weapon = data.weapon ?? (ranged ? undefined : DEFAULT_WEAPON);
+      const weaponGranted = (loadout) => ranged ? loadout.rangedWeapons.includes(weapon)
+        : data.skill !== "spear" || loadout.weapons.includes(weapon);
+      if (!weaponGranted(result)) {
         await answer({ ...result, error: "This avatar hasn’t been granted that weapon." });
         return;
       }
@@ -179,12 +188,13 @@ export function setupSkillHost(obr, buildImage, recordCombat) {
       ]);
       if (version !== sceneVersion || currentRole !== "GM") return;
       const latest = readSkills(obr, "gm");
-      if (!availableSkills(latest, token.id).includes(data.skill)) {
-        await answer({ error: "This avatar no longer has that skill." });
+      const latestLoadout = getLoadout(latest);
+      if (!latestLoadout.skills.includes(data.skill)) {
+        await answer({ ...latestLoadout, error: "This avatar no longer has that skill." });
         return;
       }
-      if (data.skill === "spear" && !availableWeapons(latest.weaponsByToken?.[token.id]).includes(weapon)) {
-        await answer({ ...result, weapons: availableWeapons(latest.weaponsByToken?.[token.id]), error: "This avatar no longer has that weapon." });
+      if (!weaponGranted(latestLoadout)) {
+        await answer({ ...latestLoadout, error: "This avatar no longer has that weapon." });
         return;
       }
       const parameter = spellParameter(latest, token.id, data.skill);
@@ -257,7 +267,7 @@ export function setupSkillHost(obr, buildImage, recordCombat) {
           }
         } else {
           const eldritch = data.skill === "eldritch-blast";
-          const maxRange = eldritch ? skill.range * dpi : Infinity;
+          const maxRange = eldritch || ranged ? skill.range * dpi : Infinity;
           let aimed = aimAtTarget(source, { center: data.targetLocation }, 0, false, maxRange);
           if (!aimed && typeof data.targetId === "string" && data.targetId !== token.id) {
             const selected = items.find((item) => item.id === data.targetId && isProjectileToken(item));
@@ -369,21 +379,23 @@ export function setupSkillHost(obr, buildImage, recordCombat) {
       } else if (version === sceneVersion && hitTokenIds.length && !meleeHit) {
         const otherDamage = data.skill === "eldritch-blast" || data.skill === "shatter";
         if (manual) {
-          damageFormula = skill.damageDice ? fireSpellDamageFormula(skill, spellLevel)
+          damageFormula = ranged ? rangedDamageFormula(token)
+            : skill.damageDice ? fireSpellDamageFormula(skill, spellLevel)
             : otherDamage ? spellDamageFormula(data.skill, token) : undefined;
         } else {
-          const damage = skill.damageDice ? rollFireSpellDamage(skill, spellLevel)
+          const damage = ranged ? rollRangedDamage(token)
+            : skill.damageDice ? rollFireSpellDamage(skill, spellLevel)
             : otherDamage ? rollSpellDamage(data.skill, token) : undefined;
           if (damage) damageRolls = [damage];
         }
         await sendMarkers(skill.impact?.delay ?? skill.hitDelay, damageRolls?.[0]);
       }
       await logCast({
-        action: skill.meleeReach && weapon !== DEFAULT_WEAPON ? WEAPONS[weapon] : skill.name,
+        action: ranged ? RANGED_WEAPONS[weapon] : skill.meleeReach && weapon !== DEFAULT_WEAPON ? WEAPONS[weapon] : skill.name,
         attack: checksHit && skill.location !== "teleport",
         selected: logSelected, hits: hitTokens, damage: combatDamage(damageRolls), damageFormula,
       });
-      if (version === sceneVersion) await answer(result);
+      if (version === sceneVersion) await answer(latestLoadout);
     } catch (error) {
       console.error("Overhead Chat skills", error);
     }
