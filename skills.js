@@ -177,6 +177,17 @@ export function availableRangedWeapons(grants) {
   return Array.isArray(grants) ? Object.keys(RANGED_WEAPONS).filter((id) => grants.includes(id)) : [];
 }
 
+export function skillGrantLabel(kind, variant) {
+  if (typeof variant !== "string") return;
+  if (kind === "ranged-weapon" && Object.hasOwn(RANGED_WEAPONS, variant)) {
+    return "ranged attack: " + RANGED_WEAPONS[variant];
+  }
+  if (kind === "weapon" && variant !== DEFAULT_WEAPON && Object.hasOwn(WEAPONS, variant)) {
+    return "melee attack: " + WEAPONS[variant];
+  }
+  if (kind === "spell" && SPELLS.includes(variant)) return "spell: " + SKILLS[variant].name;
+}
+
 export async function skillConnections(obr) {
   const [connectionId, role, party] = await Promise.all([
     obr.player.getConnectionId(), obr.player.getRole(), obr.party.getPlayers(),

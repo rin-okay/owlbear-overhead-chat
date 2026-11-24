@@ -3,7 +3,7 @@ import { isPublicToken } from "./rules.js";
 import {
   DEFAULT_WEAPON, FACINGS, FRIENDLY_FIRE_MODES, RANGED_WEAPONS, SKILLS, SKILL_CHANGED, SKILL_REQUEST, SKILL_RESULT, SPELLS, TEAMS, WEAPONS,
   aimsAtLocation, availableRangedWeapons, availableSpells, availableWeapons, friendlyFireMode, readSkills, skillConnections, spellParameter, tokenTeams, validSpellParameter, writeSkills,
-} from "./skills.js?v=2.9.11";
+} from "./skills.js?v=2.9.12";
 
 function characterLabel(token) {
   return token.name || "unnamed character";
@@ -391,6 +391,7 @@ export function setupSkillGrants(obr) {
       const { self, gm } = await skillConnections(obr);
       if (self.role !== "GM" || gm?.connectionId !== self.connectionId) throw Error("The connected skills GM must save grants.");
       const config = readSkills(obr, "gm");
+      let grant;
       if (change.tokenId) {
         const [token] = await obr.scene.items.getItems([change.tokenId]);
         if (!isPublicToken(token) || change.tokenId !== tokens.value) throw Error("Choose a token in the open scene.");
@@ -401,11 +402,13 @@ export function setupSkillGrants(obr) {
           else assigned.delete(change.team);
           config.teamsByToken = { ...config.teamsByToken, [token.id]: [...assigned] };
         } else if (change.weapon) {
-          const { field, catalog, available, defaultId } = change.weaponGrant;
+          const { id, field, catalog, available, defaultId } = change.weaponGrant;
           if (!Object.hasOwn(catalog, change.weapon) || change.weapon === defaultId) return;
           const granted = new Set(available(config[field]?.[token.id]).filter((id) => id !== defaultId));
-          if (change.grant) granted.add(change.weapon);
-          else granted.delete(change.weapon);
+          if (change.grant) {
+            if (!granted.has(change.weapon)) grant = { kind: id, variant: change.weapon };
+            granted.add(change.weapon);
+          } else granted.delete(change.weapon);
           config[field] = { ...config[field], [token.id]: [...granted] };
         } else {
           if (!SPELLS.includes(change.spell)) return;
@@ -426,8 +429,10 @@ export function setupSkillGrants(obr) {
             tokenParameters[change.spell] = values;
             config.spellParametersByToken = { ...config.spellParametersByToken, [token.id]: tokenParameters };
           } else {
-            if (change.grant) ids.add(change.spell);
-            else ids.delete(change.spell);
+            if (change.grant) {
+              if (!ids.has(change.spell)) grant = { kind: "spell", variant: change.spell };
+              ids.add(change.spell);
+            } else ids.delete(change.spell);
             config.spellsByToken = { ...config.spellsByToken, [token.id]: [...ids] };
           }
         }
@@ -437,7 +442,8 @@ export function setupSkillGrants(obr) {
       } else config.enabled = change.enabled;
       writeSkills(obr, "gm", config);
       status.textContent = "";
-      await obr.broadcast.sendMessage(SKILL_CHANGED, {}, { destination: "ALL" });
+      const data = grant ? { grant: { ...grant, id: crypto.randomUUID(), tokenId: change.tokenId } } : {};
+      await obr.broadcast.sendMessage(SKILL_CHANGED, data, { destination: "ALL" });
     } catch (error) {
       status.textContent = error.message || "Couldn’t save skill settings.";
     } finally {

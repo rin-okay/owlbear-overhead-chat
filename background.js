@@ -14,7 +14,8 @@ import { queueDiscord } from "./discord.js?v=2.3.9";
 import { parseTray } from "./dice-replay.js";
 import { queueDicePopup, resetDicePopups } from "./dice-popup.js";
 import { setupSkillHost } from "./skill-host.js?v=2.9.11";
-import { setupCombatLog } from "./combat-log.js?v=2.9.4";
+import { setupCombatLog } from "./combat-log.js?v=2.9.12";
+import { SKILL_CHANGED, skillConnections, skillGrantLabel } from "./skills.js?v=2.9.12";
 import { EMOTE, floatEmote, parseEmote } from "./emotes.js?v=2.7.22";
 import { setupHitMarkers } from "./hit-markers.js?v=2.9.8";
 import { requestChatShortcut } from "./chat-shortcut.js?v=2.6.4";
@@ -485,6 +486,31 @@ OBR.onReady(() => {
     for (const result of results) if (result.status === "rejected") report(result.reason);
   });
   OBR.broadcast.onMessage(SPEECH, queueSpeech);
+  OBR.broadcast.onMessage(SKILL_CHANGED, async ({ connectionId: sender, data }) => {
+    const grant = data?.grant;
+    if (typeof grant?.id !== "string" || !/^[a-f0-9-]{36}$/i.test(grant.id) ||
+        typeof grant.tokenId !== "string" || !grant.tokenId || grant.tokenId.length > 128) return;
+    const label = skillGrantLabel(grant.kind, grant.variant);
+    if (!label) return;
+    const id = "grant:" + grant.id;
+    const version = sceneVersion;
+    try {
+      await initialState;
+      if (!sceneReady || version !== sceneVersion || transcript.has(id)) return;
+      const { gm } = await skillConnections(OBR);
+      if (gm?.connectionId !== sender) return;
+      const [token] = await OBR.scene.items.getItems([grant.tokenId]);
+      if (!sceneReady || version !== sceneVersion || !isPublicToken(token) || transcript.has(id)) return;
+      const name = String(token.name || "Character").slice(0, 80);
+      const text = name + " has been granted " + label;
+      storeEntry({
+        id, sequence: ++sequence, roomId: GENERAL_CHAT_ROOM, receivedAt: Date.now(),
+        senderId: gm.id, name, text, parts: [text], own: sender === connectionId, grantNotice: true,
+      }, "line");
+    } catch (error) {
+      report(error);
+    }
+  });
   const lastEmote = new Map();
   OBR.scene.onReadyChange(() => lastEmote.clear());
   OBR.broadcast.onMessage(EMOTE, async (event) => {

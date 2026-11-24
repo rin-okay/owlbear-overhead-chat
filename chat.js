@@ -10,12 +10,12 @@ import {
 } from "./session.js?v=2.7.21";
 
 import { drawBubble, normalizeAppearance, prepareBubbleFont } from "./appearance.js?v=2.7.9";
-import { setupDiscordPanel } from "./discord-panel.js?v=2.9.11";
-import { damageNotation, openCombatLog, saveNotation } from "./combat-log.js?v=2.9.11";
-import { MAX_CAST_LEVEL, SKILLS } from "./skills.js?v=2.9.11";
+import { setupDiscordPanel } from "./discord-panel.js?v=2.9.12";
+import { damageNotation, openCombatLog, saveNotation } from "./combat-log.js?v=2.9.12";
+import { MAX_CAST_LEVEL, SKILLS } from "./skills.js?v=2.9.12";
 import { ABILITIES, readTokenStats } from "./stats.js?v=2.8.5";
 import { setupAvatarPanel } from "./avatar-panel.js?v=2.8.6";
-import { setupSkillGrants, setupSkillPanel } from "./skill-panel.js?v=2.9.11";
+import { setupSkillGrants, setupSkillPanel } from "./skill-panel.js?v=2.9.12";
 import { setupStatsEditor } from "./stats-panel.js?v=2.8.5";
 import { EMOTE } from "./emotes.js?v=2.7.21";
 import { setupTargeting } from "./targeting.js?v=2.7.17";
@@ -49,9 +49,9 @@ if (combatWindow) {
   document.body.classList.add("combat-view");
   const stylesheet = document.createElement("link");
   stylesheet.rel = "stylesheet";
-  stylesheet.href = new URL("./combat-log.css?v=2.9.11", import.meta.url).href;
+  stylesheet.href = new URL("./combat-log.css?v=2.9.12", import.meta.url).href;
   document.head.append(stylesheet);
-  void import("./combat-log-panel.js?v=2.9.11")
+  void import("./combat-log-panel.js?v=2.9.12")
     .then(({ setCombatRollers }) => setCombatRollers(rollCombatSave, rollCombatDamage)).catch(console.error);
 }
 
@@ -95,7 +95,7 @@ function appendLine(entry, target) {
   const line = document.createElement("li");
   if (entry.id) line.dataset.entryId = entry.id;
   line.dataset.sequence = entry.sequence;
-  if (entry.localNotice) {
+  if (entry.localNotice || entry.grantNotice) {
     line.className = "roll-status";
     line.textContent = entry.text;
     target.append(line);
