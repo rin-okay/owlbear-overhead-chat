@@ -1,4 +1,4 @@
-import { setupBless } from "./bless.js?v=2.7.11";
+import { setupBless } from "./bless.js?v=2.9.13";
 import { combatDamage } from "./combat-log.js?v=2.9.4";
 import { isShieldGraphic, readShieldGraphics, setupShield } from "./shield.js?v=2.8.6";
 import { canSpeak, MELEE_HIT_TIMING, normalizeMeleeHitTiming, ROLL_DAMAGE_FROM_COMBAT_LOG } from "./rules.js?v=2.9.4";
@@ -9,13 +9,12 @@ import { HIT_MARKERS, MELEE_HIT_CUE } from "./hit-markers.js?v=2.9.4";
 import { meleeDamageFormula, rangedDamageFormula, rollMeleeDamage, rollRangedDamage } from "./melee-damage.js?v=2.9.11";
 import { readTokenStats } from "./stats.js?v=2.8.5";
 import {
-  BLOCKED_MAGIC_MISSILE, eldritchBeamCount, fireSpellDamageFormula, MAGIC_MISSILE_INTERVAL,
-  rollFireSpellDamage, rollMagicMissileDart, rollSpellDamage, spellDamageFormula,
-} from "./spell-damage.js?v=2.9.4";
+  BLOCKED_MAGIC_MISSILE, MAGIC_MISSILE_INTERVAL, rollMagicMissileDart, rollSpellDamage, spellDamageFormula,
+} from "./spell-damage.js?v=2.9.13";
 import {
   DEFAULT_WEAPON, EMBERS_EFFECTS, MAX_CAST_LEVEL, MELEE_DURATION_MS, RANGED_WEAPONS, SKILLS, SKILL_REQUEST, SKILL_RESULT, WEAPONS,
   aimsAtLocation, availableRangedWeapons, availableSkills, availableWeapons, friendlyFireMode, readSkills, skillConnections, skillEffect, spellParameter, tokenTeams, turnToHeading,
-} from "./skills.js?v=2.9.11";
+} from "./skills.js?v=2.9.13";
 
 function aimAtTarget(source, target, range = 0, passThrough = false, maxRange = Infinity) {
   if (![target?.center?.x, target?.center?.y].every(Number.isFinite)) return;
@@ -166,7 +165,7 @@ export function setupSkillHost(obr, buildImage, recordCombat) {
           return;
         }
         const current = () => version === sceneVersion;
-        const error = await castBless(token, targets, config, current).catch((cause) => {
+        const error = await castBless(token, targets, config, spellLevel - skill.spellLevel, current).catch((cause) => {
           console.error("Overhead Chat could not update Bless", cause);
           return "Couldn’t update Bless.";
         });
@@ -303,7 +302,7 @@ export function setupSkillHost(obr, buildImage, recordCombat) {
             const canIntercept = mode === "aoe" && skill.impact ? (item) => !isAlly(item) : undefined;
             const impact = projectileImpact(source, destination, targets, token.id, dpi, blastRadius, canIntercept);
             instruction.effectProperties.destination = impact.destination;
-            if (eldritch) instruction.effectProperties.copies = eldritchBeamCount(token);
+            if (eldritch) instruction.effectProperties.copies = spellDamageFormula(skill, token).count;
             hitTokenIds = impact.hitTokenIds;
             missileBlocked = missile && Boolean(hitTokenIds.length) &&
               items.some((item) => item.attachedTo === hitTokenIds[0] && isShieldGraphic(item));
@@ -377,17 +376,9 @@ export function setupSkillHost(obr, buildImage, recordCombat) {
           await sendMarkers(skill.hitDelay, damage, { missileFollowUps });
         }
       } else if (version === sceneVersion && hitTokenIds.length && !meleeHit) {
-        const otherDamage = data.skill === "eldritch-blast" || data.skill === "shatter";
-        if (manual) {
-          damageFormula = ranged ? rangedDamageFormula(token)
-            : skill.damageDice ? fireSpellDamageFormula(skill, spellLevel)
-            : otherDamage ? spellDamageFormula(data.skill, token) : undefined;
-        } else {
-          const damage = ranged ? rollRangedDamage(token)
-            : skill.damageDice ? rollFireSpellDamage(skill, spellLevel)
-            : otherDamage ? rollSpellDamage(data.skill, token) : undefined;
-          if (damage) damageRolls = [damage];
-        }
+        const formula = ranged ? rangedDamageFormula(token) : spellDamageFormula(skill, token, spellLevel);
+        if (manual) damageFormula = formula;
+        else if (formula) damageRolls = [ranged ? rollRangedDamage(token) : rollSpellDamage(formula)];
         await sendMarkers(skill.impact?.delay ?? skill.hitDelay, damageRolls?.[0]);
       }
       await logCast({

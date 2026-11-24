@@ -3,7 +3,7 @@ import { isPublicToken } from "./rules.js";
 import {
   DEFAULT_WEAPON, FACINGS, FRIENDLY_FIRE_MODES, RANGED_WEAPONS, SKILLS, SKILL_CHANGED, SKILL_REQUEST, SKILL_RESULT, SPELLS, TEAMS, WEAPONS,
   aimsAtLocation, availableRangedWeapons, availableSpells, availableWeapons, friendlyFireMode, readSkills, skillConnections, spellParameter, tokenTeams, validSpellParameter, writeSkills,
-} from "./skills.js?v=2.9.12";
+} from "./skills.js?v=2.9.13";
 
 function characterLabel(token) {
   return token.name || "unnamed character";

@@ -80,7 +80,7 @@ export const MELEE_DURATION_MS = {
 
 export const SKILLS = {
   bless: {
-    name: "bless", key: "b", spellLevel: 1,
+    name: "bless", key: "b", spellLevel: 1, upcast: true,
     parameter: { label: "range (in cells)", min: 1, defaultValue: 6 },
     targetLimit: { label: "maximum targets", min: 1, defaultValue: 3, integer: true },
   },
@@ -91,22 +91,27 @@ export const SKILLS = {
   ranged: { name: "ranged weapon attack", key: "n", range: 30, hitDelay: 800 },
   missile: { name: "magic missile", key: "g", spellLevel: 1, upcast: true, effect: "magic_missile", range: 8, hitDelay: 1000 },
   "burning-hands": {
-    name: "burning hands", key: "h", spellLevel: 1, upcast: true, damageDice: 3, saveAbility: "dex", effect: "burning_hands", cone: true, hitDelay: 1000,
+    name: "burning hands", key: "h", spellLevel: 1, upcast: true, damage: { dice: 3, sides: 6, type: "fire" }, saveAbility: "dex", effect: "burning_hands", cone: true, hitDelay: 1000,
     parameter: { label: "length (in cells)", min: 1, defaultValue: 3 },
   },
-  "fire-bolt": { name: "fire bolt", key: "j", spellLevel: 0, effect: "fire_bolt", range: 24, hitDelay: 800 },
+  "fire-bolt": {
+    name: "fire bolt", key: "j", spellLevel: 0, damage: { dice: 1, sides: 10, type: "fire" },
+    effect: "fire_bolt", range: 24, hitDelay: 800,
+  },
   "eldritch-blast": {
-    name: "eldritch blast", key: "u", spellLevel: 0, effect: "eldritch_blast", range: 24, hitDelay: 1000,
+    name: "eldritch blast", key: "u", spellLevel: 0, damage: { dice: 1, sides: 10, type: "force" },
+    effect: "eldritch_blast", range: 24, hitDelay: 1000,
   },
   "misty-step": {
     name: "misty step", key: "i", spellLevel: 2, effect: "misty_step.out", location: "teleport", range: 6,
   },
   shatter: {
-    name: "shatter", key: "o", spellLevel: 2, effect: "shatter", location: "area", range: 12, hitDelay: 650,
+    name: "shatter", key: "o", spellLevel: 2, upcast: true, damage: { dice: 3, sides: 8, type: "thunder" },
+    saveAbility: "con", effect: "shatter", location: "area", range: 12, hitDelay: 650,
     parameter: { label: "radius (in cells)", min: 1, defaultValue: 2 },
   },
   fireball: {
-    name: "fireball", key: "k", spellLevel: 3, upcast: true, damageDice: 8, saveAbility: "dex", effect: "fireball.beam", range: 30,
+    name: "fireball", key: "k", spellLevel: 3, upcast: true, damage: { dice: 8, sides: 6, type: "fire" }, saveAbility: "dex", effect: "fireball.beam", range: 30,
     // The visible blast has a radius of roughly 320 px in the 800 px Embers frame.
     impact: { effect: "fireball.explosion", delay: 3000, visibleRadiusFraction: 0.4 },
     parameter: { label: "radius (in cells)", min: 1, defaultValue: 4 },

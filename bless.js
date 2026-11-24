@@ -79,7 +79,7 @@ export function setupBless(obr, buildImage) {
   });
   void resumeIntros();
 
-  return async (caster, selectedIds, config, hostCurrent) => {
+  return async (caster, selectedIds, config, extraTargets, hostCurrent) => {
     const version = sceneVersion;
     const current = () => version === sceneVersion && hostCurrent();
     if (casting.has(caster.id)) return "Bless is still updating.";
@@ -99,7 +99,7 @@ export function setupBless(obr, buildImage) {
       // At 200 DPI the 400 px intro spans two cells, or one cell of radius.
       const radius = spellParameter(config, caster.id, "bless");
       const range = radius * dpi;
-      const limit = spellParameter(config, caster.id, "bless", "targetLimit");
+      const limit = spellParameter(config, caster.id, "bless", "targetLimit") + extraTargets;
       const teams = tokenTeams(config, caster.id);
       const allies = sceneItems.filter((item) => item.id !== caster.id && isProjectileToken(item) &&
         tokenTeams(config, item.id).some((team) => teams.includes(team)) &&

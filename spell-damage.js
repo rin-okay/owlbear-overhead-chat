@@ -16,38 +16,24 @@ export function validMagicMissileDamage(damage) {
   return validSpellDamage(damage) && damage.type === "force" && damage.amount >= 2 && damage.amount <= 5;
 }
 
-export function eldritchBeamCount(token) {
+export function spellDamageFormula(skill, token, spellLevel = skill.spellLevel) {
+  if (!skill.damage) return;
+  const { dice, sides, type } = skill.damage;
   const { level } = readTokenStats(token).details;
-  return 1 + Number(level >= 5) + Number(level >= 11) + Number(level >= 17);
+  const extra = skill.spellLevel === 0
+    ? Number(level >= 5) + Number(level >= 11) + Number(level >= 17)
+    : spellLevel - skill.spellLevel;
+  return { count: dice + extra, sides, type, modifier: 0 };
 }
 
-export function spellDamageFormula(skill, token) {
-  const eldritch = skill === "eldritch-blast";
-  const count = eldritch ? eldritchBeamCount(token) : 3;
-  const sides = eldritch ? 10 : 8;
-  return { count, sides, type: eldritch ? "force" : "thunder", modifier: 0 };
-}
-
-export function rollSpellDamage(skill, token, random = Math.random) {
-  return rollDamage(spellDamageFormula(skill, token), random);
-}
-
-export function fireSpellDamageFormula(skill, level) {
-  return { count: skill.damageDice + level - skill.spellLevel, sides: 6, type: "fire", modifier: 0 };
-}
-
-export function rollFireSpellDamage(skill, level, random = Math.random) {
-  return rollDamage(fireSpellDamageFormula(skill, level), random);
-}
-
-function rollDamage({ count, sides, type }, random) {
+export function rollSpellDamage({ count, sides, type }, random = Math.random) {
   const dice = Array.from({ length: count }, () => 1 + Math.floor(random() * sides));
   const amount = dice.reduce((sum, value) => sum + value, 0);
   return { amount, type, maxRoll: amount === count * sides, dice, sides };
 }
 
 export function validSpellDamage(damage) {
-  const max = damage?.type === "force" ? 40 : damage?.type === "thunder" ? 24 : damage?.type === "fire" ? 84 : 0;
+  const max = damage?.type === "force" ? 40 : damage?.type === "thunder" ? 80 : damage?.type === "fire" ? 84 : 0;
   return Number.isInteger(damage?.amount) && damage.amount >= 1 && damage.amount <= max &&
     typeof damage.maxRoll === "boolean";
 }
