@@ -1,4 +1,4 @@
-import { setupBless } from "./bless.js?v=2.9.13";
+import { setupBless } from "./bless.js?v=2.9.14";
 import { combatDamage } from "./combat-log.js?v=2.9.4";
 import { isShieldGraphic, readShieldGraphics, setupShield } from "./shield.js?v=2.8.6";
 import { canSpeak, MELEE_HIT_TIMING, normalizeMeleeHitTiming, ROLL_DAMAGE_FROM_COMBAT_LOG } from "./rules.js?v=2.9.4";

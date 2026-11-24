@@ -4,6 +4,8 @@ import { skillConnections, spellParameter, tokenTeams } from "./skills.js?v=2.7.
 const BLESS_CASTER = "chat.overhead.bless.caster.v1";
 const BLESS_INTRO_END = "chat.overhead.bless.intro-end.v1";
 const BLESS_LOOP_SCALE = "chat.overhead.bless.loop-scale.v1";
+const BLESS_TARGETS = "chat.overhead.bless.targets.v1";
+const BLESS_CAST = "chat.overhead.bless.cast.v1";
 const BLESS_INTRO_MS = 5000;
 // These are the paired 400 × 400 Bless clips from the Embers catalog.
 const BLESS_IMAGE = {
@@ -27,7 +29,7 @@ export function setupBless(obr, buildImage) {
   const casting = new Set();
   let sceneVersion = 0;
 
-  function finishIntro(ids, deadline, current) {
+  function finishLegacyIntro(ids, deadline, current) {
     setTimeout(async () => {
       if (!current()) return;
       try {
@@ -51,6 +53,61 @@ export function setupBless(obr, buildImage) {
     }, Math.max(0, deadline - Date.now()));
   }
 
+  async function buildLoop(target, dpi, casterId, introId) {
+    const bounds = await obr.scene.items.getItemBounds([target.id]).catch(() => null);
+    if (![bounds?.center?.x, bounds?.center?.y].every(Number.isFinite)) return;
+    const size = Math.max(bounds.max?.x - bounds.min?.x, bounds.max?.y - bounds.min?.y);
+    const scale = Number.isFinite(size) && size > 0 ? size / (dpi * 2) : 0.5;
+    const image = buildImage(BLESS_IMAGE, { dpi: 200, offset: { x: 200, y: 200 } })
+      .position(bounds.center).scale({ x: scale, y: scale }).layer("ATTACHMENT")
+      .attachedTo(target.id).disableHit(true).locked(true)
+      .metadata({ [BLESS_CASTER]: casterId, [BLESS_CAST]: introId }).build();
+    image.disableAttachmentBehavior = ["COPY", "ROTATION"];
+    return image;
+  }
+
+  function finishIntro(introId, casterId, deadline, current, delay = Math.max(0, deadline - Date.now())) {
+    setTimeout(async () => {
+      if (!current()) return;
+      if (casting.has(casterId)) {
+        finishIntro(introId, casterId, deadline, current, 100);
+        return;
+      }
+      casting.add(casterId);
+      try {
+        const { self, gm } = await skillConnections(obr);
+        if (!current() || gm?.connectionId !== self.connectionId) return;
+        const [intro] = await obr.scene.items.getItems([introId]);
+        const targetIds = intro?.metadata?.[BLESS_TARGETS];
+        if (!current() || !intro || !blessGraphic(intro) || intro.image.url !== BLESS_INTRO.url ||
+            intro.metadata[BLESS_CASTER] !== casterId || intro.metadata[BLESS_INTRO_END] !== deadline ||
+            !Array.isArray(targetIds)) return;
+
+        const targets = new Set(targetIds);
+        const [dpi, items] = await Promise.all([
+          obr.scene.grid.getDpi(),
+          obr.scene.items.getItems((item) => (targets.has(item.id) && isProjectileToken(item)) ||
+            (blessGraphic(item) && item.metadata?.[BLESS_CAST] === introId)),
+        ]);
+        if (!current()) return;
+        if (!Number.isFinite(dpi) || dpi <= 0) throw Error("Couldn’t read the scene grid for Bless.");
+        // If the intro survived a failed cleanup, keep the loops already added for this cast.
+        const attached = new Set(items.filter(blessGraphic).map((item) => item.attachedTo));
+        const loops = (await Promise.all(
+          items.filter((item) => targets.has(item.id) && !attached.has(item.id))
+            .map((item) => buildLoop(item, dpi, casterId, introId)),
+        )).filter(Boolean);
+        if (!current()) return;
+        if (loops.length) await obr.scene.items.addItems(loops);
+        if (current()) await obr.scene.items.deleteItems([introId]);
+      } catch (error) {
+        console.error("Overhead Chat could not finish the Bless intro", error);
+      } finally {
+        casting.delete(casterId);
+      }
+    }, delay);
+  }
+
   async function resumeIntros() {
     const version = sceneVersion;
     const current = () => version === sceneVersion;
@@ -64,10 +121,15 @@ export function setupBless(obr, buildImage) {
       const groups = new Map();
       for (const item of items) {
         const deadline = item.metadata[BLESS_INTRO_END];
+        const casterId = item.metadata[BLESS_CASTER];
+        if (typeof casterId === "string" && Array.isArray(item.metadata[BLESS_TARGETS])) {
+          finishIntro(item.id, casterId, deadline, current);
+          continue;
+        }
         if (!groups.has(deadline)) groups.set(deadline, []);
         groups.get(deadline).push(item.id);
       }
-      for (const [deadline, ids] of groups) finishIntro(ids, deadline, current);
+      for (const [deadline, ids] of groups) finishLegacyIntro(ids, deadline, current);
     } catch (error) {
       console.error("Overhead Chat could not resume Bless intros", error);
     }
@@ -123,25 +185,19 @@ export function setupBless(obr, buildImage) {
       }
       if (!targets.length) return "Select an ally within Bless range.";
 
-      const graphics = await Promise.all(targets.map(async (target) => {
-        const bounds = await obr.scene.items.getItemBounds([target.id]).catch(() => null);
-        if (!Number.isFinite(bounds?.center?.x) || !Number.isFinite(bounds?.center?.y)) return null;
-        const size = Math.max(bounds.max?.x - bounds.min?.x, bounds.max?.y - bounds.min?.y);
-        const loopScale = Number.isFinite(size) && size > 0 ? size / (dpi * 2) : 0.5;
-        const image = buildImage(BLESS_INTRO, { dpi: 200, offset: { x: 200, y: 200 } })
-          .position(bounds.center).scale({ x: radius, y: radius }).layer("ATTACHMENT")
-          .attachedTo(target.id).disableHit(true).locked(true)
-          .metadata({ [BLESS_CASTER]: caster.id, [BLESS_LOOP_SCALE]: loopScale }).build();
-        image.disableAttachmentBehavior = ["COPY", "ROTATION"];
-        return image;
-      }));
+      const bounds = await obr.scene.items.getItemBounds([caster.id]).catch(() => null);
       if (!current()) return;
-      const items = graphics.filter(Boolean);
-      if (!items.length) return "Couldn’t attach Bless to the selected tokens.";
+      if (![bounds?.center?.x, bounds?.center?.y].every(Number.isFinite)) return "Couldn’t find the Bless caster.";
       const deadline = Date.now() + BLESS_INTRO_MS;
-      for (const item of items) item.metadata[BLESS_INTRO_END] = deadline;
-      await obr.scene.items.addItems(items);
-      if (current()) finishIntro(items.map(({ id }) => id), deadline, current);
+      const intro = buildImage(BLESS_INTRO, { dpi: 200, offset: { x: 200, y: 200 } })
+        .position(bounds.center).scale({ x: radius, y: radius }).layer("ATTACHMENT")
+        .attachedTo(caster.id).disableHit(true).locked(true)
+        .metadata({
+          [BLESS_CASTER]: caster.id, [BLESS_INTRO_END]: deadline, [BLESS_TARGETS]: targets.map(({ id }) => id),
+        }).build();
+      intro.disableAttachmentBehavior = ["COPY", "ROTATION"];
+      await obr.scene.items.addItems([intro]);
+      if (current()) finishIntro(intro.id, caster.id, deadline, current);
       return "";
     } finally {
       casting.delete(caster.id);
