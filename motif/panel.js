@@ -1,6 +1,6 @@
 import OBR from "./obr.js";
-import { loadMix, warm } from "./audio.js";
-import { BUILT_INS, EMPTY, KEY, LOCAL, REPLY, REQUEST } from "./model.js";
+import { loadMix, warm } from "./audio.js?v=0.1.1";
+import { BUILT_INS, EMPTY, KEY, LOCAL, REPLY, REQUEST } from "./model.js?v=0.1.1";
 
 const $ = id => document.getElementById(id);
 const editor = $("editor");

@@ -1,6 +1,6 @@
 import OBR from "./obr.js";
-import { createEngine, loadMix } from "./audio.js";
-import { EMPTY, KEY, LOCAL } from "./model.js";
+import { createEngine, loadMix } from "./audio.js?v=0.1.1";
+import { EMPTY, KEY, LOCAL } from "./model.js?v=0.1.1";
 
 const status = document.getElementById("notice");
 const listen = document.getElementById("listen");

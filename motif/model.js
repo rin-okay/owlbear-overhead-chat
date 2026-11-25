@@ -59,10 +59,17 @@ export function elapsed(entry, now) {
   return entry.offset + (entry.since === null ? 0 : Math.max(0, now - entry.since) / 1000);
 }
 
+// Let the media's end event remove the entry first, with a cleanup deadline
+// for clients that never load the file or cannot report its end.
+export function shouldPrune(entry, now) {
+  return !entry.loop && entry.since !== null && entry.end !== null &&
+    elapsed(entry, now) >= entry.end - entry.start + 4;
+}
+
 export function applyRequest(state, request, { gm, now, id, owner }) {
   const { type } = request;
   if (!gm && type !== "play") throw Error("Only the GM can control room playback.");
-  const active = state.active.filter(entry => entry.loop || entry.end === null || elapsed(entry, now) < entry.end - entry.start);
+  const active = state.active.filter(entry => !shouldPrune(entry, now));
   if (type === "play") {
     const cue = byId(state, request.cueId);
     if (!cue || (!gm && !cue.allowPlayers)) throw Error("This cue is unavailable to you.");

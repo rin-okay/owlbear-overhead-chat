@@ -1,6 +1,6 @@
 import OBR, { buildShape } from "./obr.js";
-import { createEngine, loadMix } from "./audio.js";
-import { applyRequest, elapsed, EMPTY, KEY, LOCAL, PLAY, REPLY, REQUEST } from "./model.js";
+import { createEngine, loadMix, warmSamples } from "./audio.js?v=0.1.1";
+import { applyRequest, EMPTY, KEY, LOCAL, PLAY, REPLY, REQUEST, shouldPrune } from "./model.js?v=0.1.1";
 
 const TOOL = KEY + "/tool";
 const MODE = TOOL + "/target";
@@ -228,12 +228,13 @@ OBR.onReady(async () => {
     }
     if (data.type === "open-listener") {
       void OBR.popover.open({
-        id: LISTENER, url: new URL("./listener.html", import.meta.url).href,
+        id: LISTENER, url: new URL("./listener.html?v=0.1.1", import.meta.url).href,
         width: 230, height: 78, anchorReference: "POSITION",
         anchorPosition: { left: 12, top: 110 }, disableClickAway: true,
       }).catch(report);
     }
   });
+  warmSamples();
   receiveState(await OBR.room.getMetadata());
   void registerTool().catch(report);
   let fallback = false;
@@ -243,7 +244,7 @@ OBR.onReady(async () => {
       fallback = usingListener;
       engine.suspend(fallback);
     }
-    if (current.active.some(entry => !entry.loop && entry.end !== null && elapsed(entry, Date.now()) >= entry.end - entry.start)) {
+    if (current.active.some(entry => shouldPrune(entry, Date.now()))) {
       submit({ type: "prune" }, self, self, { silent: true });
     }
   }, 1800);

@@ -14,7 +14,7 @@ A standalone Owlbear Rodeo extension for room music and sound effects. Install i
 
 Add sound in the library and paste a public HTTPS link to a browser-playable audio file. MP3 and WAV are good starting points. Dropbox share links are converted to raw links automatically. The host needs to return media that plays without sign-in. Page links and files in unsupported codecs won’t play.
 
-Motif first checks a per-device browser cache. Successful CORS-readable responses can be stored, up to 24 MiB per file and twelve files. When a host supports playback without CORS or a file exceeds the cache size, Motif falls back to browser streaming. Custom cues and current room playback are stored in room metadata. The four included sounds are original synthesized samples served alongside this extension.
+Motif preloads the bundled cues and checks a per-device browser cache before playing. You can cache a custom cue ahead of time with Cache audio, or Motif can cache it after streaming. CORS-readable responses can be stored up to 24 MiB per file and twelve files. When a host supports playback without CORS or a file exceeds the cache size, Motif falls back to browser streaming. Custom cues and current room playback are stored in room metadata. The four included sounds are original synthesized samples served alongside this extension.
 
 ## Broadcast API
 
