@@ -3,7 +3,7 @@
 body { margin: 0; pointer-events: none; }
 #hotbar {
   display: grid;
-  grid-template-columns: repeat(10, minmax(0, 1fr));
+  grid-template-columns: repeat(var(--slot-count, 10), minmax(0, 1fr));
   height: 100dvh;
   gap: 3px;
   margin: 0;
@@ -54,7 +54,7 @@ kbd {
   text-overflow: ellipsis;
   font-size: clamp(8px, 1.65vw, 11px);
 }
-.left #hotbar { grid-template-columns: minmax(0, 1fr); grid-template-rows: repeat(10, minmax(0, 1fr)); }
+.left #hotbar { grid-template-columns: minmax(0, 1fr); grid-template-rows: repeat(var(--slot-count, 10), minmax(0, 1fr)); }
 .left .slot { grid-template: minmax(0, 1fr) / 24px 27px minmax(0, 1fr); justify-items: start; }
 .left kbd { position: static; justify-self: center; }
 .left .name { text-align: left; font-size: 11px; }
@@ -62,3 +62,12 @@ kbd {
   html:not(.left) .icon { font-size: 15px; }
   html:not(.left) .icon img { width: 17px; height: 17px; }
 }
+@media (max-height: 440px) {
+  .left .slot { padding-block: 1px; }
+  .left .icon { font-size: 15px; }
+  .left .icon img { width: 16px; height: 16px; }
+}
+
+.compact .slot { grid-template-rows: minmax(0, 1fr); }
+.compact .name { display: none; }
+.compact.left .slot { grid-template-columns: 23px minmax(0, 1fr); }

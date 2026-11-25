@@ -10,8 +10,8 @@ import {
 } from "./session.js?v=2.9.16";
 
 import { drawBubble, normalizeAppearance, prepareBubbleFont } from "./appearance.js?v=2.7.9";
-import { setupDiscordPanel } from "./discord-panel.js?v=2.9.16";
-import { damageNotation, openCombatLog, saveNotation } from "./combat-log.js?v=2.9.16";
+import { setupDiscordPanel } from "./discord-panel.js?v=2.9.17";
+import { damageNotation, openCombatLog, saveNotation } from "./combat-log.js?v=2.9.17";
 import { MAX_CAST_LEVEL, SKILLS } from "./skills.js?v=2.9.16";
 import { ABILITIES, readTokenStats } from "./stats.js?v=2.8.5";
 import { setupAvatarPanel } from "./avatar-panel.js?v=2.9.16";
@@ -26,7 +26,7 @@ import { readMovementGrid, stepAvatar, turnAvatar } from "./movement.js?v=2.7.5"
 import { rollSpans, validateRollSpans } from "./dice.js";
 import { rollWithRumble } from "./rumble.js?v=2.9.4";
 import { rollWithNativeDice } from "./native-dice.js";
-import { handleHotbarKey, hotbarOrientation, sendHotbarCommand, setHotbarOrientation } from "./hotbar.js?v=2.9.16";
+import { handleHotbarKey, hotbarOrientation, hotbarShowsLabels, sendHotbarCommand, setHotbarLabels, setHotbarOrientation } from "./hotbar.js?v=2.9.17";
 
 const combatView = new URLSearchParams(location.search).has("combat-log");
 const combatWindow = combatView ? document.querySelector("#combat-window") : null;
@@ -1023,6 +1023,14 @@ function setupSettings() {
   const cameraFollow = cameraFollowPreference(OBR, (enabled) => { followCamera.checked = enabled; });
   followCamera.addEventListener("change", () => cameraFollow.set(followCamera.checked));
   const orientation = document.querySelector("#hotbar-orientation");
+  const labels = document.querySelector("#hotbar-labels");
+  if (labels) {
+    labels.checked = hotbarShowsLabels(OBR);
+    labels.addEventListener("change", () => {
+      setHotbarLabels(OBR, labels.checked);
+      void sendHotbarCommand(OBR, "layout").catch(console.error);
+    });
+  }
   if (orientation) {
     orientation.value = hotbarOrientation(OBR);
     orientation.addEventListener("change", () => {

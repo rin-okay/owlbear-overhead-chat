@@ -2,7 +2,7 @@ import OBR from "./obr.js";
 import { AVATAR, canSpeak, isPublicToken } from "./rules.js";
 import { savedAvatar, savedAvatarMode, savedAvatarSlots, savedQuickbarSlots } from "./session.js?v=2.9.16";
 import { SKILLS, SKILL_CHANGED, SKILL_REQUEST, SKILL_RESULT, readSkills, skillBinding, skillConnections } from "./skills.js?v=2.9.16";
-import { handleHotbarKey, hotbarMode } from "./hotbar.js?v=2.9.16";
+import { handleHotbarKey, hotbarMode, MAX_HOTBAR_SLOTS, MIN_HOTBAR_SLOTS, resizeHotbar } from "./hotbar.js?v=2.9.17";
 import { BUILTIN_EMOTES } from "./emotes.js?v=2.7.21";
 
 const PRIORITY = "fghjklxcvbnmtyuiop";
@@ -13,7 +13,11 @@ const ICONS = {
 };
 const SHORT_NAMES = { spear: "melee attack", ranged: "ranged attack" };
 const list = document.querySelector("#hotbar");
-document.documentElement.classList.toggle("left", new URLSearchParams(location.search).get("position") === "left");
+const params = new URLSearchParams(location.search);
+const left = params.get("position") === "left";
+const compact = params.get("labels") === "off";
+document.documentElement.classList.toggle("left", left);
+document.documentElement.classList.toggle("compact", compact);
 
 function skillSlot(key, id, unavailable = false) {
   return { key, name: SHORT_NAMES[id] ?? SKILLS[id].name, icon: ICONS[id] ?? "✦", unavailable };
@@ -25,10 +29,10 @@ function skillSlots(available, bindings) {
     .map((id) => [skillBinding(id, bindings, (key) => typeof key === "string" &&
       key.length === 1 && PRIORITY.includes(key)), id]));
   for (const key of PRIORITY) {
-    if (slots.length >= 10) break;
+    if (slots.length >= MAX_HOTBAR_SLOTS) break;
     if (byKey.has(key)) slots.push(skillSlot(key, byKey.get(key)));
   }
-  while (slots.length < 10) slots.push({});
+  while (slots.length < MIN_HOTBAR_SLOTS) slots.push({});
   return slots;
 }
 
@@ -59,6 +63,7 @@ function render(available, role, tokens) {
   const talkIds = role === "GM" && savedAvatarMode() === "talk" ? savedAvatarSlots() : null;
   const slots = quickbar ? quickbarSlots(available, talkIds, tokens)
     : skillSlots(available, readSkills(OBR, "player").bindings);
+  list.style.setProperty("--slot-count", slots.length);
   list.setAttribute("aria-label", quickbar ? "Quickbar slots" : "Skill hotbar");
   list.replaceChildren(...slots.map(({ key, name, icon, image, unavailable }) => {
     const slot = document.createElement("li");
@@ -86,6 +91,7 @@ function render(available, role, tokens) {
     slot.append(graphic, title);
     return slot;
   }));
+  return slots.length;
 }
 
 OBR.onReady(() => {
@@ -97,7 +103,18 @@ OBR.onReady(() => {
   let activeGM;
   let partyGms;
   let revision = 0;
-  const redraw = () => render(available, role, tokens);
+  let appliedLength = MIN_HOTBAR_SLOTS;
+  let resizing = Promise.resolve();
+  let closed = false;
+  const redraw = () => {
+    const length = render(available, role, tokens);
+    resizing = resizing.then(async () => {
+      if (closed || appliedLength === length) return;
+      await resizeHotbar(OBR, left, length, compact);
+      appliedLength = length;
+    }).catch(console.error);
+  };
+  window.addEventListener("pagehide", () => { closed = true; }, { once: true });
 
   async function refresh() {
     const current = ++revision;
