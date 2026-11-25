@@ -1,64 +1,15 @@
 <!doctype html>
 <html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Motif</title>
-<link rel="stylesheet" href="./style.css">
-<script type="module" src="./panel.js?v=0.1.1"></script>
-</head>
-<body>
-<main>
-<header class="mast"><img src="./icon.svg" alt=""><h1>Motif</h1><span id="room-role"></span></header>
-<section id="app" hidden>
-  <nav aria-label="Motif views">
-    <button id="show-library" aria-pressed="true">Sound library</button>
-    <button id="show-active" aria-pressed="false">Active sounds <span id="active-count">0</span></button>
-  </nav>
-  <section id="library" aria-label="Sound library">
-    <div class="filters">
-      <input id="search" type="search" placeholder="Find a sound…" aria-label="Find a sound">
-      <select id="filter" aria-label="Sound type"><option value="">All sounds</option><option value="music">Music</option><option value="sfx">Effects</option></select>
-    </div>
-    <div class="cue-list" id="cue-list"></div>
-    <div class="bar">
-      <button id="play" class="primary" disabled>Play selected sound</button>
-      <button id="add" hidden>Add sound</button>
-    </div>
-  </section>
-  <section id="active-view" aria-label="Active sounds" hidden>
-    <div class="cue-list" id="active-list"></div>
-    <div class="bar"><button id="stop-all" hidden>Stop all</button></div>
-  </section>
-  <section class="mix" aria-label="Your mix">
-    <label>Music <input type="range" id="music-volume" min="0" max="100" aria-label="Your music volume"></label>
-    <label>Effects <input type="range" id="effects-volume" min="0" max="100" aria-label="Your effects volume"></label>
-  </section>
-  <button id="enable-audio" class="primary" hidden>Enable room audio</button>
-</section>
-<p id="notice" role="status">Connecting to Owlbear Rodeo…</p>
-</main>
-<dialog id="editor">
-<form id="edit-form">
-  <h2 id="editor-title">Add sound</h2>
-  <div id="source-fields">
-    <label>Name <input name="name" maxlength="80"></label>
-    <label>Public audio URL <input name="url" type="url" maxlength="1500" placeholder="https://…"></label>
-    <div class="fields">
-      <label>Type <select name="kind"><option value="sfx">Effect</option><option value="music">Music</option></select></label>
-      <label>Tags <input name="tags" maxlength="120" placeholder="magic, door…"></label>
-    </div>
-    <label class="check"><input type="checkbox" name="allowPlayers"> Players can trigger this effect</label>
-  </div>
-  <div class="fields">
-    <label>Start (s) <input type="number" name="start" min="0" max="86400" step="any" required></label>
-    <label>End (s) <input type="number" name="end" min="0" max="86400" step="any" placeholder="File end"></label>
-  </div>
-  <label>Volume (%) <input type="number" name="volume" min="0" max="100" step="1" required></label>
-  <label class="check"><input type="checkbox" name="loop"> Loop</label>
-  <p id="edit-error" role="status"></p>
-  <div class="bar"><button type="submit" class="primary">Save</button><button type="button" id="cancel">Cancel</button></div>
-</form>
-</dialog>
-</body>
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/owlbear-overhead-chat/motif/motif.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Motif</title>
+    <script type="module" crossorigin src="/owlbear-overhead-chat/motif/assets/main-CWxpTEDX.js"></script>
+    <link rel="modulepreload" crossorigin href="/owlbear-overhead-chat/motif/assets/localSpells-CcSuxyVB.js">
+    <link rel="stylesheet" crossorigin href="/owlbear-overhead-chat/motif/assets/main-9suF9pAt.css">
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
 </html>
