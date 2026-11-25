@@ -1,4 +1,4 @@
-# Motif v0.3.1
+# Motif v0.3.2
 
 [Install in Owlbear Rodeo](https://rin-okay.github.io/owlbear-overhead-chat/motif/manifest.json).
 
@@ -6,7 +6,7 @@ This extension is adapted from [Embers by Armindo Flores](https://github.com/Arm
 
 ## Play and manage sounds
 
-Use the Motif tool, then press period to select a sound and Enter to play it. Shift+C is shared with Embers, so use the separate toolbar buttons when both extensions are enabled. Optionally click a map cell or token to show a ripple. Music can play alongside effects. Manual playback goes to all audio-enabled tokens in the scene. A manually played music cue becomes the room’s fallback. Triggered music can take over for its listeners while the fallback keeps playing muted. It becomes audible again at its current position when the listener has no active music override. Right-click **Play selected sound** and choose **Force play** to override other music, including new automation cues, until the forced track stops. Sound effects continue to play.
+Use the Motif tool, then press period to select a sound and Enter to play it. Shift+C is shared with Embers, so use the separate toolbar buttons when both extensions are enabled. Optionally click a map cell or token to show a ripple. Music can play alongside effects. Manual playback goes to all audio-enabled tokens in the scene. A manually played music cue becomes the room’s fallback. Triggered music can take over for its listeners while the fallback keeps playing muted. It becomes audible again at its current position when the listener has no active music override. Right-click **Play selected sound** and choose **Force play** to override other music, including new automation cues, until the forced track stops. Sound effects continue to play. The GM can right-click the play button and choose **Play for** to send a cue only to the checked audio-enabled tokens.
 
 The library is grouped into Sound effects and Music folders. Search matches track names, tags, and folders. The playback button stays in the footer. The GM can add music or effects under Custom using a public HTTPS media URL and set the folder, comma-separated tags, and optional duration. Motif reads duration from direct audio when it is available. Suno tracks can use a manually entered duration. Dropbox share links are normalized automatically. Audio needs to be directly playable by the browser. Motif prefetches the examples and prefetches a cue when selected, following Embers’ browser-cache approach. Sources that can’t be prefetched can stream directly.
 
