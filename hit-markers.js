@@ -116,14 +116,15 @@ export function setupHitMarkers(obr, buildLabel, buildPath, command) {
     const { dartCount, splat } = data;
     if ((splat === true && (data.damage !== undefined || followUps !== undefined)) ||
         (dartCount !== undefined && (splat !== true || data.useAnimationCue === true ||
-          !Number.isInteger(dartCount) || dartCount < 3 || dartCount > MAGIC_MISSILE_MAX_LEVEL + 2 ||
+          !Number.isInteger(dartCount) || dartCount < 1 || dartCount > MAGIC_MISSILE_MAX_LEVEL + 2 ||
           data.delay + (dartCount - 1) * MAGIC_MISSILE_INTERVAL > 6000))) return;
     if (followUps !== undefined &&
-        (!Array.isArray(followUps) || followUps.length < 2 || followUps.length > MAGIC_MISSILE_MAX_LEVEL + 1 ||
+        (!Array.isArray(followUps) || followUps.length < 1 || followUps.length > MAGIC_MISSILE_MAX_LEVEL + 1 ||
           data.useAnimationCue === true || data.delay + followUps.length * MAGIC_MISSILE_INTERVAL > 6000 ||
           !validMagicMissileDamage(data.damage) || !followUps.every(validMagicMissileDamage))) return;
     if (followUps === undefined && data.damage !== undefined &&
-        (!validMeleeDamage(data.damage) && !validSpellDamage(data.damage) || data.damage.blocked === true)) return;
+        (data.damage.blocked === true ? !validMagicMissileDamage(data.damage)
+          : !validMeleeDamage(data.damage) && !validSpellDamage(data.damage))) return;
     const version = sceneVersion;
     const current = () => version === sceneVersion;
     try {

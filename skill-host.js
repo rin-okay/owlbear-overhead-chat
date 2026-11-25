@@ -236,12 +236,13 @@ export function setupSkillHost(obr, buildImage, recordCombat) {
         const { source, size } = instruction.effectProperties;
         let { destination, rotation } = instruction.effectProperties;
         const eldritch = data.skill === "eldritch-blast";
-        const beamFormula = eldritch ? spellDamageFormula(skill, token) : undefined;
+        const beamFormula = missile ? { count: spellLevel + 2, sides: 4, type: "force", modifier: spellLevel + 2 }
+          : eldritch ? spellDamageFormula(skill, token) : undefined;
         const selectedBeams = [];
-        if (eldritch && data.targetLocation === undefined && data.targetIds !== undefined) {
+        if (beamFormula && data.targetLocation === undefined && data.targetIds !== undefined) {
           if (!Array.isArray(data.targetIds) || data.targetIds.length > 100 ||
               !data.targetIds.every((id) => typeof id === "string" && id.length > 0 && id.length <= 128)) {
-            await answer({ ...result, error: "Couldn’t read the selected Eldritch Blast targets." });
+            await answer({ ...result, error: "Couldn’t read the selected targets." });
             return;
           }
           const candidates = new Map(items.filter(isProjectileToken).map((item) => [item.id, item]));
@@ -249,9 +250,9 @@ export function setupSkillHost(obr, buildImage, recordCombat) {
             if (id !== token.id && candidates.has(id)) selectedBeams.push(candidates.get(id));
           }
           if (selectedBeams.length > beamFormula.count) {
-            const unit = beamFormula.count === 1 ? "beam" : "beams";
+            const unit = missile ? "missiles" : beamFormula.count === 1 ? "beam" : "beams";
             await answer({ ...result, errorCode: "too-many-targets",
-              error: `Too many targets for Eldritch Blast. Your avatar has ${beamFormula.count} ${unit}.` });
+              error: `Too many targets for ${skill.name}. You have ${beamFormula.count} ${unit}.` });
             return;
           }
         }
@@ -268,14 +269,27 @@ export function setupSkillHost(obr, buildImage, recordCombat) {
           return version === sceneVersion && applied;
         };
 
+        const counts = data.projectileCounts;
+        if (counts !== undefined && beamFormula && data.targetLocation === undefined &&
+            (!Array.isArray(counts) || counts.length !== selectedBeams.length || counts.length < 2 ||
+              !counts.every((count) => Number.isInteger(count) && count >= 1 && count <= beamFormula.count) ||
+              counts.reduce((sum, count) => sum + count, 0) !== beamFormula.count ||
+              selectedBeams.some((target, index) => target.id !== data.targetIds[index]))) {
+          await answer({ ...result, error: "The projectile allocation or selected targets changed. Choose the targets again." });
+          return;
+        }
         if (selectedBeams.length > 1) {
+          if (!counts && selectedBeams.length !== beamFormula.count) {
+            await answer({ ...result, error: "Choose how many projectiles to send to each target before casting." });
+            return;
+          }
           const aims = await Promise.all(selectedBeams.map(async (selected) => {
             const bounds = await obr.scene.items.getItemBounds([selected.id]).catch(() => null);
             return aimAtTarget(source, bounds, skill.range * dpi, mode !== "enabled" && isAlly(selected), skill.range * dpi);
           }));
           if (version !== sceneVersion) return;
           if (aims.some((aimed) => !aimed)) {
-            await answer({ ...result, error: "Couldn’t aim at one of the selected Eldritch Blast targets." });
+            await answer({ ...result, error: "Couldn’t aim at one of the selected targets." });
             return;
           }
           if (!await face(aims[0])) return;
@@ -283,21 +297,28 @@ export function setupSkillHost(obr, buildImage, recordCombat) {
           instructions.length = 0;
           for (const [index, aimed] of aims.entries()) {
             const selected = selectedBeams[index];
-            const count = Math.floor(beamFormula.count / aims.length) + Number(index < beamFormula.count % aims.length);
+            const count = counts?.[index] ?? 1;
             const impact = projectileImpact(source, aimed.destination, targets, token.id, dpi);
-            instructions.push({ ...instruction, effectProperties: {
-              ...instruction.effectProperties, destination: impact.destination, copies: count,
-            } });
+            const firstDart = missile ? instructions.length : 0;
+            const effectProperties = { ...instruction.effectProperties, destination: impact.destination, copies: missile ? 1 : count };
+            if (missile) {
+              for (let i = 0; i < count; i++) {
+                instructions.push({ ...instruction, effectProperties, delay: instructions.length * MAGIC_MISSILE_INTERVAL });
+              }
+            } else instructions.push({ ...instruction, effectProperties });
             const hitId = impact.hitTokenIds[0];
             const key = hitId ? `hit:${hitId}` : `miss:${selected.id}`;
             const previous = outcomes.get(key);
             if (previous) {
               previous.formula.count += count;
+              if (missile) previous.formula.modifier += count;
               previous.selected = undefined;
             } else {
               outcomes.set(key, {
                 requestId: index === 0 ? data.requestId : crypto.randomUUID(),
-                selected, hitId, formula: { ...beamFormula, count },
+                selected, hitId, firstDart, formula: { ...beamFormula, count, modifier: missile ? count : 0 },
+                blocked: missile && Boolean(hitId) &&
+                  items.some((item) => item.attachedTo === hitId && isShieldGraphic(item)),
               });
             }
           }
@@ -374,7 +395,7 @@ export function setupSkillHost(obr, buildImage, recordCombat) {
             const canIntercept = mode === "aoe" && skill.impact ? (item) => !isAlly(item) : undefined;
             const impact = projectileImpact(source, destination, targets, token.id, dpi, blastRadius, canIntercept);
             instruction.effectProperties.destination = impact.destination;
-            if (beamFormula) instruction.effectProperties.copies = beamFormula.count;
+            if (eldritch) instruction.effectProperties.copies = beamFormula.count;
             hitTokenIds = impact.hitTokenIds;
             missileBlocked = missile && Boolean(hitTokenIds.length) &&
               items.some((item) => item.attachedTo === hitTokenIds[0] && isShieldGraphic(item));
@@ -396,7 +417,7 @@ export function setupSkillHost(obr, buildImage, recordCombat) {
         }
         hitTokens = items.filter((item) => hitTokenIds.includes(item.id) && isProjectileToken(item));
       }
-      if (missile) {
+      if (missile && !beamOutcomes) {
         const dartCount = spellLevel + 2;
         for (let index = 1; index < dartCount; index++) {
           instructions.push({ ...instruction, delay: index * MAGIC_MISSILE_INTERVAL });
@@ -412,7 +433,7 @@ export function setupSkillHost(obr, buildImage, recordCombat) {
         useAnimationCue = false, missileFollowUps, dartCount, tokenIds = hitTokenIds, requestId = data.requestId,
       } = {}) => obr.broadcast.sendMessage(HIT_MARKERS, {
         requestId, tokenIds, delay, useAnimationCue,
-        splat: manual && !missileBlocked,
+        splat: manual && !missileBlocked && !damage?.blocked,
         ...(damage ? { damage } : {}),
         ...(missileFollowUps ? { missileFollowUps } : {}),
         ...(dartCount ? { dartCount } : {}),
@@ -441,15 +462,27 @@ export function setupSkillHost(obr, buildImage, recordCombat) {
       }
       if (beamOutcomes) {
         const hitsById = new Map(hitTokens.map((item) => [item.id, item]));
-        for (const { requestId, hitId, selected, formula } of beamOutcomes) {
+        for (const { requestId, hitId, selected, formula, blocked, firstDart } of beamOutcomes) {
           if (version !== sceneVersion) return;
           const hit = hitsById.get(hitId);
-          const damage = hit && !manual ? rollSpellDamage(formula) : undefined;
-          if (hit) await sendMarkers(skill.hitDelay, damage, { requestId, tokenIds: [hit.id] });
+          const marker = { requestId, tokenIds: hit ? [hit.id] : [] };
+          let rolls;
+          if (hit && missile) {
+            const delay = skill.hitDelay + firstDart * MAGIC_MISSILE_INTERVAL;
+            if (manual && !blocked) await sendMarkers(delay, undefined, { ...marker, dartCount: formula.count });
+            else {
+              rolls = Array.from({ length: formula.count }, () => blocked ? BLOCKED_MAGIC_MISSILE : rollMagicMissileDart());
+              const [damage, ...followUps] = rolls;
+              await sendMarkers(delay, damage, { ...marker, missileFollowUps: followUps.length ? followUps : undefined });
+            }
+          } else if (hit) {
+            rolls = manual ? undefined : [rollSpellDamage(formula)];
+            await sendMarkers(skill.hitDelay, rolls?.[0], marker);
+          }
           await logCast({
             requestId, selected, attack: true, hits: hit ? [hit] : [],
-            damage: combatDamage(damage ? [damage] : undefined),
-            damageFormula: hit && manual ? formula : undefined,
+            damage: combatDamage(rolls),
+            damageFormula: hit && manual && !blocked ? formula : undefined,
           });
         }
         if (version === sceneVersion) await answer(latestLoadout);

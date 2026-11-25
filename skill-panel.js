@@ -1,5 +1,8 @@
 import { setupStatsEditor } from "./stats-panel.js?v=2.8.5";
 import { isPublicToken } from "./rules.js";
+import { isProjectileToken } from "./projectile-collision.js?v=2.9.10";
+import { spellDamageFormula } from "./spell-damage.js?v=2.9.13";
+import { readTokenStats } from "./stats.js?v=2.8.5";
 import {
   DEFAULT_WEAPON, FACINGS, FRIENDLY_FIRE_MODES, RANGED_WEAPONS, SKILLS, SKILL_CHANGED, SKILL_REQUEST, SKILL_RESULT, SPELLS, TEAMS, WEAPONS,
   aimsAtLocation, availableRangedWeapons, availableSpells, availableWeapons, friendlyFireMode, readSkills, skillBinding, skillConnections, spellParameter, tokenTeams, validSpellParameter, writeSkills,
@@ -130,13 +133,27 @@ export function setupSkillPanel(obr, getAvatar, keyAllowed, showSpells, showChat
     pending.delete(type);
   }
 
-  async function request(type, token, id, revision, location, spellLevel) {
+  async function request(type, token, id, revision, location, spellLevel, chooseCounts) {
     const [{ gm, self }, selection] = await Promise.all([
       skillConnections(obr), type === "cast" ? obr.player.getSelection().catch(() => undefined) : undefined,
     ]);
     const candidates = selection?.filter((itemId) => itemId !== token.id);
-    const targetIds = id === "bless" ? selection?.slice(0, 100)
-      : id === "eldritch-blast" && !location && candidates?.length > 1 ? candidates.slice(0, 100) : undefined;
+    let targetIds = id === "bless" ? selection?.slice(0, 100) : undefined;
+    let projectileCounts;
+    if ((id === "eldritch-blast" || id === "missile") && !location && candidates?.length > 1 && available.includes(id)) {
+      const ids = new Set(candidates);
+      const items = await obr.scene.items.getItems((item) => ids.has(item.id) && isProjectileToken(item));
+      const byId = new Map(items.map((item) => [item.id, item]));
+      const targets = [...ids].filter((id) => byId.has(id)).slice(0, 100).map((id) => byId.get(id));
+      targetIds = targets.map(({ id }) => id);
+      const level = spellLevel ?? SKILLS[id].spellLevel;
+      const count = id === "missile" ? level + 2 : spellDamageFormula(SKILLS[id], token).count;
+      if (targets.length > 1 && targets.length < count &&
+          (id !== "missile" || level >= 1 && level <= readTokenStats(token).details.spellLevel)) {
+        projectileCounts = await chooseCounts(targets, count, id === "missile" ? "missiles" : "beams");
+        if (!projectileCounts) return;
+      }
+    }
     const targetId = candidates?.length === 1 ? candidates[0] : undefined;
     if (type === "list" && revision !== listRevision) return;
     const showStatus = type === "cast" ? setCastStatus : (text) => { playerStatus.textContent = text; };
@@ -163,6 +180,7 @@ export function setupSkillPanel(obr, getAvatar, keyAllowed, showSpells, showChat
         ...(id === "ranged" ? { weapon: selectedRangedWeapon(token.id) } : {}),
         ...(SKILLS[id]?.upcast && spellLevel !== undefined ? { spellLevel } : {}),
         ...(targetIds ? { targetIds } : targetId ? { targetId } : {}),
+        ...(projectileCounts ? { projectileCounts } : {}),
         ...(location && aimsAtLocation(id) ? { targetLocation: location } : {}),
       }, { destination: "ALL" });
     } catch (error) {
@@ -231,10 +249,10 @@ export function setupSkillPanel(obr, getAvatar, keyAllowed, showSpells, showChat
     if (!playerPanel.closest("[hidden]")) refresh(getAvatar(), true);
   });
 
-  async function cast(id, token, location, spellLevel) {
+  async function cast(id, token, location, spellLevel, chooseCounts) {
     if (pending.has("cast")) return;
     try {
-      await request("cast", token, id, undefined, location, spellLevel);
+      await request("cast", token, id, undefined, location, spellLevel, chooseCounts);
     } catch {
       setCastStatus("Couldn’t send the cast to the GM.");
     }

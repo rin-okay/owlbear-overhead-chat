@@ -10,15 +10,15 @@ import {
 } from "./session.js?v=2.9.16";
 
 import { drawBubble, normalizeAppearance, prepareBubbleFont } from "./appearance.js?v=2.7.9";
-import { setupDiscordPanel } from "./discord-panel.js?v=2.9.19";
-import { damageNotation, openCombatLog, saveNotation } from "./combat-log.js?v=2.9.19";
+import { setupDiscordPanel } from "./discord-panel.js?v=2.9.20";
+import { damageNotation, openCombatLog, saveNotation } from "./combat-log.js?v=2.9.20";
 import { aimsAtLocation, MAX_CAST_LEVEL, SKILLS } from "./skills.js?v=2.9.16";
 import { ABILITIES, readTokenStats } from "./stats.js?v=2.8.5";
 import { setupAvatarPanel } from "./avatar-panel.js?v=2.9.16";
-import { setupSkillGrants, setupSkillPanel } from "./skill-panel.js?v=2.9.19";
+import { setupSkillGrants, setupSkillPanel } from "./skill-panel.js?v=2.9.20";
 import { setupStatsEditor } from "./stats-panel.js?v=2.8.5";
 import { EMOTE } from "./emotes.js?v=2.7.21";
-import { setupTargeting } from "./targeting.js?v=2.9.19";
+import { setupTargeting } from "./targeting.js?v=2.9.20";
 import { listenForChatShortcut, requestChatShortcut } from "./chat-shortcut.js?v=2.6.4";
 import { cameraFollowPreference, centerAvatar, prepareKeyboardPan } from "./avatar-viewport.js?v=2.7.9";
 
@@ -26,7 +26,7 @@ import { readMovementGrid, stepAvatar, turnAvatar } from "./movement.js?v=2.7.5"
 import { rollSpans, validateRollSpans } from "./dice.js";
 import { rollWithRumble } from "./rumble.js?v=2.9.4";
 import { rollWithNativeDice } from "./native-dice.js";
-import { handleHotbarKey, hotbarOrientation, hotbarShowsLabels, sendHotbarCommand, setHotbarLabels, setHotbarOrientation } from "./hotbar.js?v=2.9.19";
+import { handleHotbarKey, hotbarOrientation, hotbarShowsLabels, sendHotbarCommand, setHotbarLabels, setHotbarOrientation } from "./hotbar.js?v=2.9.20";
 
 const combatView = new URLSearchParams(location.search).has("combat-log");
 const combatWindow = combatView ? document.querySelector("#combat-window") : null;
@@ -252,7 +252,7 @@ function updateControls() {
   input.toggleAttribute("data-controls-inactive", controlsInactive);
   input.setAttribute("aria-describedby", labelled ? "move-mode-label status" : "status");
   moveModeLabel.hidden = !labelled;
-  if (labelled) updateMoveModeLabel();
+  if (labelled || combatWindow) updateMoveModeLabel();
   send.disabled = !avatar || sending || controlsInactive;
   moveButton.disabled = !tokenControl && (!avatar || avatar.locked || sending);
 }
@@ -354,6 +354,7 @@ async function refresh() {
 function stopTokenControl() {
   if (!tokenControl) return;
   stopRotation(tokenControl);
+  tokenControl.projectilePrompt?.resolve(undefined);
   tokenControl = undefined;
   if (targeting?.editing()) targeting.clear();
   moveButton.setAttribute("aria-pressed", "false");
@@ -457,7 +458,8 @@ async function moveAvatar(mode) {
       if (token?.id !== tokenId || token.locked) throw new Error("Avatar is unavailable or locked.");
       if (offset && (!Number.isFinite(grid.dpi) || grid.dpi <= 0)) throw new Error("Scene grid size unavailable.");
       if (skill) {
-        await skillPanel.cast(skill, token, targetLocation, spellLevel);
+        await skillPanel.cast(skill, token, targetLocation, spellLevel,
+          (targets, count, unit) => askProjectileCounts(mode, targets, count, unit));
         continue;
       }
 
@@ -590,12 +592,55 @@ function useAvatarSlot(mode, key) {
   queueAvatarAction(mode, { artwork, onApplied });
 }
 
+function askProjectileCounts(mode, targets, count, unit) {
+  if (mode !== tokenControl || mode.switching) return;
+  return new Promise((resolve) => {
+    stopRotation(mode);
+    mode.projectilePrompt = { targets, remaining: count, counts: [], unit, resolve };
+    updateMoveModeLabel();
+  });
+}
+
+function handleProjectileCount(event) {
+  const mode = tokenControl;
+  const prompt = mode?.projectilePrompt;
+  if (!prompt || event.ctrlKey || event.altKey || event.metaKey || event.isComposing) return false;
+  if (event.repeat) return true;
+  if (event.key === "Escape") {
+    mode.projectilePrompt = undefined;
+    prompt.resolve(undefined);
+  } else if (/^[0-9]$/.test(event.key)) {
+    const slots = prompt.targets.length - prompt.counts.length;
+    const count = Number(event.key) || 10;
+    if (count > prompt.remaining - slots + 1) return true;
+    prompt.counts.push(count);
+    prompt.remaining -= count;
+    const left = slots - 1;
+    if (left === 1 || prompt.remaining === left) {
+      if (left === 1) prompt.counts.push(prompt.remaining);
+      else prompt.counts.push(...Array(left).fill(1));
+      mode.projectilePrompt = undefined;
+      prompt.resolve(prompt.counts);
+    }
+  }
+  updateMoveModeLabel();
+  return true;
+}
+
 function updateMoveModeLabel() {
+  const prompt = tokenControl?.projectilePrompt;
+  const max = prompt ? prompt.remaining - (prompt.targets.length - prompt.counts.length) + 1 : 0;
+  const question = prompt ? `number of ${prompt.unit} for target: ${prompt.targets[prompt.counts.length].name || "unnamed character"} · 1–${max}${max === 10 ? " (0 = 10)" : ""} · esc to cancel` : "";
+  const combatPrompt = combatWindow?.querySelector("#combat-projectile-prompt");
+  if (combatPrompt) {
+    combatPrompt.hidden = !question;
+    combatPrompt.textContent = question;
+  }
   const spell = SKILLS[tokenControl?.upcastSkill];
   moveModeLabel.textContent = controlsInactive ? "controls inactive · press F1 to chat or F2 to move"
-    : spell ? `${spell.name} level · ${spell.spellLevel}–${MAX_CAST_LEVEL}, esc to cancel`
+    : question || (spell ? `${spell.name} level · ${spell.spellLevel}–${MAX_CAST_LEVEL}, esc to cancel`
     : targeting?.editing() ? (quickcastEnabled ? "target · wasd, space or skill key" : "set target · wasd, space to set")
-    : targeting?.location() ? "move mode · target set" : "move mode enabled";
+    : targeting?.location() ? "move mode · target set" : "move mode enabled");
 }
 
 function handleSpellLevelKey(event) {
@@ -682,7 +727,7 @@ function handleControlKeyDown(event) {
     return;
   }
   if (event.isComposing || event.keyCode === 229) return;
-  if (handleSpellLevelKey(event) || handleTargetKey(event)) {
+  if (handleProjectileCount(event) || handleSpellLevelKey(event) || handleTargetKey(event)) {
     event.preventDefault();
     return;
   }
@@ -772,6 +817,10 @@ if (combatWindow) {
   });
   document.addEventListener("keydown", (event) => {
     if (event.defaultPrevented || !combatKeyTarget(event.target) || event.isComposing || event.keyCode === 229) return;
+    if (handleProjectileCount(event)) {
+      event.preventDefault();
+      return;
+    }
     const pressingSpace = event.key === " " && !event.ctrlKey && !event.altKey && !event.metaKey;
     if (pressingSpace && !targeting?.editing() && !tokenControl?.upcastSkill) {
       event.preventDefault();
