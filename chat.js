@@ -10,15 +10,15 @@ import {
 } from "./session.js?v=2.9.16";
 
 import { drawBubble, normalizeAppearance, prepareBubbleFont } from "./appearance.js?v=2.7.9";
-import { setupDiscordPanel } from "./discord-panel.js?v=2.9.17";
-import { damageNotation, openCombatLog, saveNotation } from "./combat-log.js?v=2.9.17";
-import { MAX_CAST_LEVEL, SKILLS } from "./skills.js?v=2.9.16";
+import { setupDiscordPanel } from "./discord-panel.js?v=2.9.18";
+import { damageNotation, openCombatLog, saveNotation } from "./combat-log.js?v=2.9.18";
+import { aimsAtLocation, MAX_CAST_LEVEL, SKILLS } from "./skills.js?v=2.9.16";
 import { ABILITIES, readTokenStats } from "./stats.js?v=2.8.5";
 import { setupAvatarPanel } from "./avatar-panel.js?v=2.9.16";
-import { setupSkillGrants, setupSkillPanel } from "./skill-panel.js?v=2.9.16";
+import { setupSkillGrants, setupSkillPanel } from "./skill-panel.js?v=2.9.18";
 import { setupStatsEditor } from "./stats-panel.js?v=2.8.5";
 import { EMOTE } from "./emotes.js?v=2.7.21";
-import { setupTargeting } from "./targeting.js?v=2.7.17";
+import { setupTargeting } from "./targeting.js?v=2.9.18";
 import { listenForChatShortcut, requestChatShortcut } from "./chat-shortcut.js?v=2.6.4";
 import { cameraFollowPreference, centerAvatar, prepareKeyboardPan } from "./avatar-viewport.js?v=2.7.9";
 
@@ -26,7 +26,7 @@ import { readMovementGrid, stepAvatar, turnAvatar } from "./movement.js?v=2.7.5"
 import { rollSpans, validateRollSpans } from "./dice.js";
 import { rollWithRumble } from "./rumble.js?v=2.9.4";
 import { rollWithNativeDice } from "./native-dice.js";
-import { handleHotbarKey, hotbarOrientation, hotbarShowsLabels, sendHotbarCommand, setHotbarLabels, setHotbarOrientation } from "./hotbar.js?v=2.9.17";
+import { handleHotbarKey, hotbarOrientation, hotbarShowsLabels, sendHotbarCommand, setHotbarLabels, setHotbarOrientation } from "./hotbar.js?v=2.9.18";
 
 const combatView = new URLSearchParams(location.search).has("combat-log");
 const combatWindow = combatView ? document.querySelector("#combat-window") : null;
@@ -77,6 +77,7 @@ let refreshAvatarPanel;
 let skillPanel;
 let showPlayerStats;
 let targeting;
+let quickcastEnabled = true;
 let showSkillsForRole;
 let moveWarningTimer;
 let moveWarningFade;
@@ -395,6 +396,18 @@ function queueAvatarAction(mode, action) {
   if (!movingAvatar) void moveAvatar(mode);
 }
 
+function queueSkill(mode, skill, spellLevel) {
+  if (!quickcastEnabled || !targeting?.editing() || !aimsAtLocation(skill)) {
+    queueAvatarAction(mode, { skill, targetLocation: targeting?.location(), spellLevel });
+    return;
+  }
+  void targeting.consumeLocation().then((point) => {
+    if (point && mode === tokenControl && !mode.switching && mode.actions.length < 4) {
+      queueAvatarAction(mode, { skill, targetLocation: point, spellLevel });
+    }
+  }).catch(console.error);
+}
+
 function stopRotation(mode) {
   if (!mode?.heldRotation) return;
   clearTimeout(mode.heldRotation.timer);
@@ -525,16 +538,24 @@ async function switchAvatarSlot(mode, index, onApplied) {
   }
 }
 
+function slotIndex(key) {
+  return key === "0" ? 9 : Number(key) - 1;
+}
+
+function usesTalkSlots(key) {
+  return key !== "0" && playerRole === "GM" && savedAvatarMode() === "talk";
+}
+
 function useAvatarSlot(mode, key) {
-  const index = key === "0" ? 9 : Number(key) - 1;
-  const talking = key !== "0" && playerRole === "GM" && savedAvatarMode() === "talk";
+  const index = slotIndex(key);
+  const talking = usesTalkSlots(key);
   const quickbar = talking ? undefined : savedQuickbarSlots()[index];
   if (quickbar?.kind === "spell" || quickbar?.kind === "emote") {
     mode.slotTap = undefined;
     if (!mode.switching && mode.actions.length < 4) {
       status.textContent = "";
-      queueAvatarAction(mode, quickbar.kind === "spell"
-        ? { skill: quickbar.skill, targetLocation: targeting?.location() } : { emote: quickbar.emote });
+      if (quickbar.kind === "spell") queueSkill(mode, quickbar.skill);
+      else queueAvatarAction(mode, { emote: quickbar.emote });
     }
     return;
   }
@@ -573,7 +594,7 @@ function updateMoveModeLabel() {
   const spell = SKILLS[tokenControl?.upcastSkill];
   moveModeLabel.textContent = controlsInactive ? "controls inactive · press F1 to chat or F2 to move"
     : spell ? `${spell.name} level · ${spell.spellLevel}–${MAX_CAST_LEVEL}, esc to cancel`
-    : targeting?.editing() ? "set target · wasd, space to set"
+    : targeting?.editing() ? (quickcastEnabled ? "target · wasd, space or skill key" : "set target · wasd, space to set")
     : targeting?.location() ? "move mode · target set" : "move mode enabled";
 }
 
@@ -589,7 +610,7 @@ function handleSpellLevelKey(event) {
     mode.upcastSkill = undefined;
     updateMoveModeLabel();
     if (digit && !mode.switching) {
-      queueAvatarAction(mode, { skill, targetLocation: targeting?.location(), spellLevel: Number(digit) });
+      if (!targeting?.editing() || mode.actions.length < 4) queueSkill(mode, skill, Number(digit));
     }
   }
   return true;
@@ -612,7 +633,22 @@ function handleTargetKey(event) {
     modeExitKey = event.key;
     void targeting.confirm();
   } else if (!event.repeat && key === "escape") targeting.clear();
+  else if (!event.repeat && quickcastEnabled && mode.actions.length < 4) {
+    const slot = !event.shiftKey && /^[0-9]$/.test(key) && !usesTalkSlots(key)
+      ? savedQuickbarSlots()[slotIndex(key)] : undefined;
+    const skill = slot?.kind === "spell" ? slot.skill : skillPanel?.skillForKey(key);
+    if (aimsAtLocation(skill) && skillPanel?.hasSkill(skill)) useSkillKey(mode, skill, event.shiftKey);
+  }
   return true;
+}
+
+function useSkillKey(mode, skill, upcast) {
+  if (upcast && !SKILLS[skill].upcast) return;
+  if (upcast) {
+    stopRotation(mode);
+    mode.upcastSkill = skill;
+    updateMoveModeLabel();
+  } else queueSkill(mode, skill);
 }
 
 moveButton.addEventListener("blur", (event) => {
@@ -687,13 +723,7 @@ function handleControlKeyDown(event) {
       if (!skill || tokenControl.switching || (event.shiftKey && !SKILLS[skill].upcast)) return;
       event.preventDefault();
       if (event.repeat || tokenControl.actions.length >= 4) return;
-      if (event.shiftKey) {
-        stopRotation(tokenControl);
-        tokenControl.upcastSkill = skill;
-        updateMoveModeLabel();
-      } else {
-        queueAvatarAction(tokenControl, { skill, targetLocation: targeting?.location() });
-      }
+      useSkillKey(tokenControl, skill, event.shiftKey);
     }
     return;
   }
@@ -1022,6 +1052,22 @@ function setupSettings() {
   const followCamera = settingsPanel.querySelector("#follow-camera");
   const cameraFollow = cameraFollowPreference(OBR, (enabled) => { followCamera.checked = enabled; });
   followCamera.addEventListener("change", () => cameraFollow.set(followCamera.checked));
+  const quickcast = document.querySelector("#quickcast");
+  if (quickcast) {
+    const key = JSON.stringify(["chat.overhead.quickcast", OBR.room.id, OBR.player.id]);
+    try { quickcastEnabled = localStorage.getItem(key) !== "off"; } catch {}
+    quickcast.checked = quickcastEnabled;
+    quickcast.addEventListener("change", () => {
+      quickcastEnabled = quickcast.checked;
+      try { localStorage.setItem(key, quickcastEnabled ? "on" : "off"); } catch {}
+      updateMoveModeLabel();
+    });
+    window.addEventListener("storage", (event) => {
+      if (event.key !== key || event.storageArea !== localStorage) return;
+      quickcast.checked = quickcastEnabled = event.newValue !== "off";
+      updateMoveModeLabel();
+    });
+  }
   const orientation = document.querySelector("#hotbar-orientation");
   const labels = document.querySelector("#hotbar-labels");
   if (labels) {

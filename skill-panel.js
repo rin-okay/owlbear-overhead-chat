@@ -239,7 +239,7 @@ export function setupSkillPanel(obr, getAvatar, keyAllowed, showSpells, showChat
   }
 
   return {
-    refresh, cast,
+    refresh, cast, hasSkill: (id) => available.includes(id),
     skillForKey: (key) => Object.keys(SKILLS).find((id) => binding(id) === key && (id !== "ranged" || available.includes(id))),
   };
 }

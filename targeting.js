@@ -60,11 +60,22 @@ export function setupTargeting(obr, onChange) {
 
   async function confirm() {
     const state = current;
-    if (!state?.editing) return;
+    if (!state?.editing || state.consuming) return;
     await state.work;
-    if (current !== state || !state.editing || !state.point) return;
+    if (current !== state || !state.editing || state.consuming || !state.point) return;
     state.editing = false;
     onChange();
+  }
+
+  async function consumeLocation() {
+    const state = current;
+    if (!state?.editing || state.consuming) return;
+    state.consuming = true;
+    await state.work;
+    if (current !== state || !state.editing) return;
+    const point = state.point;
+    clear();
+    return point;
   }
 
   function toggle(tokenId) {
@@ -97,12 +108,12 @@ export function setupTargeting(obr, onChange) {
   window.addEventListener("pagehide", clear, { once: true });
 
   return {
-    toggle, clear, confirm,
+    toggle, clear, confirm, consumeLocation,
     editing: () => Boolean(current?.editing),
     location: () => current && !current.editing ? current.point : undefined,
     move(offset) {
       const state = current;
-      if (!state?.editing) return;
+      if (!state?.editing || state.consuming) return;
       void enqueue(state, async () => {
         if (!state.point) return;
         await setPoint(state, {
