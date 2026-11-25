@@ -1,17 +1,17 @@
 {
   "name": "Motif",
-  "version": "0.2.5",
+  "version": "0.2.6",
   "manifest_version": 1,
   "author": "rin",
   "description": "Synchronized music and sound effects in Owlbear Rodeo.",
   "icon": "/owlbear-overhead-chat/motif/motif-wave.svg",
   "homepage_url": "https://rin-okay.github.io/owlbear-overhead-chat/motif/",
-  "background_url": "/owlbear-overhead-chat/motif/background.html?v=0.2.5",
+  "background_url": "/owlbear-overhead-chat/motif/background.html?v=0.2.6",
   "permissions": [{ "name": "autoplay", "reason": "Play room audio with the Motif panel closed." }],
   "action": {
     "title": "Motif",
     "icon": "/owlbear-overhead-chat/motif/motif-wave.svg",
-    "popover": "/owlbear-overhead-chat/motif/index.html?v=0.2.5",
+    "popover": "/owlbear-overhead-chat/motif/index.html?v=0.2.6",
     "height": 780,
     "width": 440
   }
