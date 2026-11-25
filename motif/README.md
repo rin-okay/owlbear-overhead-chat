@@ -1,4 +1,4 @@
-# Motif v0.2.7
+# Motif v0.2.8
 
 [Install in Owlbear Rodeo](https://rin-okay.github.io/owlbear-overhead-chat/motif/manifest.json).
 
@@ -6,13 +6,23 @@ This extension is adapted from [Embers by Armindo Flores](https://github.com/Arm
 
 ## Play and manage sounds
 
-Use the Motif tool, then press period to select a sound and Enter to play it. Shift+C is shared with Embers, so use the separate toolbar buttons when both extensions are enabled. Optionally click a map cell or token to show a ripple. Music can play alongside effects. Playing a second music track replaces the first.
+Use the Motif tool, then press period to select a sound and Enter to play it. Shift+C is shared with Embers, so use the separate toolbar buttons when both extensions are enabled. Optionally click a map cell or token to show a ripple. Music can play alongside effects. Manual playback goes to all audio-enabled tokens in the scene. A new manual music cue replaces other music for those listeners.
 
 The library is grouped into Sound effects and Music folders. Search matches track names, tags, and folders. The playback button stays in the footer. The GM can add music or effects under Custom using a public HTTPS media URL and set the folder, comma-separated tags, and optional duration. Motif reads duration from direct audio when it is available. Suno tracks can use a manually entered duration. Dropbox share links are normalized automatically. Audio needs to be directly playable by the browser. Motif prefetches the examples and prefetches a cue when selected, following Embers’ browser-cache approach. Sources that can’t be prefetched can stream directly.
 
 Paste a Suno embed or full song URL into Custom to share a Suno track in Active. Select and play the cue to open Suno’s player. Other listeners can open it from Active and press play. Use Minimize to keep the Suno player in a small bar at the bottom left, then Expand to restore its controls. The embedded player has its own clock and controls. Use a publicly hosted audio file for synchronized playback, Motif volume, looping, and trimming.
 
 Use Active to pause, resume, hide and mute, change volume, set clip points or looping, or stop a sound. Settings has personal music and effect volumes, plus the GM switch for player casting in the active scene. v0.2 starts a fresh custom library.
+
+## Map triggers
+
+Right-click a character token and choose **Enable audio**. The GM can review or change its listener in **Auto → Audio-enabled tokens**. If several tokens are assigned to the same Owlbear user, that client hears their combined cues with one playback per active entry.
+
+Press **Shift+C** and choose **Trigger definition (line)** or **Trigger definition (region)**. Place two endpoints for a line, or click the vertices of a polygon. Press **Enter** or click **Finish drawing**, then name it. In **Auto → Add new**, select the trigger and a direct audio cue. Choose the start and stop conditions, looping, the map ripple, the audience, and any music tags to replace for that audience.
+
+A room-wide region rule starts on the first entry and stops on the last exit when configured that way. A rule with no start event can be started from Auto. Automatic cues stop when the scene closes. Suno embeds use the manual share flow.
+
+In **Active**, expand a cue’s listener list to mute, unmute, or remove a token. The cue’s edit and stop controls apply to the whole entry.
 
 ## Broadcast API
 
