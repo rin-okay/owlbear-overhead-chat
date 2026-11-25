@@ -27,6 +27,13 @@ let avatarSlots;
 let avatarMode;
 let quickbarSlots;
 
+window.addEventListener("storage", (event) => {
+  const key = avatarKey();
+  if (event.key === key + ":slots") avatarSlots = undefined;
+  if (event.key === key + ":mode") avatarMode = undefined;
+  if (event.key === key + ":quickbar") quickbarSlots = undefined;
+});
+
 export function savedAvatarSlots() {
   if (avatarSlots) return avatarSlots;
   let stored;

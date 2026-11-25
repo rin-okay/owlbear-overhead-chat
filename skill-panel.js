@@ -2,8 +2,8 @@ import { setupStatsEditor } from "./stats-panel.js?v=2.8.5";
 import { isPublicToken } from "./rules.js";
 import {
   DEFAULT_WEAPON, FACINGS, FRIENDLY_FIRE_MODES, RANGED_WEAPONS, SKILLS, SKILL_CHANGED, SKILL_REQUEST, SKILL_RESULT, SPELLS, TEAMS, WEAPONS,
-  aimsAtLocation, availableRangedWeapons, availableSpells, availableWeapons, friendlyFireMode, readSkills, skillConnections, spellParameter, tokenTeams, validSpellParameter, writeSkills,
-} from "./skills.js?v=2.9.15";
+  aimsAtLocation, availableRangedWeapons, availableSpells, availableWeapons, friendlyFireMode, readSkills, skillBinding, skillConnections, spellParameter, tokenTeams, validSpellParameter, writeSkills,
+} from "./skills.js?v=2.9.16";
 
 function characterLabel(token) {
   return token.name || "unnamed character";
@@ -39,10 +39,7 @@ export function setupSkillPanel(obr, getAvatar, keyAllowed, showSpells, showChat
   let listRevision = 0;
 
   function binding(id) {
-    const key = preferences.bindings?.[id];
-    if (key === "" || keyAllowed(key)) return key;
-    const defaultKey = SKILLS[id].key;
-    return Object.keys(SKILLS).some((other) => preferences.bindings?.[other] === defaultKey) ? "" : defaultKey;
+    return skillBinding(id, preferences.bindings, keyAllowed);
   }
 
   function selectedWeapon(tokenId) {

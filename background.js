@@ -14,6 +14,7 @@ import { queueDiscord } from "./discord.js?v=2.3.9";
 import { parseTray } from "./dice-replay.js";
 import { queueDicePopup, resetDicePopups } from "./dice-popup.js";
 import { setupSkillHost } from "./skill-host.js?v=2.9.15";
+import { setupHotbar } from "./hotbar.js?v=2.9.16";
 import { setupCombatLog } from "./combat-log.js?v=2.9.15";
 import { SKILL_CHANGED, skillConnections, skillGrantLabel } from "./skills.js?v=2.9.13";
 import { EMOTE, floatEmote, parseEmote } from "./emotes.js?v=2.7.22";
@@ -381,6 +382,7 @@ function queueSpeech(event) {
 OBR.onReady(() => {
   setupHitMarkers(OBR, buildLabel, buildPath, Command);
   const cameraFollow = setupCameraFollow(OBR);
+  const hotbar = setupHotbar(OBR);
   let shortcutRevision = 0;
   async function openFromShortcut(mode) {
     const revision = ++shortcutRevision;
@@ -392,6 +394,8 @@ OBR.onReady(() => {
     ["F2", "move", "Move chat avatar (F2)", "./icon.svg"],
     ["F3", "center", "Center chat avatar (F3)", "./icon.svg"],
     ["F4", "follow", "Toggle camera follow mode (F4)", "./icon.svg"],
+    ["=", "bar-toggle", "Show or hide hotbar (=)", "./icon.svg"],
+    ["-", "bar-mode", "Switch hotbar mode (-)", "./icon.svg"],
   ]) {
     OBR.tool.create({
       id: "chat.overhead.shortcut." + mode,
@@ -400,6 +404,7 @@ OBR.onReady(() => {
       onClick() {
         if (mode === "follow") void cameraFollow.toggle().catch(report);
         else if (mode === "center") void centerAvatar(OBR).catch(report);
+        else if (mode === "bar-toggle" || mode === "bar-mode") void hotbar(mode.slice(4)).catch(report);
         else void openFromShortcut(mode).catch(report);
         return false;
       },

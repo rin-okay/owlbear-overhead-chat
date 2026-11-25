@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>overhead chat</title>
   <link rel="stylesheet" href="./chat.css?v=2.8.10">
-  <script type="module" src="./chat.js?v=2.9.15"></script>
+  <script type="module" src="./chat.js?v=2.9.16"></script>
 </head>
 <body>
   <main>
@@ -69,6 +69,12 @@
         </div>
       </form>
       <label class="discord-enabled"><input id="follow-camera" type="checkbox" aria-keyshortcuts="F4"> camera follow mode</label>
+      <label>hotbar position
+        <select id="hotbar-orientation">
+          <option value="bottom">bottom (horizontal)</option>
+          <option value="left">left (vertical)</option>
+        </select>
+      </label>
       <div id="bubble-preview" aria-label="bubble preview"></div>
       <div class="appearance-actions">
         <button id="reset-appearance" type="button">Reset to default</button>
@@ -86,6 +92,7 @@
         <li><kbd>F2</kbd> opens chat in move mode for your saved avatar.</li>
         <li><kbd>F3</kbd> centers the view on your saved avatar at the current zoom.</li>
         <li><kbd>F4</kbd> toggles camera follow mode.</li>
+        <li><kbd>=</kbd> shows or hides the hotbar. <kbd>-</kbd> switches between skills and quickbar slots.</li>
         <li>Use <kbd>WASD</kbd> or the arrow keys. Hold <kbd>Shift</kbd> for a half step.</li>
         <li>In move mode, <kbd>Z</kbd> sets a map target. Move the marker with <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> and press <kbd>Space</kbd> to set it and return to move mode. Press <kbd>Z</kbd> again to clear it.</li>
         <li>Hold <kbd>Shift</kbd> and press the hotkey for Bless, Magic Missile, Burning Hands, Shatter, or Fireball, then choose the spell level on the number row. <kbd>Esc</kbd> cancels the level prompt.</li>

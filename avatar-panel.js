@@ -5,7 +5,7 @@ import { isPublicToken } from "./rules.js";
 import {
   savedAvatarSlots, saveAvatarSlot, savedAvatarMode, saveAvatarMode,
   savedQuickbarSlots, saveQuickbarSlot,
-} from "./session.js?v=2.9.15";
+} from "./session.js?v=2.9.16";
 
 export function setupAvatarPanel(panel) {
   const list = panel.querySelector("#avatar-slots");

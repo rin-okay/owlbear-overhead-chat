@@ -7,15 +7,15 @@ import {
 import {
   openSessionChannel, savedAvatar, saveAvatar, savedAvatarSlots, savedAvatarMode, savedQuickbarSlots,
   savedAppearance, saveAppearance,
-} from "./session.js?v=2.9.15";
+} from "./session.js?v=2.9.16";
 
 import { drawBubble, normalizeAppearance, prepareBubbleFont } from "./appearance.js?v=2.7.9";
-import { setupDiscordPanel } from "./discord-panel.js?v=2.9.15";
-import { damageNotation, openCombatLog, saveNotation } from "./combat-log.js?v=2.9.15";
-import { MAX_CAST_LEVEL, SKILLS } from "./skills.js?v=2.9.15";
+import { setupDiscordPanel } from "./discord-panel.js?v=2.9.16";
+import { damageNotation, openCombatLog, saveNotation } from "./combat-log.js?v=2.9.16";
+import { MAX_CAST_LEVEL, SKILLS } from "./skills.js?v=2.9.16";
 import { ABILITIES, readTokenStats } from "./stats.js?v=2.8.5";
-import { setupAvatarPanel } from "./avatar-panel.js?v=2.9.15";
-import { setupSkillGrants, setupSkillPanel } from "./skill-panel.js?v=2.9.15";
+import { setupAvatarPanel } from "./avatar-panel.js?v=2.9.16";
+import { setupSkillGrants, setupSkillPanel } from "./skill-panel.js?v=2.9.16";
 import { setupStatsEditor } from "./stats-panel.js?v=2.8.5";
 import { EMOTE } from "./emotes.js?v=2.7.21";
 import { setupTargeting } from "./targeting.js?v=2.7.17";
@@ -26,6 +26,7 @@ import { readMovementGrid, stepAvatar, turnAvatar } from "./movement.js?v=2.7.5"
 import { rollSpans, validateRollSpans } from "./dice.js";
 import { rollWithRumble } from "./rumble.js?v=2.9.4";
 import { rollWithNativeDice } from "./native-dice.js";
+import { handleHotbarKey, hotbarOrientation, sendHotbarCommand, setHotbarOrientation } from "./hotbar.js?v=2.9.16";
 
 const combatView = new URLSearchParams(location.search).has("combat-log");
 const combatWindow = combatView ? document.querySelector("#combat-window") : null;
@@ -49,9 +50,9 @@ if (combatWindow) {
   document.body.classList.add("combat-view");
   const stylesheet = document.createElement("link");
   stylesheet.rel = "stylesheet";
-  stylesheet.href = new URL("./combat-log.css?v=2.9.15", import.meta.url).href;
+  stylesheet.href = new URL("./combat-log.css?v=2.9.16", import.meta.url).href;
   document.head.append(stylesheet);
-  void import("./combat-log-panel.js?v=2.9.15")
+  void import("./combat-log-panel.js?v=2.9.16")
     .then(({ setCombatRollers }) => setCombatRollers(rollCombatSave, rollCombatDamage)).catch(console.error);
 }
 
@@ -1021,6 +1022,14 @@ function setupSettings() {
   const followCamera = settingsPanel.querySelector("#follow-camera");
   const cameraFollow = cameraFollowPreference(OBR, (enabled) => { followCamera.checked = enabled; });
   followCamera.addEventListener("change", () => cameraFollow.set(followCamera.checked));
+  const orientation = document.querySelector("#hotbar-orientation");
+  if (orientation) {
+    orientation.value = hotbarOrientation(OBR);
+    orientation.addEventListener("change", () => {
+      setHotbarOrientation(OBR, orientation.value);
+      void sendHotbarCommand(OBR, "layout").catch(console.error);
+    });
+  }
   const avatarPanel = document.querySelector("#avatar-panel");
   const skillsPanel = document.querySelector("#skills-panel");
   const tutorialPanel = document.querySelector("#tutorial-panel");
@@ -1159,6 +1168,8 @@ function setupSettings() {
     void refresh();
   }
   document.addEventListener("keydown", (event) => {
+    if (!event.target.closest?.("input:not([type=checkbox]), textarea, select, [contenteditable], dialog") &&
+        handleHotbarKey(OBR, event)) return;
     if (combatWindow && event.key !== "F2" && event.target.closest?.("dialog")) return;
     if (!["F1", "F2", "F3", "F4"].includes(event.key) || event.ctrlKey || event.altKey ||
         event.metaKey || event.shiftKey || event.isComposing) return;
