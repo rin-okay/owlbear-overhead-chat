@@ -10,15 +10,15 @@ import {
 } from "./session.js?v=2.9.16";
 
 import { drawBubble, normalizeAppearance, prepareBubbleFont } from "./appearance.js?v=2.7.9";
-import { setupDiscordPanel } from "./discord-panel.js?v=2.9.21";
-import { damageNotation, openCombatLog, saveNotation } from "./combat-log.js?v=2.9.21";
+import { setupDiscordPanel } from "./discord-panel.js?v=2.9.22";
+import { damageNotation, openCombatLog, saveNotation } from "./combat-log.js?v=2.9.22";
 import { aimsAtLocation, artworkFacingAngle, MAX_CAST_LEVEL, SKILLS } from "./skills.js?v=2.9.16";
 import { ABILITIES, readTokenStats } from "./stats.js?v=2.8.5";
 import { setupAvatarPanel } from "./avatar-panel.js?v=2.9.16";
-import { setupSkillGrants, setupSkillPanel } from "./skill-panel.js?v=2.9.21";
+import { setupSkillGrants, setupSkillPanel } from "./skill-panel.js?v=2.9.22";
 import { setupStatsEditor } from "./stats-panel.js?v=2.8.5";
 import { EMOTE } from "./emotes.js?v=2.7.21";
-import { setupTargeting } from "./targeting.js?v=2.9.21";
+import { setupTargeting } from "./targeting.js?v=2.9.22";
 import { listenForChatShortcut, requestChatShortcut } from "./chat-shortcut.js?v=2.6.4";
 import { cameraFollowPreference, centerAvatar, prepareKeyboardPan } from "./avatar-viewport.js?v=2.7.9";
 
@@ -26,7 +26,7 @@ import { readMovementGrid, stepAvatar, turnAvatar } from "./movement.js?v=2.7.5"
 import { rollSpans, validateRollSpans } from "./dice.js";
 import { rollWithRumble } from "./rumble.js?v=2.9.4";
 import { rollWithNativeDice } from "./native-dice.js";
-import { handleHotbarKey, hotbarOrientation, hotbarShowsLabels, sendHotbarCommand, setHotbarLabels, setHotbarOrientation } from "./hotbar.js?v=2.9.21";
+import { handleHotbarKey, hotbarOrientation, hotbarShowsLabels, sendHotbarCommand, setHotbarLabels, setHotbarOrientation } from "./hotbar.js?v=2.9.22";
 
 const combatView = new URLSearchParams(location.search).has("combat-log");
 const combatWindow = combatView ? document.querySelector("#combat-window") : null;

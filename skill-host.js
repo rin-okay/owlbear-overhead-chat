@@ -4,8 +4,8 @@ import { isShieldGraphic, readShieldGraphics, setupShield } from "./shield.js?v=
 import { setupSleep } from "./sleep.js?v=2.9.15";
 import { canSpeak, MELEE_HIT_TIMING, normalizeMeleeHitTiming, ROLL_DAMAGE_FROM_COMBAT_LOG } from "./rules.js?v=2.9.4";
 import {
-  areaHits, clearSpellPath, coneHits, isProjectileToken, isProjectileWall, openMeleeDoor, projectileImpact, teleportLandingClear,
-} from "./projectile-collision.js?v=2.9.10";
+  areaHits, clearSpellPath, coneHits, isProjectileToken, isProjectileWall, openMeleeDoor, projectileImpact, projectileTokenContainsPoint, teleportLandingClear,
+} from "./projectile-collision.js?v=2.9.22";
 import { HIT_MARKERS, MELEE_HIT_CUE } from "./hit-markers.js?v=2.9.4";
 import { meleeDamageFormula, rangedDamageFormula, rollMeleeDamage, rollRangedDamage } from "./melee-damage.js?v=2.9.11";
 import { readTokenStats } from "./stats.js?v=2.8.5";
@@ -285,7 +285,7 @@ export function setupSkillHost(obr, buildImage, recordCombat) {
           }
           const aims = await Promise.all(selectedBeams.map(async (selected) => {
             const bounds = await obr.scene.items.getItemBounds([selected.id]).catch(() => null);
-            return aimAtTarget(source, bounds, skill.range * dpi, mode !== "enabled" && isAlly(selected), skill.range * dpi);
+            return aimAtTarget(source, bounds, 0, false, skill.range * dpi);
           }));
           if (version !== sceneVersion) return;
           if (aims.some((aimed) => !aimed)) {
@@ -298,7 +298,8 @@ export function setupSkillHost(obr, buildImage, recordCombat) {
           for (const [index, aimed] of aims.entries()) {
             const selected = selectedBeams[index];
             const count = counts?.[index] ?? 1;
-            const impact = projectileImpact(source, aimed.destination, targets, token.id, dpi);
+            const impact = projectileImpact(source, aimed.destination, targets, token.id, dpi, 0,
+              (item) => item.id === selected.id);
             const firstDart = missile ? instructions.length : 0;
             const effectProperties = { ...instruction.effectProperties, destination: impact.destination, copies: missile ? 1 : count };
             if (missile) {
@@ -369,15 +370,18 @@ export function setupSkillHost(obr, buildImage, recordCombat) {
           }
         } else {
           const maxRange = eldritch || ranged ? skill.range * dpi : Infinity;
+          const projectileSpell = projectile && Number.isInteger(skill.spellLevel);
           const targetId = selectedBeams[0]?.id ?? data.targetId;
-          let aimed = aimAtTarget(source, { center: data.targetLocation }, 0, false, maxRange);
+          const pointAim = aimAtTarget(source, { center: data.targetLocation }, 0, false, maxRange);
+          let aimed = pointAim;
           if (!aimed && typeof targetId === "string" && targetId !== token.id) {
             const selected = items.find((item) => item.id === targetId && isProjectileToken(item));
             if (selected) {
               logSelected = selected;
               const target = await obr.scene.items.getItemBounds([selected.id]).catch(() => null);
               if (version !== sceneVersion) return;
-              aimed = aimAtTarget(source, target, (skill.range ?? 0) * dpi, mode !== "enabled" && isAlly(selected), maxRange);
+              const minimumReach = projectileSpell ? 0 : (skill.range ?? 0) * dpi;
+              aimed = aimAtTarget(source, target, minimumReach, !projectileSpell && mode !== "enabled" && isAlly(selected), maxRange);
             }
           }
           if (aimed) {
@@ -392,8 +396,15 @@ export function setupSkillHost(obr, buildImage, recordCombat) {
             hitTokenIds = coneHits(source, rotation, size * dpi, targets, token.id, dpi);
           } else if (projectile) {
             const blastRadius = skill.impact ? parameter * dpi : 0;
-            // In AoE mode an ally can be caught in the blast without stopping its projectile.
-            const canIntercept = mode === "aoe" && skill.impact ? (item) => !isAlly(item) : undefined;
+            let canIntercept;
+            if (projectileSpell && aimed) {
+              if (skill.impact) canIntercept = () => false;
+              else if (pointAim) canIntercept = (item) => projectileTokenContainsPoint(item, data.targetLocation, dpi);
+              else canIntercept = (item) => item.id === logSelected?.id;
+            } else if (mode === "aoe" && skill.impact) {
+              // In AoE mode an ally can be caught in the blast without stopping its projectile.
+              canIntercept = (item) => !isAlly(item);
+            }
             const impact = projectileImpact(source, destination, targets, token.id, dpi, blastRadius, canIntercept);
             instruction.effectProperties.destination = impact.destination;
             if (eldritch) instruction.effectProperties.copies = beamFormula.count;

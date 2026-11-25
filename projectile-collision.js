@@ -87,6 +87,11 @@ function tokenCircle(token, dpi) {
   if (validPoint(center) && Number.isFinite(radius) && radius > 0) return { center, radius };
 }
 
+export function projectileTokenContainsPoint(token, point, dpi) {
+  const circle = tokenCircle(token, dpi);
+  return Boolean(circle && Math.hypot(point.x - circle.center.x, point.y - circle.center.y) <= circle.radius + EPSILON);
+}
+
 function circleDistance(origin, direction, circle) {
   const offset = subtract(circle.center, origin);
   const ahead = dot(offset, direction);
