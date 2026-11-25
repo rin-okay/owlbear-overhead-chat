@@ -43,6 +43,8 @@ For each damaging hit, the GM can choose **full**, **half** (rounded down), or *
 
 ## Skill hotkeys with Embers
 
+In move mode, hold Ctrl and press a spell’s hotkey to aim it at the map. For spells that can be upcast, hold Ctrl+Shift and press the hotkey, then choose a level with 1–9. Move the marker with WASD and press Space to cast or Esc to cancel.
+
 Enable [Embers](https://extensions.owlbear.rodeo/embers) in the room, then turn on **enable skill hotkeys** in **skills → grants** as GM. Choose a token, select a spell or weapon variant, then check the corresponding grant box. Everyone starts with generic slash. The enable switch and grants are saved in the GM’s browser for the room. A GM running this release must be connected to approve casts.
 
 Open **skills** to set your avatar’s facing at zero rotation, pick a granted weapon, and rebind available skills. Facing is saved per artwork, and weapon choice is saved per token. The default move-mode keys are **F** for melee weapon attack, **G** for Magic Missile, **H** for Burning Hands, **J** for Fire Bolt, and **K** for Fireball. The GM grants the spells independently. After granting Fireball or Burning Hands, set its radius or cone length for that token in cells. Clear the field to restore the default.

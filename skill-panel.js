@@ -265,6 +265,7 @@ export function setupSkillPanel(obr, getAvatar, keyAllowed, showSpells, showChat
 
   return {
     refresh, cast, hasSkill: (id) => available.includes(id),
+    facingFor: (token) => facingFor(preferences, token),
     skillForKey: (key) => Object.keys(SKILLS).find((id) => binding(id) === key && (id !== "ranged" || available.includes(id))),
   };
 }

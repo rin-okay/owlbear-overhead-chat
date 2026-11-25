@@ -92,7 +92,9 @@ export function setupTargeting(obr, onChange) {
     onChange();
     void enqueue(state, async () => {
       try {
-        const ahead = Number.isFinite(heading);
+        const direction = typeof heading === "function" ? await heading() : heading;
+        if (current !== state) return;
+        const ahead = Number.isFinite(direction);
         const [dpi, bounds, gridType] = await Promise.all([
           obr.scene.grid.getDpi(), obr.scene.items.getItemBounds([tokenId]),
           ahead ? obr.scene.grid.getType() : undefined,
@@ -109,7 +111,7 @@ export function setupTargeting(obr, onChange) {
         const center = await obr.scene.grid.snapPosition(bounds.center, 1, false, true);
         if (current !== state) return;
         if (!validPoint(center)) throw Error("Couldn’t find the avatar’s grid tile.");
-        await setPoint(state, forwardPoint(center, dpi, heading, gridType === "SQUARE"));
+        await setPoint(state, forwardPoint(center, dpi, direction, gridType === "SQUARE"));
       } catch (error) {
         report(error);
         if (current === state) clear();
@@ -122,11 +124,22 @@ export function setupTargeting(obr, onChange) {
     else start(tokenId);
   }
 
+  function aim(tokenId, heading, pendingCast) {
+    if (current && !current.consuming) {
+      current.pendingCast = pendingCast;
+      current.editing = true;
+      onChange();
+      return;
+    }
+    clear();
+    start(tokenId, heading, pendingCast);
+  }
+
   obr.scene.onReadyChange((ready) => { if (!ready) clear(); });
   window.addEventListener("pagehide", clear, { once: true });
 
   return {
-    start, toggle, clear, confirm, consumeLocation,
+    start, aim, toggle, clear, confirm, consumeLocation,
     editing: () => Boolean(current?.editing),
     pendingCast: () => current?.pendingCast,
     location: () => current && !current.editing ? current.point : undefined,

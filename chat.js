@@ -10,15 +10,15 @@ import {
 } from "./session.js?v=2.9.16";
 
 import { drawBubble, normalizeAppearance, prepareBubbleFont } from "./appearance.js?v=2.7.9";
-import { setupDiscordPanel } from "./discord-panel.js?v=2.10.1";
-import { damageNotation, openCombatLog, saveNotation } from "./combat-log.js?v=2.10.1";
+import { setupDiscordPanel } from "./discord-panel.js?v=2.10.2";
+import { damageNotation, openCombatLog, saveNotation } from "./combat-log.js?v=2.10.2";
 import { aimsAtLocation, artworkFacingAngle, MAX_CAST_LEVEL, SKILLS } from "./skills.js?v=2.9.16";
 import { ABILITIES, readTokenStats } from "./stats.js?v=2.8.5";
 import { setupAvatarPanel } from "./avatar-panel.js?v=2.9.16";
-import { setupSkillGrants, setupSkillPanel } from "./skill-panel.js?v=2.10.1";
+import { setupSkillGrants, setupSkillPanel } from "./skill-panel.js?v=2.10.2";
 import { setupStatsEditor } from "./stats-panel.js?v=2.8.5";
 import { EMOTE } from "./emotes.js?v=2.7.21";
-import { setupTargeting } from "./targeting.js?v=2.10.1";
+import { setupTargeting } from "./targeting.js?v=2.10.2";
 import { listenForChatShortcut, requestChatShortcut } from "./chat-shortcut.js?v=2.6.4";
 import { cameraFollowPreference, centerAvatar, prepareKeyboardPan } from "./avatar-viewport.js?v=2.7.9";
 
@@ -26,7 +26,7 @@ import { readMovementGrid, stepAvatar, turnAvatar } from "./movement.js?v=2.7.5"
 import { rollSpans, validateRollSpans } from "./dice.js";
 import { rollWithRumble } from "./rumble.js?v=2.9.4";
 import { rollWithNativeDice } from "./native-dice.js";
-import { handleHotbarKey, hotbarOrientation, hotbarShowsLabels, sendHotbarCommand, setHotbarLabels, setHotbarOrientation } from "./hotbar.js?v=2.10.1";
+import { handleHotbarKey, hotbarOrientation, hotbarShowsLabels, sendHotbarCommand, setHotbarLabels, setHotbarOrientation } from "./hotbar.js?v=2.10.2";
 
 const combatView = new URLSearchParams(location.search).has("combat-log");
 const combatWindow = combatView ? document.querySelector("#combat-window") : null;
@@ -414,6 +414,15 @@ function queueTargetCast(mode, cast) {
   }).catch(console.error);
 }
 
+function aimSpell(mode, cast) {
+  const tokenId = mode.tokenId;
+  targeting.aim(tokenId, async () => {
+    const { token } = await getAvatar();
+    if (token?.id !== tokenId || token.locked) throw Error("Avatar is unavailable or locked.");
+    return token.rotation + artworkFacingAngle(token, skillPanel.facingFor(token));
+  }, cast);
+}
+
 function stopRotation(mode) {
   if (!mode?.heldRotation) return;
   clearTimeout(mode.heldRotation.timer);
@@ -647,7 +656,7 @@ function updateMoveModeLabel() {
     combatPrompt.hidden = !question;
     combatPrompt.textContent = question;
   }
-  const spell = SKILLS[tokenControl?.upcastSkill];
+  const spell = SKILLS[tokenControl?.upcast?.skill];
   const aimedSpell = SKILLS[targeting?.pendingCast()?.skill];
   moveModeLabel.textContent = controlsInactive ? "controls inactive · press F1 to chat or F2 to move"
     : question || (spell ? `${spell.name} level · ${spell.spellLevel}–${MAX_CAST_LEVEL}, esc to cancel`
@@ -658,19 +667,34 @@ function updateMoveModeLabel() {
 
 function handleSpellLevelKey(event) {
   const mode = tokenControl;
-  const skill = mode?.upcastSkill;
-  if (!skill) return false;
-  if (event.ctrlKey || event.altKey || event.metaKey) return false;
+  const upcast = mode?.upcast;
+  if (!upcast || event.altKey || event.metaKey) return false;
+  const digit = event.code ? /^Digit([1-9])$/.exec(event.code)?.[1] : /^[1-9]$/.exec(event.key)?.[0];
+  if (event.ctrlKey && (!upcast.aim || (!digit && event.key !== "Escape"))) return false;
   if (event.repeat) return true;
 
-  const digit = event.code ? /^Digit([1-9])$/.exec(event.code)?.[1] : /^[1-9]$/.exec(event.key)?.[0];
   if (digit || event.key === "Escape") {
-    mode.upcastSkill = undefined;
+    mode.upcast = undefined;
     updateMoveModeLabel();
     if (digit && !mode.switching) {
-      if (!targeting?.editing() || mode.actions.length < 4) queueSkill(mode, skill, Number(digit));
+      const spellLevel = Number(digit);
+      if (upcast.aim) aimSpell(mode, { skill: upcast.skill, spellLevel });
+      else if (!targeting?.editing() || mode.actions.length < 4) queueSkill(mode, upcast.skill, spellLevel);
     }
   }
+  return true;
+}
+
+function handleAimKey(event) {
+  const mode = tokenControl;
+  if (!mode || mode.switching || mode.projectilePrompt || mode.upcast || !targeting ||
+      !event.ctrlKey || event.altKey || event.metaKey) return false;
+  const key = /^Digit([0-9])$/.exec(event.code)?.[1] ?? event.key.toLowerCase();
+  const slot = /^[0-9]$/.test(key) && !usesTalkSlots(key) ? savedQuickbarSlots()[slotIndex(key)] : undefined;
+  const skill = slot?.kind === "spell" ? slot.skill : skillPanel?.skillForKey(key);
+  if (!Number.isInteger(SKILLS[skill]?.spellLevel) || !aimsAtLocation(skill) ||
+      !skillPanel?.hasSkill(skill) || (event.shiftKey && !SKILLS[skill].upcast)) return false;
+  if (!event.repeat) useSkillKey(mode, skill, event.shiftKey, true);
   return true;
 }
 
@@ -702,13 +726,14 @@ function handleTargetKey(event) {
   return true;
 }
 
-function useSkillKey(mode, skill, upcast) {
+function useSkillKey(mode, skill, upcast, aim = false) {
   if (upcast && !SKILLS[skill].upcast) return;
+  if (upcast || aim) stopRotation(mode);
   if (upcast) {
-    stopRotation(mode);
-    mode.upcastSkill = skill;
+    mode.upcast = { skill, aim };
     updateMoveModeLabel();
-  } else queueSkill(mode, skill);
+  } else if (aim) aimSpell(mode, { skill });
+  else queueSkill(mode, skill);
 }
 
 moveButton.addEventListener("blur", (event) => {
@@ -742,7 +767,7 @@ function handleControlKeyDown(event) {
     return;
   }
   if (event.isComposing || event.keyCode === 229) return;
-  if (handleProjectileCount(event) || handleSpellLevelKey(event) || handleTargetKey(event)) {
+  if (handleProjectileCount(event) || handleSpellLevelKey(event) || handleAimKey(event) || handleTargetKey(event)) {
     event.preventDefault();
     return;
   }
@@ -837,7 +862,7 @@ if (combatWindow) {
       return;
     }
     const pressingSpace = event.key === " " && !event.ctrlKey && !event.altKey && !event.metaKey;
-    if (pressingSpace && !targeting?.editing() && !tokenControl?.upcastSkill) {
+    if (pressingSpace && !targeting?.editing() && !tokenControl?.upcast) {
       event.preventDefault();
       if (!event.repeat) void focusChatFromCombat().catch(console.error);
       return;
