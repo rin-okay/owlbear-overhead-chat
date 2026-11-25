@@ -134,8 +134,9 @@ export function setupSkillPanel(obr, getAvatar, keyAllowed, showSpells, showChat
     const [{ gm, self }, selection] = await Promise.all([
       skillConnections(obr), type === "cast" ? obr.player.getSelection().catch(() => undefined) : undefined,
     ]);
-    const targetIds = id === "bless" ? selection?.slice(0, 100) : undefined;
     const candidates = selection?.filter((itemId) => itemId !== token.id);
+    const targetIds = id === "bless" ? selection?.slice(0, 100)
+      : id === "eldritch-blast" && !location && candidates?.length > 1 ? candidates.slice(0, 100) : undefined;
     const targetId = candidates?.length === 1 ? candidates[0] : undefined;
     if (type === "list" && revision !== listRevision) return;
     const showStatus = type === "cast" ? setCastStatus : (text) => { playerStatus.textContent = text; };
@@ -203,7 +204,8 @@ export function setupSkillPanel(obr, getAvatar, keyAllowed, showSpells, showChat
           data.connectionId !== expected.target || data.tokenId !== expected.tokenId) continue;
       clearPending(type);
       if (type === "cast") {
-        if (data.errorCode === "spell-level" && typeof data.error === "string" && showChatNotice?.(data.error)) {
+        if (["spell-level", "too-many-targets"].includes(data.errorCode) &&
+            typeof data.error === "string" && showChatNotice?.(data.error)) {
           setCastStatus("");
         } else {
           setCastStatus(data.error || "");

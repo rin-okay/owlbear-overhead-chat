@@ -13,7 +13,7 @@ import { chatParts, isRollCommand, rollSpans } from "./dice.js";
 import { queueDiscord } from "./discord.js?v=2.3.9";
 import { parseTray } from "./dice-replay.js";
 import { queueDicePopup, resetDicePopups } from "./dice-popup.js";
-import { setupSkillHost } from "./skill-host.js?v=2.9.15";
+import { setupSkillHost } from "./skill-host.js?v=2.9.19";
 import { setupHotbar } from "./hotbar.js?v=2.9.17";
 import { setupCombatLog } from "./combat-log.js?v=2.9.15";
 import { SKILL_CHANGED, skillConnections, skillGrantLabel } from "./skills.js?v=2.9.13";

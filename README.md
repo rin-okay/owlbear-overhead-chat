@@ -55,7 +55,7 @@ Ranged Weapon Attack (**N**) is available after the GM grants at least one range
 
 Burning Hands (**H**) rolls 3d6 fire damage at level 1. Fireball (**K**) rolls 8d6 fire damage at level 3. To upcast either spell, hold **Shift** and press its hotkey, then choose a level on the number row. Each level above the spell’s base level adds 1d6. Each hit uses the same damage roll. The combat log offers a Dex save for each hit token. The player or GM rolls it through chat, and the GM can apply full or half damage after resolving the save.
 
-Eldritch Blast (**U**) fires along your facing, toward the selected target, or toward your map marker. It reaches up to 24 cells and stops at the first eligible token or blocking wall. It rolls 1d10 force damage per beam, with extra beams at token levels 5, 11, and 17. The beams share one aim point and the hit marker shows their combined damage.
+Eldritch Blast (**U**) fires along your facing, toward the selected target, or toward your map marker. It reaches up to 24 cells and stops at the first eligible token or blocking wall. It rolls 1d10 force damage per beam, with extra beams at token levels 5, 11, and 17. Select up to one token per beam to split a cast. Extra beams are shared across the selected tokens, starting with the first selected. With a single target, all beams share its aim point and the hit marker shows their combined damage.
 
 Misty Step (**I**) moves your avatar to a map target within six cells and plays mist at both ends. Press **Z**, position the marker with **WASD**, then press **Space** to set it. You can land on an occupied space. Blocking walls still stop the cast if they cross the path or overlap the landing space.
 

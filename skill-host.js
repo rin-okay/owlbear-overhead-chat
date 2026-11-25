@@ -218,6 +218,7 @@ export function setupSkillHost(obr, buildImage, recordCombat) {
       let hitTokenIds = [];
       let hitTokens = [];
       let logSelected;
+      let beamOutcomes;
       let missileBlocked = false;
       let doorId;
       if (checksHit) {
@@ -234,7 +235,75 @@ export function setupSkillHost(obr, buildImage, recordCombat) {
         const targets = hitsAllies ? items : items.filter((item) => !isAlly(item));
         const { source, size } = instruction.effectProperties;
         let { destination, rotation } = instruction.effectProperties;
-        if (skill.location) {
+        const eldritch = data.skill === "eldritch-blast";
+        const beamFormula = eldritch ? spellDamageFormula(skill, token) : undefined;
+        const selectedBeams = [];
+        if (eldritch && data.targetLocation === undefined && data.targetIds !== undefined) {
+          if (!Array.isArray(data.targetIds) || data.targetIds.length > 100 ||
+              !data.targetIds.every((id) => typeof id === "string" && id.length > 0 && id.length <= 128)) {
+            await answer({ ...result, error: "Couldn’t read the selected Eldritch Blast targets." });
+            return;
+          }
+          const candidates = new Map(items.filter(isProjectileToken).map((item) => [item.id, item]));
+          for (const id of new Set(data.targetIds)) {
+            if (id !== token.id && candidates.has(id)) selectedBeams.push(candidates.get(id));
+          }
+          if (selectedBeams.length > beamFormula.count) {
+            const unit = beamFormula.count === 1 ? "beam" : "beams";
+            await answer({ ...result, errorCode: "too-many-targets",
+              error: `Too many targets for Eldritch Blast. Your avatar has ${beamFormula.count} ${unit}.` });
+            return;
+          }
+        }
+        const face = async (aimed) => {
+          let applied = false;
+          await obr.scene.items.updateItems([token.id], ([item]) => {
+            if (version !== sceneVersion || !canSpeak(sender, item, permissions) || item.locked) return;
+            turnToHeading(item, data.facing, aimed.heading);
+            applied = true;
+          });
+          if (version === sceneVersion && !applied) {
+            await answer({ ...result, error: "Couldn’t turn the avatar toward the target." });
+          }
+          return version === sceneVersion && applied;
+        };
+
+        if (selectedBeams.length > 1) {
+          const aims = await Promise.all(selectedBeams.map(async (selected) => {
+            const bounds = await obr.scene.items.getItemBounds([selected.id]).catch(() => null);
+            return aimAtTarget(source, bounds, skill.range * dpi, mode !== "enabled" && isAlly(selected), skill.range * dpi);
+          }));
+          if (version !== sceneVersion) return;
+          if (aims.some((aimed) => !aimed)) {
+            await answer({ ...result, error: "Couldn’t aim at one of the selected Eldritch Blast targets." });
+            return;
+          }
+          if (!await face(aims[0])) return;
+          const outcomes = new Map();
+          instructions.length = 0;
+          for (const [index, aimed] of aims.entries()) {
+            const selected = selectedBeams[index];
+            const count = Math.floor(beamFormula.count / aims.length) + Number(index < beamFormula.count % aims.length);
+            const impact = projectileImpact(source, aimed.destination, targets, token.id, dpi);
+            instructions.push({ ...instruction, effectProperties: {
+              ...instruction.effectProperties, destination: impact.destination, copies: count,
+            } });
+            const hitId = impact.hitTokenIds[0];
+            const key = hitId ? `hit:${hitId}` : `miss:${selected.id}`;
+            const previous = outcomes.get(key);
+            if (previous) {
+              previous.formula.count += count;
+              previous.selected = undefined;
+            } else {
+              outcomes.set(key, {
+                requestId: index === 0 ? data.requestId : crypto.randomUUID(),
+                selected, hitId, formula: { ...beamFormula, count },
+              });
+            }
+          }
+          beamOutcomes = [...outcomes.values()];
+          hitTokenIds = beamOutcomes.map(({ hitId }) => hitId).filter(Boolean);
+        } else if (skill.location) {
           const isArea = skill.location === "area";
           if (isArea && data.targetLocation === undefined) {
             logSelected = items.find((item) => item.id === data.targetId && isProjectileToken(item));
@@ -277,11 +346,11 @@ export function setupSkillHost(obr, buildImage, recordCombat) {
             });
           }
         } else {
-          const eldritch = data.skill === "eldritch-blast";
           const maxRange = eldritch || ranged ? skill.range * dpi : Infinity;
+          const targetId = selectedBeams[0]?.id ?? data.targetId;
           let aimed = aimAtTarget(source, { center: data.targetLocation }, 0, false, maxRange);
-          if (!aimed && typeof data.targetId === "string" && data.targetId !== token.id) {
-            const selected = items.find((item) => item.id === data.targetId && isProjectileToken(item));
+          if (!aimed && typeof targetId === "string" && targetId !== token.id) {
+            const selected = items.find((item) => item.id === targetId && isProjectileToken(item));
             if (selected) {
               logSelected = selected;
               const target = await obr.scene.items.getItemBounds([selected.id]).catch(() => null);
@@ -290,16 +359,7 @@ export function setupSkillHost(obr, buildImage, recordCombat) {
             }
           }
           if (aimed) {
-            let applied = false;
-            await obr.scene.items.updateItems([token.id], ([item]) => {
-              if (version !== sceneVersion || !canSpeak(sender, item, permissions) || item.locked) return;
-              turnToHeading(item, data.facing, aimed.heading);
-              applied = true;
-            });
-            if (version !== sceneVersion || !applied) {
-              if (version === sceneVersion) await answer({ ...result, error: "Couldn’t turn the avatar toward the target." });
-              return;
-            }
+            if (!await face(aimed)) return;
             if (projectile) destination = aimed.destination;
             else {
               rotation = aimed.heading;
@@ -314,7 +374,7 @@ export function setupSkillHost(obr, buildImage, recordCombat) {
             const canIntercept = mode === "aoe" && skill.impact ? (item) => !isAlly(item) : undefined;
             const impact = projectileImpact(source, destination, targets, token.id, dpi, blastRadius, canIntercept);
             instruction.effectProperties.destination = impact.destination;
-            if (eldritch) instruction.effectProperties.copies = spellDamageFormula(skill, token).count;
+            if (beamFormula) instruction.effectProperties.copies = beamFormula.count;
             hitTokenIds = impact.hitTokenIds;
             missileBlocked = missile && Boolean(hitTokenIds.length) &&
               items.some((item) => item.attachedTo === hitTokenIds[0] && isShieldGraphic(item));
@@ -348,8 +408,10 @@ export function setupSkillHost(obr, buildImage, recordCombat) {
       const metadata = hitTokenIds.length ? await obr.room.getMetadata().catch(() => ({})) : {};
       if (version !== sceneVersion) return;
       const manual = metadata[ROLL_DAMAGE_FROM_COMBAT_LOG] === true;
-      const sendMarkers = (delay, damage, { useAnimationCue = false, missileFollowUps, dartCount } = {}) => obr.broadcast.sendMessage(HIT_MARKERS, {
-        requestId: data.requestId, tokenIds: hitTokenIds, delay, useAnimationCue,
+      const sendMarkers = (delay, damage, {
+        useAnimationCue = false, missileFollowUps, dartCount, tokenIds = hitTokenIds, requestId = data.requestId,
+      } = {}) => obr.broadcast.sendMessage(HIT_MARKERS, {
+        requestId, tokenIds, delay, useAnimationCue,
         splat: manual && !missileBlocked,
         ...(damage ? { damage } : {}),
         ...(missileFollowUps ? { missileFollowUps } : {}),
@@ -376,6 +438,22 @@ export function setupSkillHost(obr, buildImage, recordCombat) {
       if (doorId && version === sceneVersion) {
         await openMeleeDoor(obr, doorId, sender.role, () => version === sceneVersion)
           .catch((error) => console.error("Overhead Chat could not open the door", error));
+      }
+      if (beamOutcomes) {
+        const hitsById = new Map(hitTokens.map((item) => [item.id, item]));
+        for (const { requestId, hitId, selected, formula } of beamOutcomes) {
+          if (version !== sceneVersion) return;
+          const hit = hitsById.get(hitId);
+          const damage = hit && !manual ? rollSpellDamage(formula) : undefined;
+          if (hit) await sendMarkers(skill.hitDelay, damage, { requestId, tokenIds: [hit.id] });
+          await logCast({
+            requestId, selected, attack: true, hits: hit ? [hit] : [],
+            damage: combatDamage(damage ? [damage] : undefined),
+            damageFormula: hit && manual ? formula : undefined,
+          });
+        }
+        if (version === sceneVersion) await answer(latestLoadout);
+        return;
       }
       if (version === sceneVersion && hitTokenIds.length && missile) {
         if (manual && !missileBlocked) {
