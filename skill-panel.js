@@ -133,7 +133,7 @@ export function setupSkillPanel(obr, getAvatar, keyAllowed, showSpells, showChat
     pending.delete(type);
   }
 
-  async function request(type, token, id, revision, location, spellLevel, chooseCounts) {
+  async function request(type, token, id, revision, location, spellLevel, { chooseCounts, openTarget } = {}) {
     const [{ gm, self }, selection] = await Promise.all([
       skillConnections(obr), type === "cast" ? obr.player.getSelection().catch(() => undefined) : undefined,
     ]);
@@ -162,8 +162,9 @@ export function setupSkillPanel(obr, getAvatar, keyAllowed, showSpells, showChat
       return;
     }
     const requestId = crypto.randomUUID();
+    const facing = type === "cast" ? facingFor(preferences, token) : undefined;
     const expected = {
-      requestId, gm: gm.connectionId, target: self.connectionId, tokenId: token.id,
+      requestId, gm: gm.connectionId, target: self.connectionId, tokenId: token.id, facing, openTarget,
       timeout: setTimeout(() => {
         if (pending.get(type)?.requestId !== requestId) return;
         clearPending(type);
@@ -175,7 +176,7 @@ export function setupSkillPanel(obr, getAvatar, keyAllowed, showSpells, showChat
     try {
       await obr.broadcast.sendMessage(SKILL_REQUEST, {
         requestId, tokenId: token.id, type,
-        ...(type === "cast" ? { skill: id, facing: facingFor(preferences, token) } : {}),
+        ...(type === "cast" ? { skill: id, facing } : {}),
         ...(id === "spear" ? { weapon: selectedWeapon(token.id) } : {}),
         ...(id === "ranged" ? { weapon: selectedRangedWeapon(token.id) } : {}),
         ...(SKILLS[id]?.upcast && spellLevel !== undefined ? { spellLevel } : {}),
@@ -221,8 +222,12 @@ export function setupSkillPanel(obr, getAvatar, keyAllowed, showSpells, showChat
       if (connectionId !== expected.gm || data?.requestId !== expected.requestId ||
           data.connectionId !== expected.target || data.tokenId !== expected.tokenId) continue;
       clearPending(type);
+      const targetingRequested = type === "cast" && data.errorCode === "target-required" && expected.openTarget;
       if (type === "cast") {
-        if (["spell-level", "too-many-targets"].includes(data.errorCode) &&
+        if (targetingRequested) {
+          expected.openTarget(expected.facing);
+          setCastStatus("");
+        } else if (["spell-level", "too-many-targets"].includes(data.errorCode) &&
             typeof data.error === "string" && showChatNotice?.(data.error)) {
           setCastStatus("");
         } else {
@@ -234,7 +239,7 @@ export function setupSkillPanel(obr, getAvatar, keyAllowed, showSpells, showChat
       enabled = data.enabled === true;
       weapons = availableWeapons(data.weapons);
       rangedWeapons = availableRangedWeapons(data.rangedWeapons);
-      playerStatus.textContent = data.error || (enabled ? "" : "The GM hasn’t enabled skill hotkeys.");
+      playerStatus.textContent = (!targetingRequested && data.error) || (enabled ? "" : "The GM hasn’t enabled skill hotkeys.");
       render();
     }
   });
@@ -249,10 +254,10 @@ export function setupSkillPanel(obr, getAvatar, keyAllowed, showSpells, showChat
     if (!playerPanel.closest("[hidden]")) refresh(getAvatar(), true);
   });
 
-  async function cast(id, token, location, spellLevel, chooseCounts) {
+  async function cast(id, token, location, spellLevel, options) {
     if (pending.has("cast")) return;
     try {
-      await request("cast", token, id, undefined, location, spellLevel, chooseCounts);
+      await request("cast", token, id, undefined, location, spellLevel, options);
     } catch {
       setCastStatus("Couldn’t send the cast to the GM.");
     }

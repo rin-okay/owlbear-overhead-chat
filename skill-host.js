@@ -332,7 +332,8 @@ export function setupSkillHost(obr, buildImage, recordCombat) {
           const target = await spellDestination(obr, data, items, isArea);
           if (version !== sceneVersion) return;
           if (![target?.x, target?.y].every(Number.isFinite)) {
-            await answer({ ...result, error: "Set a map target with Z, WASD, and Space first." });
+            if (lastCast.get(sender.id) === now) lastCast.delete(sender.id);
+            await answer({ ...result, errorCode: "target-required", error: "Set a map target with Z, WASD, and Space first." });
             return;
           }
           const distance = Math.hypot(target.x - source.x, target.y - source.y);

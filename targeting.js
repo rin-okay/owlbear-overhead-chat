@@ -3,6 +3,13 @@ import { buildPath, Command } from "./obr.js";
 const report = (error) => console.warn("Overhead Chat target selection", error);
 const validPoint = (point) => Number.isFinite(point?.x) && Number.isFinite(point?.y);
 
+function forwardPoint(center, dpi, heading, square) {
+  const angle = (square ? Math.round(heading / 45) * 45 : heading) * Math.PI / 180;
+  const x = Math.cos(angle);
+  const y = Math.sin(angle);
+  return { x: center.x + dpi * (square ? Math.round(x) : x), y: center.y + dpi * (square ? Math.round(y) : y) };
+}
+
 export function setupTargeting(obr, onChange) {
   let current;
   let markerWork = Promise.resolve();
@@ -78,25 +85,31 @@ export function setupTargeting(obr, onChange) {
     return point;
   }
 
-  function toggle(tokenId) {
-    if (current) {
-      clear();
-      return;
-    }
+  function start(tokenId, heading) {
+    if (current) return;
     const state = { editing: true, work: Promise.resolve() };
     current = state;
     onChange();
     void enqueue(state, async () => {
       try {
-        const [dpi, bounds] = await Promise.all([
+        const ahead = Number.isFinite(heading);
+        const [dpi, bounds, gridType] = await Promise.all([
           obr.scene.grid.getDpi(), obr.scene.items.getItemBounds([tokenId]),
+          ahead ? obr.scene.grid.getType() : undefined,
         ]);
         if (current !== state) return;
         if (!Number.isFinite(dpi) || dpi <= 0 || !validPoint(bounds?.center)) {
           throw Error("The scene grid or avatar is unavailable.");
         }
         state.dpi = dpi;
-        await setPoint(state, bounds.center);
+        if (!ahead) {
+          await setPoint(state, bounds.center);
+          return;
+        }
+        const center = await obr.scene.grid.snapPosition(bounds.center, 1, false, true);
+        if (current !== state) return;
+        if (!validPoint(center)) throw Error("Couldn’t find the avatar’s grid tile.");
+        await setPoint(state, forwardPoint(center, dpi, heading, gridType === "SQUARE"));
       } catch (error) {
         report(error);
         if (current === state) clear();
@@ -104,11 +117,16 @@ export function setupTargeting(obr, onChange) {
     });
   }
 
+  function toggle(tokenId) {
+    if (current) clear();
+    else start(tokenId);
+  }
+
   obr.scene.onReadyChange((ready) => { if (!ready) clear(); });
   window.addEventListener("pagehide", clear, { once: true });
 
   return {
-    toggle, clear, confirm, consumeLocation,
+    start, toggle, clear, confirm, consumeLocation,
     editing: () => Boolean(current?.editing),
     location: () => current && !current.editing ? current.point : undefined,
     move(offset) {

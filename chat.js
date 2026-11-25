@@ -10,15 +10,15 @@ import {
 } from "./session.js?v=2.9.16";
 
 import { drawBubble, normalizeAppearance, prepareBubbleFont } from "./appearance.js?v=2.7.9";
-import { setupDiscordPanel } from "./discord-panel.js?v=2.9.20";
-import { damageNotation, openCombatLog, saveNotation } from "./combat-log.js?v=2.9.20";
-import { aimsAtLocation, MAX_CAST_LEVEL, SKILLS } from "./skills.js?v=2.9.16";
+import { setupDiscordPanel } from "./discord-panel.js?v=2.9.21";
+import { damageNotation, openCombatLog, saveNotation } from "./combat-log.js?v=2.9.21";
+import { aimsAtLocation, artworkFacingAngle, MAX_CAST_LEVEL, SKILLS } from "./skills.js?v=2.9.16";
 import { ABILITIES, readTokenStats } from "./stats.js?v=2.8.5";
 import { setupAvatarPanel } from "./avatar-panel.js?v=2.9.16";
-import { setupSkillGrants, setupSkillPanel } from "./skill-panel.js?v=2.9.20";
+import { setupSkillGrants, setupSkillPanel } from "./skill-panel.js?v=2.9.21";
 import { setupStatsEditor } from "./stats-panel.js?v=2.8.5";
 import { EMOTE } from "./emotes.js?v=2.7.21";
-import { setupTargeting } from "./targeting.js?v=2.9.20";
+import { setupTargeting } from "./targeting.js?v=2.9.21";
 import { listenForChatShortcut, requestChatShortcut } from "./chat-shortcut.js?v=2.6.4";
 import { cameraFollowPreference, centerAvatar, prepareKeyboardPan } from "./avatar-viewport.js?v=2.7.9";
 
@@ -26,7 +26,7 @@ import { readMovementGrid, stepAvatar, turnAvatar } from "./movement.js?v=2.7.5"
 import { rollSpans, validateRollSpans } from "./dice.js";
 import { rollWithRumble } from "./rumble.js?v=2.9.4";
 import { rollWithNativeDice } from "./native-dice.js";
-import { handleHotbarKey, hotbarOrientation, hotbarShowsLabels, sendHotbarCommand, setHotbarLabels, setHotbarOrientation } from "./hotbar.js?v=2.9.20";
+import { handleHotbarKey, hotbarOrientation, hotbarShowsLabels, sendHotbarCommand, setHotbarLabels, setHotbarOrientation } from "./hotbar.js?v=2.9.21";
 
 const combatView = new URLSearchParams(location.search).has("combat-log");
 const combatWindow = combatView ? document.querySelector("#combat-window") : null;
@@ -458,8 +458,14 @@ async function moveAvatar(mode) {
       if (token?.id !== tokenId || token.locked) throw new Error("Avatar is unavailable or locked.");
       if (offset && (!Number.isFinite(grid.dpi) || grid.dpi <= 0)) throw new Error("Scene grid size unavailable.");
       if (skill) {
-        await skillPanel.cast(skill, token, targetLocation, spellLevel,
-          (targets, count, unit) => askProjectileCounts(mode, targets, count, unit));
+        await skillPanel.cast(skill, token, targetLocation, spellLevel, {
+          chooseCounts: (targets, count, unit) => askProjectileCounts(mode, targets, count, unit),
+          openTarget: (facing) => {
+            if (mode !== tokenControl || mode.switching || tokenId !== mode.tokenId) return;
+            stopRotation(mode);
+            targeting?.start(tokenId, token.rotation + artworkFacingAngle(token, facing));
+          },
+        });
         continue;
       }
 
