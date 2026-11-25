@@ -1,4 +1,4 @@
-# Motif v0.2.3
+# Motif v0.2.4
 
 [Install in Owlbear Rodeo](https://rin-okay.github.io/owlbear-overhead-chat/motif/manifest.json).
 
