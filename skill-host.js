@@ -1,6 +1,7 @@
 import { setupBless } from "./bless.js?v=2.9.14";
 import { combatDamage } from "./combat-log.js?v=2.9.4";
-import { isShieldGraphic, readShieldGraphics, setupShield } from "./shield.js?v=2.8.6";
+import { isShieldGraphic, readShieldGraphics, setupShield } from "./shield.js?v=2.9.15";
+import { setupSleep } from "./sleep.js?v=2.9.15";
 import { canSpeak, MELEE_HIT_TIMING, normalizeMeleeHitTiming, ROLL_DAMAGE_FROM_COMBAT_LOG } from "./rules.js?v=2.9.4";
 import {
   areaHits, clearSpellPath, coneHits, isProjectileToken, isProjectileWall, openMeleeDoor, projectileImpact, teleportLandingClear,
@@ -14,7 +15,7 @@ import {
 import {
   DEFAULT_WEAPON, EMBERS_EFFECTS, MAX_CAST_LEVEL, MELEE_DURATION_MS, RANGED_WEAPONS, SKILLS, SKILL_REQUEST, SKILL_RESULT, WEAPONS,
   aimsAtLocation, availableRangedWeapons, availableSkills, availableWeapons, friendlyFireMode, readSkills, skillConnections, skillEffect, spellParameter, tokenTeams, turnToHeading,
-} from "./skills.js?v=2.9.13";
+} from "./skills.js?v=2.9.15";
 
 function aimAtTarget(source, target, range = 0, passThrough = false, maxRange = Infinity) {
   if (![target?.center?.x, target?.center?.y].every(Number.isFinite)) return;
@@ -61,6 +62,7 @@ async function teleportCaster(obr, token, source, destination, sender, permissio
 export function setupSkillHost(obr, buildImage, recordCombat) {
   const castBless = setupBless(obr, buildImage);
   const toggleShield = setupShield(obr, buildImage);
+  const toggleSleep = setupSleep(obr, buildImage);
   const lastCast = new Map();
   let sceneVersion = 0;
   obr.scene.onReadyChange(() => { sceneVersion++; lastCast.clear(); });
@@ -147,6 +149,16 @@ export function setupSkillHost(obr, buildImage, recordCombat) {
         return;
       }
       lastCast.set(sender.id, now);
+      if (data.skill === "sleep") {
+        const current = () => version === sceneVersion;
+        const error = await toggleSleep(token, current).catch((cause) => {
+          console.error("Overhead Chat could not update Sleep (AFK)", cause);
+          return "Couldn’t update Sleep (AFK).";
+        });
+        if (!error) await logCast();
+        if (current()) await answer({ ...result, error });
+        return;
+      }
       if (data.skill === "shield") {
         const current = () => version === sceneVersion;
         const error = await toggleShield(token, canActivateShield, current).catch((cause) => {

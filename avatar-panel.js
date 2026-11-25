@@ -1,11 +1,11 @@
 import OBR from "./obr.js";
 import { BUILTIN_EMOTES } from "./emotes.js?v=2.7.21";
-import { SKILLS, SPELLS } from "./skills.js?v=2.8.6";
+import { SKILLS, SPELLS } from "./skills.js?v=2.9.15";
 import { isPublicToken } from "./rules.js";
 import {
   savedAvatarSlots, saveAvatarSlot, savedAvatarMode, saveAvatarMode,
   savedQuickbarSlots, saveQuickbarSlot,
-} from "./session.js?v=2.7.21";
+} from "./session.js?v=2.9.15";
 
 export function setupAvatarPanel(panel) {
   const list = panel.querySelector("#avatar-slots");
@@ -136,7 +136,7 @@ function setupQuickbar(panel) {
         source.replaceChildren(...tokens.map((token) => new Option(token.name || "unnamed image", token.id)));
         pending = { index, kind, control, render, tokens };
         picker.hidden = false;
-        status.textContent = "Choose an image for slot " + (index + 1) + ".";
+        status.textContent = "Choose an image for slot " + ((index + 1) % 10) + ".";
         source.focus();
         return;
       }
@@ -173,12 +173,13 @@ function setupQuickbar(panel) {
   });
 
   const renderSpells = slots.map((saved, index) => {
+    const key = (index + 1) % 10;
     const number = document.createElement("span");
-    number.textContent = index + 1;
+    number.textContent = key;
     const row = document.createElement("div");
     row.className = "avatar-art-slot";
     const type = document.createElement("select");
-    type.setAttribute("aria-label", "slot " + (index + 1) + " type");
+    type.setAttribute("aria-label", "slot " + key + " type");
     for (const [id, name] of [["", "empty"], ["avatar", "avatar"], ["emote", "emote"], ["spell", "spell"]]) {
       type.add(new Option(name, id));
     }
@@ -186,9 +187,9 @@ function setupQuickbar(panel) {
     const art = document.createElement("button");
     art.type = "button";
     const emote = document.createElement("select");
-    emote.setAttribute("aria-label", "slot " + (index + 1) + " emote");
+    emote.setAttribute("aria-label", "slot " + key + " emote");
     const spell = document.createElement("select");
-    spell.setAttribute("aria-label", "slot " + (index + 1) + " spell");
+    spell.setAttribute("aria-label", "slot " + key + " spell");
     const updateSpells = () => {
       const current = slots[index]?.skill;
       spell.replaceChildren(new Option(spells.length ? "choose spell" : "no granted spells", ""),

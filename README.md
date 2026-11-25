@@ -61,7 +61,9 @@ Misty Step (**I**) moves your avatar to a map target within six cells and plays 
 
 Shatter (**O**) uses the map marker or a single selected token within 12 cells. Its radius defaults to two cells and can be changed per token in **skills → grants**. The blast rolls 3d8 thunder damage once at level 2, plus 1d8 per spell level above 2. Hold Shift and press its hotkey, then choose the spell level on the number row. The combat log offers a Constitution save for each hit token.
 
-Shield (**L**) is a first-level spell that applies to your own avatar. Cast it once to attach the blue shield and cast it again to remove it. A token with Shield active when Magic Missile is cast takes zero damage from its darts and shows **blocked** for each impact.
+Shield (**L**) is a first-level spell that applies to your own avatar. Cast it once to play the intro and attach the looping blue shield, and cast it again to remove it. A token with Shield active when Magic Missile is cast takes zero damage from its darts and shows **blocked** for each impact.
+
+Sleep (AFK) is available to every token. In move mode, press 0 to toggle the sleeping symbol on your own avatar. Slot 0 can also be reassigned in the quickbar.
 
 Bless (default **B**) uses the same team assignments. With no selection, Bless affects the caster and randomly fills the remaining slots with allies in range. With a selection, it affects only the selected eligible allies, including the caster if selected. The GM can set the range and maximum recipients in **skills → grants**. The defaults are six cells and three targets at level 1. Hold Shift and press its hotkey, then choose a spell level to add one target per slot level above 1. Cast again to remove this caster’s Bless graphics. Bless uses the [JB2A loop from Embers](https://github.com/ArmindoFlores/embers).
 

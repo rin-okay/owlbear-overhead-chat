@@ -7,15 +7,15 @@ import {
 import {
   openSessionChannel, savedAvatar, saveAvatar, savedAvatarSlots, savedAvatarMode, savedQuickbarSlots,
   savedAppearance, saveAppearance,
-} from "./session.js?v=2.7.21";
+} from "./session.js?v=2.9.15";
 
 import { drawBubble, normalizeAppearance, prepareBubbleFont } from "./appearance.js?v=2.7.9";
-import { setupDiscordPanel } from "./discord-panel.js?v=2.9.14";
-import { damageNotation, openCombatLog, saveNotation } from "./combat-log.js?v=2.9.14";
-import { MAX_CAST_LEVEL, SKILLS } from "./skills.js?v=2.9.14";
+import { setupDiscordPanel } from "./discord-panel.js?v=2.9.15";
+import { damageNotation, openCombatLog, saveNotation } from "./combat-log.js?v=2.9.15";
+import { MAX_CAST_LEVEL, SKILLS } from "./skills.js?v=2.9.15";
 import { ABILITIES, readTokenStats } from "./stats.js?v=2.8.5";
-import { setupAvatarPanel } from "./avatar-panel.js?v=2.8.6";
-import { setupSkillGrants, setupSkillPanel } from "./skill-panel.js?v=2.9.14";
+import { setupAvatarPanel } from "./avatar-panel.js?v=2.9.15";
+import { setupSkillGrants, setupSkillPanel } from "./skill-panel.js?v=2.9.15";
 import { setupStatsEditor } from "./stats-panel.js?v=2.8.5";
 import { EMOTE } from "./emotes.js?v=2.7.21";
 import { setupTargeting } from "./targeting.js?v=2.7.17";
@@ -49,9 +49,9 @@ if (combatWindow) {
   document.body.classList.add("combat-view");
   const stylesheet = document.createElement("link");
   stylesheet.rel = "stylesheet";
-  stylesheet.href = new URL("./combat-log.css?v=2.9.14", import.meta.url).href;
+  stylesheet.href = new URL("./combat-log.css?v=2.9.15", import.meta.url).href;
   document.head.append(stylesheet);
-  void import("./combat-log-panel.js?v=2.9.14")
+  void import("./combat-log-panel.js?v=2.9.15")
     .then(({ setCombatRollers }) => setCombatRollers(rollCombatSave, rollCombatDamage)).catch(console.error);
 }
 
@@ -525,8 +525,8 @@ async function switchAvatarSlot(mode, index, onApplied) {
 }
 
 function useAvatarSlot(mode, key) {
-  const index = Number(key) - 1;
-  const talking = playerRole === "GM" && savedAvatarMode() === "talk";
+  const index = key === "0" ? 9 : Number(key) - 1;
+  const talking = key !== "0" && playerRole === "GM" && savedAvatarMode() === "talk";
   const quickbar = talking ? undefined : savedQuickbarSlots()[index];
   if (quickbar?.kind === "spell" || quickbar?.kind === "emote") {
     mode.slotTap = undefined;
@@ -561,7 +561,7 @@ function useAvatarSlot(mode, key) {
   }
   const artwork = quickbar?.artwork;
   if (!artwork) {
-    status.textContent = `Assign slot ${index + 1} in the quickbar first.`;
+    status.textContent = `Assign slot ${key} in the quickbar first.`;
     return;
   }
   status.textContent = "";
@@ -665,7 +665,7 @@ function handleControlKeyDown(event) {
       stopTokenControl();
       if (combatWindow) combatModePaused = true;
       else input.focus();
-    } else if (/^[1-9]$/.test(key) && !event.ctrlKey && !event.altKey && !event.metaKey) {
+    } else if (/^[0-9]$/.test(key) && !event.ctrlKey && !event.altKey && !event.metaKey) {
       event.preventDefault();
       if (!event.repeat) useAvatarSlot(tokenControl, key);
     } else if (Object.hasOwn(movementKeys, key) && !event.ctrlKey && !event.altKey && !event.metaKey) {

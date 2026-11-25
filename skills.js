@@ -85,6 +85,7 @@ export const SKILLS = {
     targetLimit: { label: "maximum targets", min: 1, defaultValue: 3, integer: true },
   },
   shield: { name: "shield", key: "l", spellLevel: 1 },
+  sleep: { name: "sleep (afk)", key: "", spellLevel: 0 },
   heart: { name: "heart", key: "p", effect: "generic.marker.heart.3" },
   // Keep the original skill ID so existing bindings and clients still work.
   spear: { name: "melee weapon attack", key: "f", meleeReach: 1 },
@@ -140,14 +141,14 @@ export function writeSkills(obr, type, settings) {
 }
 
 export function availableSkills(config, tokenId) {
-  if (config.enabled !== true) return [];
+  if (config.enabled !== true) return ["sleep"];
   const ranged = availableRangedWeapons(config.rangedWeaponsByToken?.[tokenId]);
-  return ["spear", ...(ranged.length ? ["ranged"] : []), ...availableSpells(config, tokenId)];
+  return ["spear", "sleep", ...(ranged.length ? ["ranged"] : []), ...availableSpells(config, tokenId)];
 }
 
 export function availableSpells(config, tokenId) {
   const spells = config.spellsByToken?.[tokenId];
-  if (Array.isArray(spells)) return SPELLS.filter((id) => spells.includes(id));
+  if (Array.isArray(spells)) return SPELLS.filter((id) => id !== "sleep" && spells.includes(id));
   return Array.isArray(config.missileTokens) && config.missileTokens.includes(tokenId) ? ["missile"] : [];
 }
 

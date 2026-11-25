@@ -90,8 +90,10 @@ export function savedQuickbarSlots() {
     stored = JSON.parse(localStorage.getItem(avatarKey() + ":quickbar"));
     if (!Array.isArray(stored)) legacy = JSON.parse(localStorage.getItem(avatarKey() + ":art"));
   } catch {}
-  quickbarSlots = Array.from({ length: 9 }, (_, index) =>
-    normalizeQuickbar(legacy ? { kind: "avatar", artwork: legacy[index] } : stored?.[index]));
+  quickbarSlots = Array.from({ length: 10 }, (_, index) => {
+    if (index === 9 && stored?.[index] === undefined) return { kind: "spell", skill: "sleep" };
+    return normalizeQuickbar(legacy ? { kind: "avatar", artwork: legacy[index] } : stored?.[index]);
+  });
   return quickbarSlots;
 }
 

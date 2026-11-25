@@ -3,7 +3,7 @@ import { isPublicToken } from "./rules.js";
 import {
   DEFAULT_WEAPON, FACINGS, FRIENDLY_FIRE_MODES, RANGED_WEAPONS, SKILLS, SKILL_CHANGED, SKILL_REQUEST, SKILL_RESULT, SPELLS, TEAMS, WEAPONS,
   aimsAtLocation, availableRangedWeapons, availableSpells, availableWeapons, friendlyFireMode, readSkills, skillConnections, spellParameter, tokenTeams, validSpellParameter, writeSkills,
-} from "./skills.js?v=2.9.13";
+} from "./skills.js?v=2.9.15";
 
 function characterLabel(token) {
   return token.name || "unnamed character";
@@ -63,7 +63,7 @@ export function setupSkillPanel(obr, getAvatar, keyAllowed, showSpells, showChat
   }
 
   function render() {
-    showSpells(enabled ? available : []);
+    showSpells(available);
     facing.disabled = !avatar;
     facing.value = String(facingFor(preferences, avatar));
     arrow.style.transform = `rotate(${facing.value}deg)`;
@@ -301,7 +301,9 @@ export function setupSkillGrants(obr) {
       if (id !== defaultId) select.add(new Option(name, id));
     }
   }
-  for (const id of SPELLS) spell.add(new Option(SKILLS[id].name, id));
+  for (const id of SPELLS) {
+    if (id !== "sleep") spell.add(new Option(SKILLS[id].name, id));
+  }
   for (const name of TEAMS) team.add(new Option(name, name));
   for (const mode of FRIENDLY_FIRE_MODES) friendlyFire.add(new Option(mode, mode));
 
@@ -411,7 +413,7 @@ export function setupSkillGrants(obr) {
           } else granted.delete(change.weapon);
           config[field] = { ...config[field], [token.id]: [...granted] };
         } else {
-          if (!SPELLS.includes(change.spell)) return;
+          if (change.spell === "sleep" || !SPELLS.includes(change.spell)) return;
           const ids = new Set(availableSpells(config, token.id));
           if (Object.hasOwn(change, "parameter")) {
             const definition = SKILLS[change.spell][change.field];
