@@ -1,4 +1,4 @@
-# Motif v0.2.8
+# Motif v0.2.9
 
 [Install in Owlbear Rodeo](https://rin-okay.github.io/owlbear-overhead-chat/motif/manifest.json).
 
@@ -39,4 +39,4 @@ await OBR.broadcast.sendMessage("io.github.rin-okay.motif-v2/effects", {
 }, { destination: "ALL" });
 ```
 
-The built-in IDs are `stillwater`, `silver-bell`, `low-knock`, and `soft-sweep`. Custom IDs are shown in the GM library. A connected GM with Motif handles shared playback. Overhead Chat can send this broadcast alongside its existing Embers call.
+The built-in music IDs are `stillwater`, `lantern-lane`, and `iron-pulse`. The built-in sound effect IDs are `silver-bell`, `low-knock`, and `soft-sweep`. Custom IDs are shown in the GM library. A connected GM with Motif handles shared playback. Overhead Chat can send this broadcast alongside its existing Embers call.
