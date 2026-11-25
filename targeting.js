@@ -85,9 +85,9 @@ export function setupTargeting(obr, onChange) {
     return point;
   }
 
-  function start(tokenId, heading) {
+  function start(tokenId, heading, pendingCast) {
     if (current) return;
-    const state = { editing: true, work: Promise.resolve() };
+    const state = { editing: true, pendingCast, work: Promise.resolve() };
     current = state;
     onChange();
     void enqueue(state, async () => {
@@ -128,6 +128,7 @@ export function setupTargeting(obr, onChange) {
   return {
     start, toggle, clear, confirm, consumeLocation,
     editing: () => Boolean(current?.editing),
+    pendingCast: () => current?.pendingCast,
     location: () => current && !current.editing ? current.point : undefined,
     move(offset) {
       const state = current;

@@ -5,7 +5,7 @@ import { setupSleep } from "./sleep.js?v=2.9.15";
 import { canSpeak, MELEE_HIT_TIMING, normalizeMeleeHitTiming, ROLL_DAMAGE_FROM_COMBAT_LOG } from "./rules.js?v=2.9.4";
 import {
   areaHits, clearSpellPath, coneHits, isProjectileToken, isProjectileWall, openMeleeDoor, projectileImpact, projectileTokenContainsPoint, teleportLandingClear,
-} from "./projectile-collision.js?v=2.10.0";
+} from "./projectile-collision.js?v=2.10.1";
 import { HIT_MARKERS, MELEE_HIT_CUE } from "./hit-markers.js?v=2.9.4";
 import { meleeDamageFormula, rangedDamageFormula, rollMeleeDamage, rollRangedDamage } from "./melee-damage.js?v=2.9.11";
 import { readTokenStats } from "./stats.js?v=2.8.5";

@@ -10,15 +10,15 @@ import {
 } from "./session.js?v=2.9.16";
 
 import { drawBubble, normalizeAppearance, prepareBubbleFont } from "./appearance.js?v=2.7.9";
-import { setupDiscordPanel } from "./discord-panel.js?v=2.10.0";
-import { damageNotation, openCombatLog, saveNotation } from "./combat-log.js?v=2.10.0";
+import { setupDiscordPanel } from "./discord-panel.js?v=2.10.1";
+import { damageNotation, openCombatLog, saveNotation } from "./combat-log.js?v=2.10.1";
 import { aimsAtLocation, artworkFacingAngle, MAX_CAST_LEVEL, SKILLS } from "./skills.js?v=2.9.16";
 import { ABILITIES, readTokenStats } from "./stats.js?v=2.8.5";
 import { setupAvatarPanel } from "./avatar-panel.js?v=2.9.16";
-import { setupSkillGrants, setupSkillPanel } from "./skill-panel.js?v=2.10.0";
+import { setupSkillGrants, setupSkillPanel } from "./skill-panel.js?v=2.10.1";
 import { setupStatsEditor } from "./stats-panel.js?v=2.8.5";
 import { EMOTE } from "./emotes.js?v=2.7.21";
-import { setupTargeting } from "./targeting.js?v=2.10.0";
+import { setupTargeting } from "./targeting.js?v=2.10.1";
 import { listenForChatShortcut, requestChatShortcut } from "./chat-shortcut.js?v=2.6.4";
 import { cameraFollowPreference, centerAvatar, prepareKeyboardPan } from "./avatar-viewport.js?v=2.7.9";
 
@@ -26,7 +26,7 @@ import { readMovementGrid, stepAvatar, turnAvatar } from "./movement.js?v=2.7.5"
 import { rollSpans, validateRollSpans } from "./dice.js";
 import { rollWithRumble } from "./rumble.js?v=2.9.4";
 import { rollWithNativeDice } from "./native-dice.js";
-import { handleHotbarKey, hotbarOrientation, hotbarShowsLabels, sendHotbarCommand, setHotbarLabels, setHotbarOrientation } from "./hotbar.js?v=2.10.0";
+import { handleHotbarKey, hotbarOrientation, hotbarShowsLabels, sendHotbarCommand, setHotbarLabels, setHotbarOrientation } from "./hotbar.js?v=2.10.1";
 
 const combatView = new URLSearchParams(location.search).has("combat-log");
 const combatWindow = combatView ? document.querySelector("#combat-window") : null;
@@ -402,9 +402,14 @@ function queueSkill(mode, skill, spellLevel) {
     queueAvatarAction(mode, { skill, targetLocation: targeting?.location(), spellLevel });
     return;
   }
+  queueTargetCast(mode, { skill, spellLevel });
+}
+
+function queueTargetCast(mode, cast) {
+  if (mode.actions.length >= 4) return;
   void targeting.consumeLocation().then((point) => {
     if (point && mode === tokenControl && !mode.switching && mode.actions.length < 4) {
-      queueAvatarAction(mode, { skill, targetLocation: point, spellLevel });
+      queueAvatarAction(mode, { ...cast, targetLocation: point });
     }
   }).catch(console.error);
 }
@@ -463,7 +468,7 @@ async function moveAvatar(mode) {
           openTarget: (facing) => {
             if (mode !== tokenControl || mode.switching || tokenId !== mode.tokenId) return;
             stopRotation(mode);
-            targeting?.start(tokenId, token.rotation + artworkFacingAngle(token, facing));
+            targeting?.start(tokenId, token.rotation + artworkFacingAngle(token, facing), { skill, spellLevel });
           },
         });
         continue;
@@ -643,8 +648,10 @@ function updateMoveModeLabel() {
     combatPrompt.textContent = question;
   }
   const spell = SKILLS[tokenControl?.upcastSkill];
+  const aimedSpell = SKILLS[targeting?.pendingCast()?.skill];
   moveModeLabel.textContent = controlsInactive ? "controls inactive · press F1 to chat or F2 to move"
     : question || (spell ? `${spell.name} level · ${spell.spellLevel}–${MAX_CAST_LEVEL}, esc to cancel`
+    : aimedSpell ? `${aimedSpell.name} · wasd, space to cast`
     : targeting?.editing() ? (quickcastEnabled ? "target · wasd, space or skill key" : "set target · wasd, space to set")
     : targeting?.location() ? "move mode · target set" : "move mode enabled");
 }
@@ -682,7 +689,9 @@ function handleTargetKey(event) {
   if (/^[wasd]$/.test(key)) targeting.move(movementKeys[key].offset);
   else if (!event.repeat && key === " ") {
     modeExitKey = event.key;
-    void targeting.confirm();
+    const cast = targeting.pendingCast();
+    if (cast) queueTargetCast(mode, cast);
+    else void targeting.confirm();
   } else if (!event.repeat && key === "escape") targeting.clear();
   else if (!event.repeat && quickcastEnabled && mode.actions.length < 4) {
     const slot = !event.shiftKey && /^[0-9]$/.test(key) && !usesTalkSlots(key)
