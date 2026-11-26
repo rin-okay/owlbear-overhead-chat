@@ -10,7 +10,7 @@ import {
 } from "./session.js?v=2.9.16";
 
 import { drawBubble, normalizeAppearance, prepareBubbleFont } from "./appearance.js?v=2.7.9";
-import { setupDiscordPanel } from "./discord-panel.js?v=2.10.2";
+import { setupDiscordPanel } from "./discord-panel.js?v=2.11.1";
 import { damageNotation, openCombatLog, saveNotation } from "./combat-log.js?v=2.11.0";
 import { aimsAtLocation, artworkFacingAngle, MAX_CAST_LEVEL, SKILLS } from "./skills.js?v=2.11.0";
 import { ABILITIES, readTokenStats } from "./stats.js?v=2.8.5";

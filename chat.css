@@ -56,8 +56,24 @@ form { flex: none; }
 
 [hidden] { display: none !important; }
 nav { display: flex; gap: 6px; }
-header nav { flex-wrap: wrap; }
-header nav button { padding-inline: 10px; }
+main > header > nav { flex: 1; min-width: 0; }
+main > header > nav > button {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 40px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+}
+main > header > nav svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
 nav button { min-height: 32px; background: #312940; color: #e2d4f6; }
 nav button[aria-pressed="true"], nav button:hover { background: #c7b6f8; color: #271c3a; }
 #chat-panel { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 12px; }

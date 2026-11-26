@@ -4,20 +4,31 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>overhead chat</title>
-  <link rel="stylesheet" href="./chat.css?v=2.11.0">
-  <script type="module" src="./chat.js?v=2.11.0"></script>
+  <link rel="stylesheet" href="./chat.css?v=2.11.1">
+  <script type="module" src="./chat.js?v=2.11.1"></script>
 </head>
 <body>
   <main>
     <header>
-      <img src="./icon.svg" alt="" width="26" height="26">
       <nav aria-label="overhead chat views">
-        <button type="button" id="chat-tab" aria-pressed="true" aria-controls="chat-panel">chat</button>
-        <button type="button" id="settings-tab" aria-pressed="false" aria-controls="settings-panel">settings</button>
-        <button type="button" id="avatar-tab" aria-pressed="false" aria-controls="avatar-panel">avatar</button>
-        <button type="button" id="skills-tab" aria-pressed="false" aria-controls="skills-panel">skills</button>
-        <button type="button" id="combat-log-open" aria-haspopup="dialog">combat log</button>
-        <button type="button" id="gm-tab" aria-pressed="false" aria-controls="gm-panel" hidden>gm</button>
+        <button type="button" id="chat-tab" aria-pressed="true" aria-controls="chat-panel" aria-label="Chat" title="Chat">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h14a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-8l-5 4v-4H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z"/><path d="M7 9h10M7 12h7"/></svg>
+        </button>
+        <button type="button" id="settings-tab" aria-pressed="false" aria-controls="settings-panel" aria-label="Settings" title="Settings">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h4m4 0h8M4 12h9m4 0h3M4 18h3m4 0h9"/><circle cx="10" cy="6" r="2"/><circle cx="15" cy="12" r="2"/><circle cx="9" cy="18" r="2"/></svg>
+        </button>
+        <button type="button" id="avatar-tab" aria-pressed="false" aria-controls="avatar-panel" aria-label="Avatar" title="Avatar">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="7" r="4"/><path d="M4 21v-1a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v1Z"/></svg>
+        </button>
+        <button type="button" id="skills-tab" aria-pressed="false" aria-controls="skills-panel" aria-label="Skills" title="Skills">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 17 6-6 3 3-6 6a2.1 2.1 0 0 1-3-3Zm6-6 5-5 3 3-5 5M17 2v2m3 1h2m-1 10v4m-2-2h4M5 5v4M3 7h4"/></svg>
+        </button>
+        <button type="button" id="combat-log-open" aria-haspopup="dialog" aria-label="Combat log" title="Combat log">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3h10l4 4v14H5zM15 3v5h4M9 12h6m-6 4h6"/></svg>
+        </button>
+        <button type="button" id="gm-tab" aria-pressed="false" aria-controls="gm-panel" aria-label="GM" title="GM" hidden>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3c2.5 2 5 3 8 3v5c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6c3 0 5.5-1 8-3Z"/><path d="M12 8v7m-3.5-3.5h7"/></svg>
+        </button>
       </nav>
     </header>
     <div id="chat-panel">
