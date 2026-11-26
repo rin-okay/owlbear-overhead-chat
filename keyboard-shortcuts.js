@@ -1,4 +1,4 @@
-import { actionForEvent, bindingStorageKey, browserLayout, editableTarget, keyboardProfile, KEY_ACTIONS, mapShortcut } from "./key-bindings.js?v=2.11.2";
+import { actionForEvent, bindingStorageKey, browserLayout, editableTarget, keyboardProfile, KEY_ACTIONS, mapShortcut } from "./key-bindings.js?v=2.11.4";
 
 export const KEYBOARD_MODAL = "chat.overhead.keyboard";
 const APP_KEY = "chat.overhead.shortcut.";
@@ -6,7 +6,7 @@ const APP_KEY = "chat.overhead.shortcut.";
 export async function openKeyboard(obr) {
   const [width, height] = await Promise.all([obr.viewport.getWidth(), obr.viewport.getHeight()]);
   await obr.modal.open({
-    id: KEYBOARD_MODAL, url: new URL("./keyboard.html?v=2.11.3", import.meta.url).href,
+    id: KEYBOARD_MODAL, url: new URL("./keyboard.html?v=2.11.4", import.meta.url).href,
     width: Math.min(1040, Math.max(280, width - 32)),
     height: Math.min(720, Math.max(280, height - 36)),
     hidePaper: true,

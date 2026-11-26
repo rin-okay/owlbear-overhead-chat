@@ -1,4 +1,4 @@
-import { bindingLabel, keyboardProfile } from "./key-bindings.js?v=2.11.2";
+import { bindingLabel, keyboardProfile } from "./key-bindings.js?v=2.11.4";
 import { setupStatsEditor } from "./stats-panel.js?v=2.8.5";
 import { isPublicToken } from "./rules.js";
 import { isProjectileToken } from "./projectile-collision.js?v=2.9.10";

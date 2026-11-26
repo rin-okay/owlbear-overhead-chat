@@ -13,14 +13,14 @@ import { chatParts, isRollCommand, rollSpans } from "./dice.js";
 import { queueDiscord } from "./discord.js?v=2.3.9";
 import { parseTray } from "./dice-replay.js";
 import { queueDicePopup, resetDicePopups } from "./dice-popup.js";
-import { setupSkillHost } from "./skill-host.js?v=2.11.3";
-import { setupHotbar } from "./hotbar.js?v=2.11.3";
-import { openCombatLog, setupCombatLog } from "./combat-log.js?v=2.11.3";
+import { setupSkillHost } from "./skill-host.js?v=2.11.4";
+import { setupHotbar } from "./hotbar.js?v=2.11.4";
+import { openCombatLog, setupCombatLog } from "./combat-log.js?v=2.11.4";
 import { SKILL_CHANGED, skillConnections, skillGrantLabel } from "./skills.js?v=2.11.0";
 import { EMOTE, floatEmote, parseEmote } from "./emotes.js?v=2.7.22";
 import { setupHitMarkers } from "./hit-markers.js?v=2.11.0";
 import { requestChatShortcut } from "./chat-shortcut.js?v=2.11.0";
-import { openKeyboard, setupSceneKeys } from "./keyboard-shortcuts.js?v=2.11.3";
+import { openKeyboard, setupSceneKeys } from "./keyboard-shortcuts.js?v=2.11.4";
 import { setupChatRecovery } from "./chat-recovery.js?v=2.6.6";
 import { centerAvatar, setupCameraFollow } from "./avatar-viewport.js?v=2.7.9";
 

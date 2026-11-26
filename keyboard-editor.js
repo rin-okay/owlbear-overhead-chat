@@ -1,12 +1,13 @@
 import OBR from "./obr.js";
 import {
-  KEY_ACTIONS, KEYBOARD_ROWS, FIXED_KEYS, MODIFIERS, assignBinding, bindingLabel, browserLayout, eventChord,
+  KEY_ACTIONS, KEYBOARD_KEYS, INTERNATIONAL_KEYS, FIXED_KEYS, MODIFIERS, assignBinding, bindingLabel, browserLayout, eventChord,
   keyLabel, readKeyboard, resolveBindings, writeKeyboard,
-} from "./key-bindings.js?v=2.11.2";
-import { KEYBOARD_MODAL } from "./keyboard-shortcuts.js?v=2.11.3";
+} from "./key-bindings.js?v=2.11.4";
+import { KEYBOARD_MODAL } from "./keyboard-shortcuts.js?v=2.11.4";
 
 OBR.onReady(() => {
   const board = document.querySelector("#board");
+  const extraKeys = document.querySelector("#international-keys");
   const layers = document.querySelector("#modifiers");
   const sidebar = document.querySelector("#actions");
   const selection = document.querySelector("#selection");
@@ -123,40 +124,49 @@ OBR.onReady(() => {
     });
     layers.replaceChildren(...toggles);
     const left = board.scrollLeft;
-    const rows = KEYBOARD_ROWS.map((row) => {
-      const line = document.createElement("div");
-      line.className = "key-row";
-      for (const code of row) {
-        const id = occupant(code, layer);
-        const action = KEY_ACTIONS[id];
-        const key = layer ? document.createElement("span") : button("", () => {
-          if (selected && selected !== id) assign(selected, { code, modifiers: 0 });
-          else if (id) choose(id);
-        });
-        key.className = "key" + (id ? " bound" : "");
-        key.dataset.code = code;
-        const description = bindingLabel({ code, modifiers: layer }, layout) + (action ? " · " + action.label : "");
-        key.setAttribute("aria-label", description);
-        key.title = description;
-        const glyph = document.createElement("kbd");
-        glyph.textContent = keyLabel(code, layout);
-        key.append(glyph);
-        if (action) {
-          const name = document.createElement("small");
-          name.textContent = action.label;
-          key.append(name);
-          if (!layer) {
-            dragSource(key, id);
-            if (id === selected) key.setAttribute("aria-pressed", "true");
-          }
-        }
-        if (!layer) dropTarget(key, (source) => assign(source, { code, modifiers: 0 }));
-        line.append(key);
-      }
-      return line;
-    });
-    board.replaceChildren(...rows);
+    const keys = document.createElement("div");
+    keys.className = "ansi-keyboard";
+    for (const { code, x, y, width, height, fixed } of KEYBOARD_KEYS) {
+      const key = renderKey(code, fixed);
+      key.style.gridColumn = `${x + 1} / span ${width}`;
+      key.style.gridRow = `${y} / span ${height}`;
+      keys.append(key);
+    }
+    board.replaceChildren(keys);
     board.scrollLeft = left;
+    extraKeys.replaceChildren(...INTERNATIONAL_KEYS.map((code) => renderKey(code)));
+  }
+
+  function renderKey(code, fixed = false) {
+    const id = fixed ? undefined : occupant(code, layer);
+    const actionName = fixed ? FIXED_KEYS.find(([key]) => key === code)?.[1] : KEY_ACTIONS[id]?.label;
+    const editable = !layer && !fixed;
+    const key = editable ? button("", () => {
+      if (selected && selected !== id) assign(selected, { code, modifiers: 0 });
+      else if (id) choose(id);
+    }) : document.createElement("span");
+    key.className = "key" + (id ? " bound" : fixed ? " fixed-key" : "");
+    key.dataset.code = code;
+    const name = fixed ? keyLabel(code) : bindingLabel({ code, modifiers: layer }, layout);
+    const description = actionName ? name + " · " + actionName : name;
+    key.setAttribute("aria-label", description + (fixed ? " · fixed" : ""));
+    key.title = description + (fixed ? " · fixed" : "");
+    const glyph = document.createElement("kbd");
+    glyph.textContent = keyLabel(code, fixed ? undefined : layout);
+    key.append(glyph);
+    if (actionName) {
+      const label = document.createElement("small");
+      label.textContent = actionName;
+      key.append(label);
+    }
+    if (editable) {
+      if (id) {
+        dragSource(key, id);
+        if (id === selected) key.setAttribute("aria-pressed", "true");
+      }
+      dropTarget(key, (source) => assign(source, { code, modifiers: 0 }));
+    }
+    return key;
   }
 
   function renderSidebar() {
@@ -224,11 +234,6 @@ OBR.onReady(() => {
     layer = 0;
     save({}, "Default bindings restored.");
   });
-  document.querySelector("#fixed").replaceChildren(...FIXED_KEYS.map(([key, label]) => {
-    const node = document.createElement("span");
-    node.textContent = key + " · " + label;
-    return node;
-  }));
   showAll.addEventListener("change", renderSidebar);
   filter.addEventListener("input", renderSidebar);
   dropTarget(document.querySelector("#sidebar"), (id) => assign(id, null));

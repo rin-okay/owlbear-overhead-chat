@@ -9,23 +9,59 @@ const chord = (code, modifiers = 0) => ({ code, modifiers });
 export const modifierMask = (event) => (event.shiftKey ? SHIFT : 0) | (event.ctrlKey ? CTRL : 0) |
   (event.altKey ? ALT : 0) | (event.metaKey ? META : 0);
 
-export const KEYBOARD_ROWS = [
-  "Escape Backquote Digit1 Digit2 Digit3 Digit4 Digit5 Digit6 Digit7 Digit8 Digit9 Digit0 Minus Equal Backspace",
-  "Tab KeyQ KeyW KeyE KeyR KeyT KeyY KeyU KeyI KeyO KeyP BracketLeft BracketRight Backslash",
-  "CapsLock KeyA KeyS KeyD KeyF KeyG KeyH KeyJ KeyK KeyL Semicolon Quote Enter",
-  "IntlBackslash KeyZ KeyX KeyC KeyV KeyB KeyN KeyM Comma Period Slash IntlRo IntlYen ArrowUp",
-  "Space ArrowLeft ArrowDown ArrowRight Insert Delete Home End PageUp PageDown",
-  "NumLock NumpadDivide NumpadMultiply NumpadSubtract Numpad7 Numpad8 Numpad9 NumpadAdd Numpad4 Numpad5 Numpad6 Numpad1 Numpad2 Numpad3 NumpadEnter Numpad0 NumpadDecimal",
-].map((row) => row.split(" "));
+// ANSI key widths and offsets use quarter-key units.
+function row(keys, y, start = 0, fixed = false) {
+  let x = start;
+  return keys.split(" ").map((token) => {
+    const [code, width = "4", height = "1"] = token.split(":");
+    const key = { code, x, y, width: Number(width), height: Number(height), fixed };
+    x += key.width;
+    return key;
+  });
+}
+
+export const KEYBOARD_KEYS = [
+  ...row("Escape", 1),
+  ...row("F1 F2 F3 F4", 1, 8, true),
+  ...row("F5 F6 F7 F8", 1, 26, true),
+  ...row("F9 F10 F11 F12", 1, 44, true),
+  ...row("PrintScreen ScrollLock Pause", 1, 61, true),
+
+  ...row("Backquote Digit1 Digit2 Digit3 Digit4 Digit5 Digit6 Digit7 Digit8 Digit9 Digit0 Minus Equal Backspace:8", 3),
+  ...row("Tab:6 KeyQ KeyW KeyE KeyR KeyT KeyY KeyU KeyI KeyO KeyP BracketLeft BracketRight Backslash:6", 4),
+  ...row("CapsLock:7 KeyA KeyS KeyD KeyF KeyG KeyH KeyJ KeyK KeyL Semicolon Quote Enter:9", 5),
+  ...row("ShiftLeft:9", 6, 0, true),
+  ...row("KeyZ KeyX KeyC KeyV KeyB KeyN KeyM Comma Period Slash", 6, 9),
+  ...row("ShiftRight:11", 6, 49, true),
+  ...row("ControlLeft:5 MetaLeft:5 AltLeft:5", 7, 0, true),
+  ...row("Space:25", 7, 15),
+  ...row("AltRight:5 MetaRight:5 ContextMenu:5 ControlRight:5", 7, 40, true),
+
+  ...row("Insert Home PageUp", 3, 61),
+  ...row("Delete End PageDown", 4, 61),
+  ...row("ArrowUp", 6, 65),
+  ...row("ArrowLeft ArrowDown ArrowRight", 7, 61),
+
+  ...row("NumLock NumpadDivide NumpadMultiply NumpadSubtract", 3, 74),
+  ...row("Numpad7 Numpad8 Numpad9 NumpadAdd:4:2", 4, 74),
+  ...row("Numpad4 Numpad5 Numpad6", 5, 74),
+  ...row("Numpad1 Numpad2 Numpad3 NumpadEnter:4:2", 6, 74),
+  ...row("Numpad0:8 NumpadDecimal", 7, 74),
+].sort((left, right) => left.y - right.y || left.x - right.x);
+
+export const INTERNATIONAL_KEYS = ["IntlBackslash", "IntlRo", "IntlYen"];
 
 const printed = {
   Backquote: "`", Minus: "-", Equal: "=", BracketLeft: "[", BracketRight: "]", Backslash: "\\",
   Semicolon: ";", Quote: "'", Comma: ",", Period: ".", Slash: "/", IntlBackslash: "<>",
   IntlRo: "ろ", IntlYen: "¥", ArrowUp: "↑", ArrowDown: "↓", ArrowLeft: "←", ArrowRight: "→",
   NumpadAdd: "+", NumpadSubtract: "-", NumpadMultiply: "*", NumpadDivide: "/", NumpadDecimal: ".",
-  Escape: "Esc", Backspace: "Bksp", CapsLock: "Caps", PageUp: "PgUp", PageDown: "PgDn",
+  Escape: "Esc", Backspace: "Backspace", CapsLock: "Caps Lock", PageUp: "PgUp", PageDown: "PgDn",
+  ShiftLeft: "Shift", ShiftRight: "Shift", ControlLeft: "Ctrl", ControlRight: "Ctrl",
+  MetaLeft: "Meta", MetaRight: "Meta", AltLeft: "Alt", AltRight: "AltGr", ContextMenu: "Menu",
+  NumpadEnter: "Enter", NumLock: "Num Lock", PrintScreen: "PrtSc", ScrollLock: "Scroll",
 };
-const codeSet = new Set(KEYBOARD_ROWS.flat());
+const codeSet = new Set([...KEYBOARD_KEYS.filter((key) => !key.fixed).map((key) => key.code), ...INTERNATIONAL_KEYS]);
 const keyCodes = new Map([
   ...[...codeSet].filter((code) => !code.startsWith("Numpad") && !code.startsWith("Intl"))
     .map((code) => [code.replace(/^(Key|Digit)/, "").toLowerCase(), code]),

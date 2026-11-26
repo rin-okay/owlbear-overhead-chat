@@ -23,16 +23,19 @@ button:hover, button[aria-pressed="true"], button.drop { border-color: var(--acc
 .editor { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
 .board-panel, aside { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; min-width: 0; padding: 12px; }
 .toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 12px; }
-#modifiers, #fixed { display: flex; gap: 5px; flex-wrap: wrap; }
-#fixed { margin-bottom: 7px; color: var(--muted); }
-#fixed span { font-size: 11px; border: 1px solid var(--line); padding: 3px 6px; border-radius: 4px; }
+#modifiers { display: flex; gap: 5px; flex-wrap: wrap; }
 #board { overflow-x: auto; padding: 3px; }
-.key-row { display: flex; gap: 4px; min-width: 590px; margin-bottom: 4px; }
+.ansi-keyboard {
+  display: grid;
+  grid-template-columns: repeat(90, minmax(0, 1fr));
+  grid-template-rows: 46px 14px repeat(5, 49px);
+  min-width: 750px;
+}
 .key {
-  flex: 1 1 0;
   min-width: 0;
-  height: 52px;
-  padding: 3px;
+  min-height: 0;
+  margin: 2px;
+  padding: 2px;
   display: grid;
   align-content: center;
   justify-items: stretch;
@@ -46,8 +49,10 @@ button:hover, button[aria-pressed="true"], button.drop { border-color: var(--acc
 .key small { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; font-size: 10px; line-height: 1.1; margin-top: 4px; color: var(--muted); }
 .key.bound { background: #3e3047; border-color: #83678c; }
 .key.bound small { color: #f1c7f0; }
-.key[data-code="Space"] { flex-grow: 3; }
-.key[data-code="Enter"], .key[data-code="Backspace"], .key[data-code="CapsLock"] { flex-grow: 1.5; }
+.key.fixed-key { color: var(--muted); background: #262333; }
+.international { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 6px; color: var(--muted); font-size: 12px; }
+#international-keys { display: flex; gap: 4px; }
+#international-keys .key { width: 45px; height: 37px; margin: 0; color: #f4ecfa; }
 .selection { display: flex; gap: 7px; flex-wrap: wrap; align-items: center; margin-top: 8px; }
 .selection:empty { display: none; }
 #feedback { color: #f1c7f0; margin-top: 8px; min-height: 1.45em; }
