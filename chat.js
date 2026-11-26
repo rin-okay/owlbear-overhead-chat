@@ -1363,7 +1363,7 @@ function setupSettings() {
         // Let Owlbear finish removing the modal's focus trap first.
         requestAnimationFrame(() => {
           if (!mode || tokenControl !== mode) return;
-          const focusTarget = moveButton.closest("[hidden]") ? chatMain : moveButton;
+          const focusTarget = combatWindow || (moveButton.closest("[hidden]") ? chatMain : moveButton);
           chatMain.tabIndex = -1;
           window.focus();
           focusTarget.focus({ preventScroll: true });
