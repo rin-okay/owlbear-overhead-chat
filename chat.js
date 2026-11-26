@@ -10,8 +10,8 @@ import {
 } from "./session.js?v=2.9.16";
 
 import { drawBubble, normalizeAppearance, prepareBubbleFont } from "./appearance.js?v=2.7.9";
-import { setupDiscordPanel } from "./discord-panel.js?v=2.11.5";
-import { damageNotation, openCombatLog, saveNotation } from "./combat-log.js?v=2.11.5";
+import { setupDiscordPanel } from "./discord-panel.js?v=2.11.6";
+import { damageNotation, openCombatLog, saveNotation } from "./combat-log.js?v=2.11.6";
 import { aimsAtLocation, artworkFacingAngle, MAX_CAST_LEVEL, SKILLS } from "./skills.js?v=2.11.0";
 import { ABILITIES, readTokenStats } from "./stats.js?v=2.8.5";
 import { setupAvatarPanel } from "./avatar-panel.js?v=2.11.0";
@@ -42,6 +42,7 @@ const input = document.querySelector("#message");
 const send = form.querySelector("[type=submit]");
 const moveButton = form.querySelector("#move-avatar");
 const combatOpenButton = document.querySelector("#combat-log-open");
+const viewNav = document.querySelector("header nav");
 const moveModeLabel = form.querySelector("#move-mode-label");
 const moveWarning = form.querySelector("#move-warning");
 const status = document.querySelector("#status");
@@ -752,16 +753,28 @@ function useSkillKey(mode, skill, upcast, aim, heldModifiers) {
   else queueSkill(mode, skill);
 }
 
+function viewTab(target) {
+  const tab = target?.closest?.("button[aria-pressed][aria-controls]");
+  if (tab?.parentElement === viewNav) return tab;
+}
+
+viewNav.addEventListener("click", (event) => {
+  if (tokenControl) viewTab(event.target)?.focus({ preventScroll: true });
+}, true);
+viewNav.addEventListener("focusout", (event) => {
+  if (viewTab(event.target)) stopRotation(tokenControl);
+});
+
 moveButton.addEventListener("blur", (event) => {
   stopRotation(tokenControl);
   if (event.relatedTarget && event.relatedTarget !== input &&
-      !combatOpenButton?.contains(event.relatedTarget)) suspendTokenControl();
+      !viewTab(event.relatedTarget) && !combatOpenButton?.contains(event.relatedTarget)) suspendTokenControl();
 });
 window.addEventListener("blur", () => suspendTokenControl(!combatWindow));
 window.addEventListener("pagehide", () => suspendTokenControl());
 document.addEventListener("pointerdown", (event) => {
   if (!combatWindow && event.target !== input && !moveButton.contains(event.target) &&
-      !combatOpenButton?.contains(event.target)) suspendTokenControl();
+      !viewTab(event.target) && !combatOpenButton?.contains(event.target)) suspendTokenControl();
 });
 input.addEventListener("pointerdown", () => {
   tokenFocusHandoff = undefined;
@@ -837,6 +850,13 @@ form.addEventListener("keyup", handleControlKeyUp);
 form.addEventListener("keydown", (event) => {
   if (event.target === input || (event.target === moveButton && tokenControl)) handleControlKeyDown(event);
 });
+viewNav.addEventListener("keydown", (event) => {
+  if (tokenControl && viewTab(event.target)) handleControlKeyDown(event);
+});
+viewNav.addEventListener("keyup", (event) => {
+  if (viewTab(event.target)) handleControlKeyUp(event);
+});
+
 function resumeCombatControls({ combatKey = false } = {}) {
   combatModePaused = false;
   if (!tokenControl) startTokenControl({ combatKey });
