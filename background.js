@@ -15,14 +15,13 @@ import { parseTray } from "./dice-replay.js";
 import { queueDicePopup, resetDicePopups } from "./dice-popup.js";
 import { setupSkillHost } from "./skill-host.js?v=2.11.4";
 import { setupHotbar } from "./hotbar.js?v=2.11.4";
-import { openCombatLog, setupCombatLog } from "./combat-log.js?v=2.11.4";
+import { setupCombatLog } from "./combat-log.js?v=2.11.5";
 import { SKILL_CHANGED, skillConnections, skillGrantLabel } from "./skills.js?v=2.11.0";
 import { EMOTE, floatEmote, parseEmote } from "./emotes.js?v=2.7.22";
 import { setupHitMarkers } from "./hit-markers.js?v=2.11.0";
 import { requestChatShortcut } from "./chat-shortcut.js?v=2.11.0";
-import { openKeyboard, setupSceneKeys } from "./keyboard-shortcuts.js?v=2.11.4";
 import { setupChatRecovery } from "./chat-recovery.js?v=2.6.6";
-import { centerAvatar, setupCameraFollow } from "./avatar-viewport.js?v=2.7.9";
+import { setupCameraFollow } from "./avatar-viewport.js?v=2.7.9";
 
 const HISTORY_LIMIT = 1000;
 const HISTORY_PAGE_SIZE = 100;
@@ -382,39 +381,28 @@ function queueSpeech(event) {
 
 OBR.onReady(() => {
   setupHitMarkers(OBR, buildLabel, buildPath, Command);
-  const cameraFollow = setupCameraFollow(OBR);
-  const hotbar = setupHotbar(OBR);
+  setupCameraFollow(OBR);
+  setupHotbar(OBR);
   let shortcutRevision = 0;
   async function openFromShortcut(mode) {
     const revision = ++shortcutRevision;
     await OBR.action.open();
     if (revision === shortcutRevision) requestChatShortcut(OBR, mode);
   }
-  for (const [key, mode, label, icon] of [
+  for (const [shortcut, mode, label, icon] of [
     ["F1", "chat", "Focus Overhead Chat (F1)", "./toolbar-chat.svg"],
-    ["F2", "move", "Move chat avatar (F2)", "./icon.svg"],
-    ["F3", "center", "Center chat avatar (F3)", "./icon.svg"],
-    ["F4", "follow", "Toggle camera follow mode (F4)", "./icon.svg"],
+    ["F2", "move", "Move Chat Avatar (F2)", "./toolbar-move.svg"],
   ]) {
     OBR.tool.create({
       id: "chat.overhead.shortcut." + mode,
-      shortcut: key,
+      shortcut,
       icons: [{ icon: new URL(icon, import.meta.url).href, label }],
       onClick() {
-        if (mode === "follow") void cameraFollow.toggle().catch(report);
-        else if (mode === "center") void centerAvatar(OBR).catch(report);
-        else void openFromShortcut(mode).catch(report);
+        void openFromShortcut(mode).catch(report);
         return false;
       },
     }).catch(report);
   }
-  setupSceneKeys(OBR, {
-    "hotbar-toggle": () => hotbar("toggle"),
-    "hotbar-mode": () => hotbar("mode"),
-    keyboard: () => openKeyboard(OBR),
-    "move-mode": () => openFromShortcut("toggle-move"),
-    "combat-log": () => openCombatLog(OBR),
-  }, report);
   combatLog = setupCombatLog(OBR);
   setupSkillHost(OBR, buildImage, combatLog.record);
   setupChatRecovery(OBR, function* () {

@@ -2,9 +2,9 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   actionForEvent, assignBinding, bindingLabel, bindingStorageKey, browserLayout, keyboardProfile,
-  eventChord, legacyOverrides, mapShortcut, resolveBindings, writeKeyboard,
+  eventChord, legacyOverrides, resolveBindings, writeKeyboard,
 } from "../key-bindings.js";
-import { handleRoomKey, setupSceneKeys } from "../keyboard-shortcuts.js";
+import { handleRoomKey } from "../keyboard-shortcuts.js";
 
 const event = (code, key, props = {}) => ({ code, key, ...props });
 const command = (code, key, props, overrides) => actionForEvent(resolveBindings(overrides), event(code, key, props))?.id;
@@ -84,29 +84,21 @@ test("IME, AltGr and modifier-only presses never dispatch gameplay", () => {
   assert.equal(eventChord(event("ControlLeft", "Control")), undefined);
 });
 
-test("labels and native map shortcuts use the reported layout where supported", async () => {
+test("binding labels use the reported layout where supported", async () => {
   const layout = await browserLayout({ getLayoutMap: async () => new Map([["KeyA", "q"], ["Equal", "´"]]) });
   assert.equal(bindingLabel({ code: "KeyA", modifiers: 3 }, layout), "Shift+Ctrl+Q");
-  assert.equal(mapShortcut({ code: "KeyA", modifiers: 0 }, layout), "q");
-  assert.equal(mapShortcut({ code: "Equal", modifiers: 0 }, {}), "=");
-  assert.equal(mapShortcut({ code: "Slash", modifiers: 0 }, {}), "/");
-  assert.equal(mapShortcut({ code: "Minus", modifiers: 0 }, {}), "-");
-  assert.equal(mapShortcut({ code: "Backspace", modifiers: 0 }, {}), "backspace");
   assert.deepEqual(await browserLayout({ getLayoutMap: async () => { throw Error("Denied"); } }), {});
 });
 
 function client(t, id = "player") {
   const storage = new Map();
-  const win = new EventTarget();
   Object.defineProperty(globalThis, "localStorage", { value: {
     getItem: (key) => storage.get(key) ?? null, setItem: (key, value) => storage.set(key, value),
   }, configurable: true });
-  Object.defineProperty(globalThis, "window", { value: win, configurable: true });
   t.after(() => {
     delete globalThis.localStorage;
-    delete globalThis.window;
   });
-  return { win, obr: { room: { id: "room" }, player: { id } } };
+  return { obr: { room: { id: "room" }, player: { id } } };
 }
 
 test("room dispatch protects typing, retains F10 and reads a change without reloading", (t) => {
@@ -126,31 +118,4 @@ test("room dispatch protects typing, retains F10 and reads a change without relo
   assert.equal(handleRoomKey(obr, key("Equal", "Dead"), handlers), false);
   assert.equal(handleRoomKey(obr, key("KeyT", "t"), handlers), true);
   assert.deepEqual(calls, ["keyboard", "toggle", "toggle"]);
-});
-
-test("Owlbear shortcuts refresh and release displaced map keys", async (t) => {
-  const { obr, win } = client(t);
-  const tools = new Map();
-  const errors = [];
-  obr.tool = {
-    create: async (tool) => { tools.set(tool.id.split(".").at(-1), tool); },
-    remove: async (id) => { tools.delete(id.split(".").at(-1)); },
-  };
-  setupSceneKeys(obr, { keyboard() {}, "hotbar-toggle"() {}, "hotbar-mode"() {} }, (error) => errors.push(error));
-  const tick = () => new Promise((resolve) => setImmediate(resolve));
-  await tick();
-  assert.equal(tools.get("keyboard-fixed").shortcut, "F10");
-  assert.equal(tools.get("hotbar-toggle").shortcut, "=");
-  const { overrides } = keyboardProfile(obr);
-  writeKeyboard(obr, {
-    overrides: assignBinding(overrides, "hotbar-toggle", { code: "Minus", modifiers: 0 }),
-    layout: { Minus: "ß" },
-  });
-  const changed = new Event("storage");
-  Object.defineProperty(changed, "key", { value: bindingStorageKey(obr) });
-  win.dispatchEvent(changed);
-  await tick();
-  assert.equal(tools.get("hotbar-toggle").shortcut, "ß");
-  assert.equal(tools.get("hotbar-mode").shortcut, undefined);
-  assert.deepEqual(errors, []);
 });

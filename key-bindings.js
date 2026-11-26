@@ -75,7 +75,7 @@ const commands = [];
 function add(id, label, code, props = {}) {
   commands.push({ id, label, defaultKey: code ? chord(code) : null, ...props });
 }
-const room = { group: "Room", scene: true };
+const room = { group: "Room" };
 add("hotbar-toggle", "Show / hide hotbar", "Equal", room);
 add("hotbar-mode", "Switch hotbar mode", "Minus", room);
 add("keyboard", "Open keyboard settings", "Slash", room);
@@ -249,17 +249,6 @@ export async function browserLayout(keyboard = globalThis.navigator?.keyboard) {
   } catch {
     return {};
   }
-}
-
-export function mapShortcut(binding, layout) {
-  if (!binding || binding.code.startsWith("Numpad")) return;
-  const { code, modifiers } = binding;
-  const symbol = /^[A-Za-z0-9]$/.test(plain(code)) || printed[code]?.length === 1 &&
-    !code.startsWith("Arrow") ? plain(code) : code;
-  const key = layout[code] ?? symbol;
-  if (["Dead", "Unidentified", "+", "AltGraph"].includes(key) || code.startsWith("Intl") && !layout[code]) return;
-  const name = code === "Space" ? "space" : key.toLowerCase();
-  return [...MODIFIERS.filter(([bit]) => modifiers & bit).map(([, word]) => word.toLowerCase()), name].join("+");
 }
 
 const profiles = new Map();

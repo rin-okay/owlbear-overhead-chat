@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>overhead chat</title>
   <link rel="stylesheet" href="./chat.css?v=2.11.1">
-  <script type="module" src="./chat.js?v=2.11.4"></script>
+  <script type="module" src="./chat.js?v=2.11.5"></script>
 </head>
 <body>
   <main>
@@ -80,6 +80,9 @@
         </div>
       </form>
       <label class="discord-enabled"><input id="follow-camera" type="checkbox" aria-keyshortcuts="F4"> camera follow mode</label>
+      <div class="appearance-actions">
+        <button id="center-chat-avatar" type="button" aria-keyshortcuts="F3">center avatar</button>
+      </div>
       <label>hotbar position
         <select id="hotbar-orientation">
           <option value="bottom">bottom (horizontal)</option>
@@ -87,6 +90,10 @@
         </select>
       </label>
       <label class="discord-enabled"><input id="hotbar-labels" type="checkbox" checked> show labels on hotbar</label>
+      <div class="appearance-actions">
+        <button id="toggle-hotbar" type="button">show / hide hotbar</button>
+        <button id="switch-hotbar-mode" type="button">switch hotbar mode</button>
+      </div>
       <label class="discord-enabled"><input id="quickcast" type="checkbox" checked> quickcast at target marker</label>
       <div id="bubble-preview" aria-label="bubble preview"></div>
       <div class="appearance-actions">
@@ -106,7 +113,7 @@
         <li><kbd>F2</kbd> opens chat in move mode for your saved avatar.</li>
         <li><kbd>F3</kbd> centers the view on your saved avatar at the current zoom.</li>
         <li><kbd>F4</kbd> toggles camera follow mode.</li>
-        <li><kbd>F10</kbd> opens keyboard settings. The hotbar keys default to the two positions to the right of 0.</li>
+        <li>With chat focused, <kbd>F10</kbd> opens keyboard settings. The hotbar keys default to the two positions to the right of 0.</li>
         <li>Use <kbd data-binding="move-up">W</kbd><kbd data-binding="move-left">A</kbd><kbd data-binding="move-down">S</kbd><kbd data-binding="move-right">D</kbd> or the alternate movement keys. By default, hold <kbd>Shift</kbd> for a half step.</li>
         <li>In move mode, <kbd data-binding="target">Z</kbd> sets a map target. Move the marker with your movement keys and press <kbd data-binding="confirm">Space</kbd> to set it. Use the targeting shortcut again to clear it.</li>
         <li>Misty Step and Shatter open targeting one tile ahead if they need a target.</li>

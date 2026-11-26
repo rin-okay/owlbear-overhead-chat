@@ -10,8 +10,8 @@ import {
 } from "./session.js?v=2.9.16";
 
 import { drawBubble, normalizeAppearance, prepareBubbleFont } from "./appearance.js?v=2.7.9";
-import { setupDiscordPanel } from "./discord-panel.js?v=2.11.4";
-import { damageNotation, openCombatLog, saveNotation } from "./combat-log.js?v=2.11.4";
+import { setupDiscordPanel } from "./discord-panel.js?v=2.11.5";
+import { damageNotation, openCombatLog, saveNotation } from "./combat-log.js?v=2.11.5";
 import { aimsAtLocation, artworkFacingAngle, MAX_CAST_LEVEL, SKILLS } from "./skills.js?v=2.11.0";
 import { ABILITIES, readTokenStats } from "./stats.js?v=2.8.5";
 import { setupAvatarPanel } from "./avatar-panel.js?v=2.11.0";
@@ -27,8 +27,8 @@ import { rollSpans, validateRollSpans } from "./dice.js";
 import { rollWithRumble } from "./rumble.js?v=2.9.4";
 import { rollWithNativeDice } from "./native-dice.js";
 import { hotbarOrientation, hotbarShowsLabels, sendHotbarCommand, setHotbarLabels, setHotbarOrientation } from "./hotbar.js?v=2.11.4";
-import { actionForChord, actionForEvent, bindingLabel, eventChord, keyIdentity, keyboardProfile, modifierMask } from "./key-bindings.js?v=2.11.4";
-import { handleRoomKey, openKeyboard } from "./keyboard-shortcuts.js?v=2.11.4";
+import { actionForChord, actionForEvent, bindingLabel, eventChord, keyIdentity, keyboardProfile, modifierMask } from "./key-bindings.js?v=2.11.5";
+import { handleRoomKey, openKeyboard } from "./keyboard-shortcuts.js?v=2.11.5";
 
 const combatView = new URLSearchParams(location.search).has("combat-log");
 const combatWindow = combatView ? document.querySelector("#combat-window") : null;
@@ -1335,6 +1335,14 @@ function setupSettings() {
       : openFromShortcut("toggle-move"),
     "combat-log": () => { if (!combatWindow) combatOpenButton.click(); },
   };
+  const centerChatAvatar = () => centerAvatar(OBR);
+  for (const [id, handler] of [
+    ["center-chat-avatar", centerChatAvatar],
+    ["toggle-hotbar", roomKeys["hotbar-toggle"]],
+    ["switch-hotbar-mode", roomKeys["hotbar-mode"]],
+  ]) {
+    document.getElementById(id).addEventListener("click", () => void handler().catch(console.error));
+  }
   window.addEventListener("storage", updateMoveModeLabel);
   document.addEventListener("keydown", (event) => {
     if (handleRoomKey(OBR, event, roomKeys)) return;
@@ -1345,7 +1353,7 @@ function setupSettings() {
     event.stopPropagation();
     if (event.repeat) return;
     if (event.key === "F4") void cameraFollow.toggle().catch(console.error);
-    else if (event.key === "F3") void centerAvatar(OBR).catch(console.error);
+    else if (event.key === "F3") void centerChatAvatar().catch(console.error);
     else if (!combatWindow) openFromShortcut(event.key === "F1" ? "chat" : "move");
     else if (event.key === "F1") void focusChatFromCombat().catch(console.error);
     else {
