@@ -1,5 +1,5 @@
 import { setupBless } from "./bless.js?v=2.9.14";
-import { combatDamage } from "./combat-log.js?v=2.9.4";
+import { combatDamage } from "./combat-log.js?v=2.11.0";
 import { isShieldGraphic, readShieldGraphics, setupShield } from "./shield.js?v=2.9.15";
 import { setupSleep } from "./sleep.js?v=2.9.15";
 import { canSpeak, MELEE_HIT_TIMING, normalizeMeleeHitTiming, ROLL_DAMAGE_FROM_COMBAT_LOG } from "./rules.js?v=2.9.4";
@@ -15,7 +15,7 @@ import {
 import {
   DEFAULT_WEAPON, EMBERS_EFFECTS, MAX_CAST_LEVEL, MELEE_DURATION_MS, RANGED_WEAPONS, SKILLS, SKILL_REQUEST, SKILL_RESULT, WEAPONS,
   aimsAtLocation, availableRangedWeapons, availableSkills, availableWeapons, friendlyFireMode, readSkills, skillConnections, skillEffect, spellParameter, tokenTeams, turnToHeading,
-} from "./skills.js?v=2.9.15";
+} from "./skills.js?v=2.11.0";
 
 function aimAtTarget(source, target, range = 0, passThrough = false, maxRange = Infinity) {
   if (![target?.center?.x, target?.center?.y].every(Number.isFinite)) return;

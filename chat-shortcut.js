@@ -20,7 +20,7 @@ export function listenForChatShortcut(obr, openChat) {
     } catch {
       return;
     }
-    if ((request?.mode === "chat" || request?.mode === "move") &&
+    if (["chat", "move", "toggle-move"].includes(request?.mode) &&
         Date.now() - request.time >= 0 && Date.now() - request.time < SHORTCUT_TTL) openChat(request.mode);
   }
   window.addEventListener("storage", (event) => {

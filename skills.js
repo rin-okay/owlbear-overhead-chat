@@ -136,13 +136,6 @@ export function readSkills(obr, type) {
   }
 }
 
-export function skillBinding(id, bindings, keyAllowed) {
-  const key = bindings?.[id];
-  if (key === "" || keyAllowed(key)) return key;
-  const defaultKey = SKILLS[id].key;
-  return Object.keys(SKILLS).some((other) => bindings?.[other] === defaultKey) ? "" : defaultKey;
-}
-
 export function writeSkills(obr, type, settings) {
   localStorage.setItem(storageKey(obr, type), JSON.stringify(settings));
 }

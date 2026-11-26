@@ -1,3 +1,4 @@
+import { bindingLabel, keyboardProfile } from "./key-bindings.js?v=2.11.0";
 import { setupStatsEditor } from "./stats-panel.js?v=2.8.5";
 import { isPublicToken } from "./rules.js";
 import { isProjectileToken } from "./projectile-collision.js?v=2.9.10";
@@ -5,8 +6,8 @@ import { spellDamageFormula } from "./spell-damage.js?v=2.9.13";
 import { readTokenStats } from "./stats.js?v=2.8.5";
 import {
   DEFAULT_WEAPON, FACINGS, FRIENDLY_FIRE_MODES, RANGED_WEAPONS, SKILLS, SKILL_CHANGED, SKILL_REQUEST, SKILL_RESULT, SPELLS, TEAMS, WEAPONS,
-  aimsAtLocation, availableRangedWeapons, availableSpells, availableWeapons, friendlyFireMode, readSkills, skillBinding, skillConnections, spellParameter, tokenTeams, validSpellParameter, writeSkills,
-} from "./skills.js?v=2.9.16";
+  aimsAtLocation, availableRangedWeapons, availableSpells, availableWeapons, friendlyFireMode, readSkills, skillConnections, spellParameter, tokenTeams, validSpellParameter, writeSkills,
+} from "./skills.js?v=2.11.0";
 
 function characterLabel(token) {
   return token.name || "unnamed character";
@@ -17,7 +18,7 @@ function facingFor(settings, token) {
   return FACINGS.some(([angle]) => angle === facing) ? facing : 0;
 }
 
-export function setupSkillPanel(obr, getAvatar, keyAllowed, showSpells, showChatNotice) {
+export function setupSkillPanel(obr, getAvatar, showSpells, showChatNotice) {
   const playerPanel = document.querySelector("#player-skills");
   const playerStatus = document.querySelector("#skill-settings-status");
   const castStatus = document.querySelector("#skill-cast-status");
@@ -27,10 +28,7 @@ export function setupSkillPanel(obr, getAvatar, keyAllowed, showSpells, showChat
   const preview = document.querySelector("#skill-avatar-preview");
   const portrait = preview.querySelector("img");
   const arrow = preview.querySelector("span");
-  // A stale popover can be missing a binding without blocking startup.
-  const bindInputs = Object.keys(SKILLS)
-    .map((id) => [id, playerPanel.querySelector("#skill-bind-" + id)])
-    .filter(([, select]) => select);
+  const bindingsList = playerPanel.querySelector("#skill-key-summary");
   const pending = new Map();
   let preferences = readSkills(obr, "player");
   let avatar;
@@ -40,10 +38,6 @@ export function setupSkillPanel(obr, getAvatar, keyAllowed, showSpells, showChat
   let enabled = false;
   let castStatusTimer;
   let listRevision = 0;
-
-  function binding(id) {
-    return skillBinding(id, preferences.bindings, keyAllowed);
-  }
 
   function selectedWeapon(tokenId) {
     const selected = preferences.weaponsByToken?.[tokenId];
@@ -75,12 +69,21 @@ export function setupSkillPanel(obr, getAvatar, keyAllowed, showSpells, showChat
     rangedWeapon.value = selectedRangedWeapon(avatar?.id) ?? "";
     rangedWeapon.closest("label").hidden = !available.includes("ranged");
     rangedWeapon.disabled = !enabled || !rangedWeapons.length;
-    for (const [id, select] of bindInputs) {
-      select.closest("label").hidden = !available.includes(id);
-      select.value = binding(id);
-      select.disabled = !enabled;
-    }
+    renderBindings();
   }
+
+  function renderBindings() {
+    if (!bindingsList) return;
+    const { bindings, layout } = keyboardProfile(obr);
+    bindingsList.replaceChildren(...available.map((id) => {
+      const row = document.createElement("li");
+      const key = document.createElement("kbd");
+      key.textContent = bindingLabel(bindings["skill-" + id], layout);
+      row.append(SKILLS[id].name + " ", key);
+      return row;
+    }));
+  }
+  if (bindingsList) window.addEventListener("storage", renderBindings);
 
   for (const [angle, label] of FACINGS) facing.add(new Option(label, angle));
   facing.addEventListener("change", () => {
@@ -98,25 +101,6 @@ export function setupSkillPanel(obr, getAvatar, keyAllowed, showSpells, showChat
       ...preferences, rangedWeaponsByToken: { ...preferences.rangedWeaponsByToken, [avatar.id]: rangedWeapon.value },
     });
   });
-  for (const [id, select] of bindInputs) {
-    select.add(new Option("unbound", ""));
-    for (const key of "abcdefghijklmnopqrstuvwxyz") {
-      if (keyAllowed(key)) select.add(new Option(key.toUpperCase(), key));
-    }
-    select.addEventListener("change", () => {
-      const key = select.value;
-      const other = Object.keys(SKILLS).find((other) => key && other !== id && binding(other) === key);
-      if (other && available.includes(other)) {
-        playerStatus.textContent = "That key is already bound to a skill.";
-        render();
-        return;
-      }
-      const bindings = { ...preferences.bindings, [id]: key };
-      if (other) bindings[other] = "";
-      savePreferences({ ...preferences, bindings });
-    });
-  }
-
   function savePreferences(next) {
     try {
       writeSkills(obr, "player", next);
@@ -266,7 +250,6 @@ export function setupSkillPanel(obr, getAvatar, keyAllowed, showSpells, showChat
   return {
     refresh, cast, hasSkill: (id) => available.includes(id),
     facingFor: (token) => facingFor(preferences, token),
-    skillForKey: (key) => Object.keys(SKILLS).find((id) => binding(id) === key && (id !== "ranged" || available.includes(id))),
   };
 }
 

@@ -1,5 +1,5 @@
 import { isProjectileToken } from "./projectile-collision.js?v=2.7.3";
-import { skillConnections, spellParameter, tokenTeams } from "./skills.js?v=2.7.7";
+import { skillConnections, spellParameter, tokenTeams } from "./skills.js?v=2.11.0";
 
 const BLESS_CASTER = "chat.overhead.bless.caster.v1";
 const BLESS_INTRO_END = "chat.overhead.bless.intro-end.v1";

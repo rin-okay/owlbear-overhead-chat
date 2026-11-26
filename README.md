@@ -35,6 +35,14 @@ The GM can turn on **habbo hotel mode** in the **gm** tab for pixel-style bubble
 
 [Owlbear Rodeo's extension installation guide](https://docs.owlbear.rodeo/extensions/tutorial-hello-world/install-your-extension/) · [Owlbear Rodeo's player permissions guide](https://docs.owlbear.rodeo/docs/permissions/)
 
+## Keyboard settings
+
+Open **settings → keyboard settings**, press **F10**, or use the physical slash-position shortcut when you are outside a text field. F1–F4 and F10 are fixed. The editor saves per player, room, and browser. Existing skill hotkeys migrate automatically. Shift+Enter still adds a new line with the default chat binding.
+
+Drag an action from **Unassigned** onto the keyboard, or double-click its name and press a key or chord. The old action on that key moves to Unassigned. Drag an assigned action to the sidebar or use **Unassign** to clear it. Select Shift, Ctrl, Alt, or Meta above the keyboard to edit that layer. Movement, targeting, chat, hotbar, spells, quickbar slots and their prompt choices all use the same bindings. A quickbar binding also supplies that numbered choice in spell-level and projectile prompts. Related default chords follow their base key until customized individually.
+
+Within extension panels, the shortcuts use physical key positions. For example, the hotbar toggle is the second key to the right of 0 on a standard number row, even if the keycap isn't marked `=`. The graphic uses local labels when the browser exposes them or you capture a key. When the Owlbear map itself has focus, the extension registers supported shortcut strings with Owlbear. Use F10 or the toolbar if your browser or layout prevents a map shortcut from registering, or capture a different key for that action.
+
 ## Combat log
 
 Click **combat log** in Overhead Chat to open the bottom-right panel. It stays open while you use the map. The avatar has the same move-mode controls while the log has focus. Press Space to focus chat, or use it to confirm a map target while targeting. The log shows recent casts, targets, misses, blocks, and the dice behind rolled damage. Combat history starts when you join the scene and clears on a scene change.

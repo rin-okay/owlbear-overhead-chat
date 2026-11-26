@@ -1,4 +1,4 @@
-import { skillConnections } from "./skills.js?v=2.9.15";
+import { skillConnections } from "./skills.js?v=2.11.0";
 
 const SHIELD = "chat.overhead.shield.v1";
 const SHIELD_INTRO_END = "chat.overhead.shield.intro-end.v1";

@@ -11,22 +11,24 @@ import {
 
 import { drawBubble, normalizeAppearance, prepareBubbleFont } from "./appearance.js?v=2.7.9";
 import { setupDiscordPanel } from "./discord-panel.js?v=2.10.2";
-import { damageNotation, openCombatLog, saveNotation } from "./combat-log.js?v=2.10.2";
-import { aimsAtLocation, artworkFacingAngle, MAX_CAST_LEVEL, SKILLS } from "./skills.js?v=2.9.16";
+import { damageNotation, openCombatLog, saveNotation } from "./combat-log.js?v=2.11.0";
+import { aimsAtLocation, artworkFacingAngle, MAX_CAST_LEVEL, SKILLS } from "./skills.js?v=2.11.0";
 import { ABILITIES, readTokenStats } from "./stats.js?v=2.8.5";
-import { setupAvatarPanel } from "./avatar-panel.js?v=2.9.16";
-import { setupSkillGrants, setupSkillPanel } from "./skill-panel.js?v=2.10.2";
+import { setupAvatarPanel } from "./avatar-panel.js?v=2.11.0";
+import { setupSkillGrants, setupSkillPanel } from "./skill-panel.js?v=2.11.0";
 import { setupStatsEditor } from "./stats-panel.js?v=2.8.5";
 import { EMOTE } from "./emotes.js?v=2.7.21";
 import { setupTargeting } from "./targeting.js?v=2.10.2";
-import { listenForChatShortcut, requestChatShortcut } from "./chat-shortcut.js?v=2.6.4";
+import { listenForChatShortcut, requestChatShortcut } from "./chat-shortcut.js?v=2.11.0";
 import { cameraFollowPreference, centerAvatar, prepareKeyboardPan } from "./avatar-viewport.js?v=2.7.9";
 
 import { readMovementGrid, stepAvatar, turnAvatar } from "./movement.js?v=2.7.5";
 import { rollSpans, validateRollSpans } from "./dice.js";
 import { rollWithRumble } from "./rumble.js?v=2.9.4";
 import { rollWithNativeDice } from "./native-dice.js";
-import { handleHotbarKey, hotbarOrientation, hotbarShowsLabels, sendHotbarCommand, setHotbarLabels, setHotbarOrientation } from "./hotbar.js?v=2.10.2";
+import { hotbarOrientation, hotbarShowsLabels, sendHotbarCommand, setHotbarLabels, setHotbarOrientation } from "./hotbar.js?v=2.11.0";
+import { actionForChord, actionForEvent, bindingLabel, eventChord, keyIdentity, keyboardProfile, modifierMask } from "./key-bindings.js?v=2.11.0";
+import { handleRoomKey, openKeyboard } from "./keyboard-shortcuts.js?v=2.11.0";
 
 const combatView = new URLSearchParams(location.search).has("combat-log");
 const combatWindow = combatView ? document.querySelector("#combat-window") : null;
@@ -52,7 +54,7 @@ if (combatWindow) {
   stylesheet.rel = "stylesheet";
   stylesheet.href = new URL("./combat-log.css?v=2.9.16", import.meta.url).href;
   document.head.append(stylesheet);
-  void import("./combat-log-panel.js?v=2.9.16")
+  void import("./combat-log-panel.js?v=2.11.0")
     .then(({ setCombatRollers }) => setCombatRollers(rollCombatSave, rollCombatDamage)).catch(console.error);
 }
 
@@ -82,16 +84,6 @@ let showSkillsForRole;
 let moveWarningTimer;
 let moveWarningFade;
 const SLOT_DOUBLE_TAP_MS = 500;
-
-const movementKeys = {
-  arrowleft: { offset: [-1, 0] }, a: { offset: [-1, 0] },
-  arrowright: { offset: [1, 0] }, d: { offset: [1, 0] },
-  arrowup: { offset: [0, -1] }, w: { offset: [0, -1] },
-  arrowdown: { offset: [0, 1] }, s: { offset: [0, 1] },
-  q: { rotation: -15 }, ",": { rotation: -15 },
-  e: { rotation: 15 }, ".": { rotation: 15 },
-  r: { mirror: true },
-};
 
 function appendLine(entry, target) {
   const line = document.createElement("li");
@@ -624,14 +616,16 @@ function askProjectileCounts(mode, targets, count, unit) {
 function handleProjectileCount(event) {
   const mode = tokenControl;
   const prompt = mode?.projectilePrompt;
-  if (!prompt || event.ctrlKey || event.altKey || event.metaKey || event.isComposing) return false;
+  if (!prompt) return false;
+  const action = controlAction(event);
+  const digit = choiceDigit(action);
   if (event.repeat) return true;
-  if (event.key === "Escape") {
+  if (action?.id === "cancel") {
     mode.projectilePrompt = undefined;
     prompt.resolve(undefined);
-  } else if (/^[0-9]$/.test(event.key)) {
+  } else if (digit) {
     const slots = prompt.targets.length - prompt.counts.length;
-    const count = Number(event.key) || 10;
+    const count = Number(digit) || 10;
     if (count > prompt.remaining - slots + 1) return true;
     prompt.counts.push(count);
     prompt.remaining -= count;
@@ -647,10 +641,25 @@ function handleProjectileCount(event) {
   return true;
 }
 
+function controlAction(event) {
+  return actionForEvent(keyboardProfile(OBR).bindings, event);
+}
+
+function shortcutLabel(id) {
+  const { bindings, layout } = keyboardProfile(OBR);
+  return bindingLabel(bindings[id], layout);
+}
+
+function choiceDigit(action) {
+  return action?.id.startsWith("slot-") ? action.digit : undefined;
+}
+
 function updateMoveModeLabel() {
   const prompt = tokenControl?.projectilePrompt;
   const max = prompt ? prompt.remaining - (prompt.targets.length - prompt.counts.length) + 1 : 0;
-  const question = prompt ? `number of ${prompt.unit} for target: ${prompt.targets[prompt.counts.length].name || "unnamed character"} · 1–${max}${max === 10 ? " (0 = 10)" : ""} · esc to cancel` : "";
+  const cancel = shortcutLabel("cancel");
+  const confirm = shortcutLabel("confirm");
+  const question = prompt ? `number of ${prompt.unit} for target: ${prompt.targets[prompt.counts.length].name || "unnamed character"} · choices 1–${max}${max === 10 ? " (0 = 10)" : ""} · ${cancel} to cancel` : "";
   const combatPrompt = combatWindow?.querySelector("#combat-projectile-prompt");
   if (combatPrompt) {
     combatPrompt.hidden = !question;
@@ -659,24 +668,29 @@ function updateMoveModeLabel() {
   const spell = SKILLS[tokenControl?.upcast?.skill];
   const aimedSpell = SKILLS[targeting?.pendingCast()?.skill];
   moveModeLabel.textContent = controlsInactive ? "controls inactive · press F1 to chat or F2 to move"
-    : question || (spell ? `${spell.name} level · ${spell.spellLevel}–${MAX_CAST_LEVEL}, esc to cancel`
-    : aimedSpell ? `${aimedSpell.name} · wasd, space to cast`
-    : targeting?.editing() ? (quickcastEnabled ? "target · wasd, space or skill key" : "set target · wasd, space to set")
+    : question || (spell ? `${spell.name} level · choices ${spell.spellLevel}–${MAX_CAST_LEVEL} · ${cancel} to cancel`
+    : aimedSpell ? `${aimedSpell.name} · move marker · ${confirm} to cast`
+    : targeting?.editing() ? `target · move marker · ${confirm} to set${quickcastEnabled ? " or press a skill key" : ""}`
     : targeting?.location() ? "move mode · target set" : "move mode enabled");
 }
 
 function handleSpellLevelKey(event) {
   const mode = tokenControl;
   const upcast = mode?.upcast;
-  if (!upcast || event.altKey || event.metaKey) return false;
-  const digit = event.code ? /^Digit([1-9])$/.exec(event.code)?.[1] : /^[1-9]$/.exec(event.key)?.[0];
-  if (event.ctrlKey && (!upcast.aim || (!digit && event.key !== "Escape"))) return false;
-  if (event.repeat) return true;
-
-  if (digit || event.key === "Escape") {
+  if (!upcast) return false;
+  let action = controlAction(event);
+  // The modifiers that began an upcast can stay held while deciding its level.
+  if (!choiceDigit(action) && action?.id !== "cancel") {
+    const pressed = eventChord(event);
+    if (pressed && (pressed.modifiers & upcast.heldModifiers)) {
+      action = actionForChord(keyboardProfile(OBR).bindings, { ...pressed, modifiers: pressed.modifiers & ~upcast.heldModifiers });
+    }
+  }
+  const digit = choiceDigit(action);
+  if (!event.repeat && ((digit && digit !== "0") || action?.id === "cancel")) {
     mode.upcast = undefined;
     updateMoveModeLabel();
-    if (digit && !mode.switching) {
+    if (digit && digit !== "0" && !mode.switching) {
       const spellLevel = Number(digit);
       if (upcast.aim) aimSpell(mode, { skill: upcast.skill, spellLevel });
       else if (!targeting?.editing() || mode.actions.length < 4) queueSkill(mode, upcast.skill, spellLevel);
@@ -685,24 +699,28 @@ function handleSpellLevelKey(event) {
   return true;
 }
 
-function handleAimKey(event) {
+function boundSkill(action) {
+  if (action?.skill) return action.skill;
+  if (action?.digit && !usesTalkSlots(action.digit)) {
+    const slot = savedQuickbarSlots()[slotIndex(action.digit)];
+    if (slot?.kind === "spell") return slot.skill;
+  }
+}
+
+function handleAimKey(event, action) {
   const mode = tokenControl;
-  if (!mode || mode.switching || mode.projectilePrompt || mode.upcast || !targeting ||
-      !event.ctrlKey || event.altKey || event.metaKey) return false;
-  const key = /^Digit([0-9])$/.exec(event.code)?.[1] ?? event.key.toLowerCase();
-  const slot = /^[0-9]$/.test(key) && !usesTalkSlots(key) ? savedQuickbarSlots()[slotIndex(key)] : undefined;
-  const skill = slot?.kind === "spell" ? slot.skill : skillPanel?.skillForKey(key);
+  if (!action?.aim || !mode || mode.switching || !targeting) return false;
+  const skill = boundSkill(action);
   if (!Number.isInteger(SKILLS[skill]?.spellLevel) || !aimsAtLocation(skill) ||
-      !skillPanel?.hasSkill(skill) || (event.shiftKey && !SKILLS[skill].upcast)) return false;
-  if (!event.repeat) useSkillKey(mode, skill, event.shiftKey, true);
+      !skillPanel?.hasSkill(skill) || (action.upcast && !SKILLS[skill].upcast)) return false;
+  if (!event.repeat) useSkillKey(mode, skill, action.upcast, true, modifierMask(event));
   return true;
 }
 
-function handleTargetKey(event) {
+function handleTargetKey(event, action) {
   const mode = tokenControl;
-  if (!mode || mode.switching || !targeting || event.ctrlKey || event.altKey || event.metaKey) return false;
-  const key = event.key.toLowerCase();
-  if (key === "z" && !event.shiftKey) {
+  if (!mode || mode.switching || !targeting) return false;
+  if (action?.id === "target") {
     if (!event.repeat) {
       stopRotation(mode);
       targeting.toggle(mode.tokenId);
@@ -710,27 +728,25 @@ function handleTargetKey(event) {
     return true;
   }
   if (!targeting.editing()) return false;
-  if (/^[wasd]$/.test(key)) targeting.move(movementKeys[key].offset);
-  else if (!event.repeat && key === " ") {
-    modeExitKey = event.key;
+  if (action?.offset) targeting.move(action.half ? action.offset.map((offset) => offset * 2) : action.offset);
+  else if (!event.repeat && action?.id === "confirm") {
+    modeExitKey = keyIdentity(event);
     const cast = targeting.pendingCast();
     if (cast) queueTargetCast(mode, cast);
     else void targeting.confirm();
-  } else if (!event.repeat && key === "escape") targeting.clear();
-  else if (!event.repeat && quickcastEnabled && mode.actions.length < 4) {
-    const slot = !event.shiftKey && /^[0-9]$/.test(key) && !usesTalkSlots(key)
-      ? savedQuickbarSlots()[slotIndex(key)] : undefined;
-    const skill = slot?.kind === "spell" ? slot.skill : skillPanel?.skillForKey(key);
-    if (aimsAtLocation(skill) && skillPanel?.hasSkill(skill)) useSkillKey(mode, skill, event.shiftKey);
+  } else if (!event.repeat && action?.id === "cancel") targeting.clear();
+  else if (!event.repeat && quickcastEnabled && mode.actions.length < 4 && !action?.aim) {
+    const skill = boundSkill(action);
+    if (aimsAtLocation(skill) && skillPanel?.hasSkill(skill)) useSkillKey(mode, skill, action?.upcast, false, modifierMask(event));
   }
   return true;
 }
 
-function useSkillKey(mode, skill, upcast, aim = false) {
+function useSkillKey(mode, skill, upcast, aim, heldModifiers) {
   if (upcast && !SKILLS[skill].upcast) return;
   if (upcast || aim) stopRotation(mode);
   if (upcast) {
-    mode.upcast = { skill, aim };
+    mode.upcast = { skill, aim, heldModifiers };
     updateMoveModeLabel();
   } else if (aim) aimSpell(mode, { skill });
   else queueSkill(mode, skill);
@@ -753,25 +769,27 @@ input.addEventListener("pointerdown", () => {
 });
 moveButton.addEventListener("click", toggleTokenControl);
 function handleControlKeyUp(event) {
-  if (event.key === modeExitKey) {
+  const physicalKey = keyIdentity(event);
+  if (physicalKey && physicalKey === modeExitKey) {
     modeExitKey = undefined;
     event.preventDefault();
   }
-  if (tokenControl?.heldRotation?.key === (event.code || event.key.toLowerCase())) stopRotation(tokenControl);
+  if (tokenControl?.heldRotation?.key === physicalKey) stopRotation(tokenControl);
 }
 
 function handleControlKeyDown(event) {
-  const physicalKey = event.code || event.key.toLowerCase();
-  if (event.repeat && tokenControl?.heldRotation?.key === physicalKey) {
+  if (event.defaultPrevented || event.isComposing || event.keyCode === 229) return;
+  const physicalKey = keyIdentity(event);
+  if (physicalKey && event.repeat && tokenControl?.heldRotation?.key === physicalKey) {
     event.preventDefault();
     return;
   }
-  if (event.isComposing || event.keyCode === 229) return;
-  if (handleProjectileCount(event) || handleSpellLevelKey(event) || handleAimKey(event) || handleTargetKey(event)) {
+  const action = controlAction(event);
+  if (handleProjectileCount(event) || handleSpellLevelKey(event) || handleAimKey(event, action) || handleTargetKey(event, action)) {
     event.preventDefault();
     return;
   }
-  if (event.key === modeExitKey) {
+  if (physicalKey && physicalKey === modeExitKey) {
     if (event.repeat) {
       event.preventDefault();
       return;
@@ -779,42 +797,33 @@ function handleControlKeyDown(event) {
     modeExitKey = undefined;
   }
   if (tokenControl) {
-    const key = event.key.toLowerCase();
-    if (key === "escape" || key === " " || key === "enter") {
+    if (["cancel", "confirm", "send"].includes(action?.id)) {
       event.preventDefault();
       if (event.repeat) return;
-      modeExitKey = event.key;
+      modeExitKey = physicalKey;
       stopTokenControl();
       if (combatWindow) combatModePaused = true;
       else input.focus();
-    } else if (/^[0-9]$/.test(key) && !event.ctrlKey && !event.altKey && !event.metaKey) {
+    } else if (choiceDigit(action)) {
       event.preventDefault();
-      if (!event.repeat) useAvatarSlot(tokenControl, key);
-    } else if (Object.hasOwn(movementKeys, key) && !event.ctrlKey && !event.altKey && !event.metaKey) {
+      if (!event.repeat) useAvatarSlot(tokenControl, action.digit);
+    } else if (action?.offset || action?.rotation || action?.mirror) {
       event.preventDefault();
-      if (tokenControl.switching) return;
-      let action = movementKeys[key];
-      const { offset, rotation, mirror } = action;
-      if (event.repeat && (rotation || mirror || tokenControl.actions.length >= 4)) return;
-      if (event.shiftKey && offset) {
-        action = { offset: [offset[0] / 2, offset[1] / 2] };
-      } else if (event.shiftKey && (key === "q" || key === "e")) {
-        action = { rotation: Math.sign(rotation) * 90 };
-      }
+      if (tokenControl.switching || event.repeat &&
+          (action.rotation || action.mirror || tokenControl.actions.length >= 4)) return;
       queueAvatarAction(tokenControl, action);
       if (action.rotation) holdRotation(tokenControl, physicalKey, action);
-    } else if (!event.ctrlKey && !event.altKey && !event.metaKey) {
-      const skill = skillPanel?.skillForKey(key);
-      if (!skill || tokenControl.switching || (event.shiftKey && !SKILLS[skill].upcast)) return;
+    } else if (action?.skill && !action.aim && (action.skill !== "ranged" || skillPanel?.hasSkill("ranged"))) {
+      if (tokenControl.switching) return;
       event.preventDefault();
       if (event.repeat || tokenControl.actions.length >= 4) return;
-      useSkillKey(tokenControl, skill, event.shiftKey);
+      useSkillKey(tokenControl, action.skill, action.upcast, false, modifierMask(event));
     }
     return;
   }
-  if (combatWindow || event.key !== "Enter" || event.shiftKey) return;
+  if (combatWindow || action?.id !== "send") return;
   event.preventDefault();
-  form.requestSubmit();
+  if (!event.repeat) form.requestSubmit();
 }
 
 async function focusChatFromCombat() {
@@ -856,13 +865,14 @@ if (combatWindow) {
     if (combatKeyTarget(event.target)) handleControlKeyUp(event);
   });
   document.addEventListener("keydown", (event) => {
-    if (event.defaultPrevented || !combatKeyTarget(event.target) || event.isComposing || event.keyCode === 229) return;
+    if (event.defaultPrevented || !combatKeyTarget(event.target) ||
+        event.target.closest?.("input, textarea, select, [contenteditable], [popover]:popover-open") ||
+        event.isComposing || event.keyCode === 229) return;
     if (handleProjectileCount(event)) {
       event.preventDefault();
       return;
     }
-    const pressingSpace = event.key === " " && !event.ctrlKey && !event.altKey && !event.metaKey;
-    if (pressingSpace && !targeting?.editing() && !tokenControl?.upcast) {
+    if (controlAction(event)?.id === "confirm" && !targeting?.editing() && !tokenControl?.upcast) {
       event.preventDefault();
       if (!event.repeat) void focusChatFromCombat().catch(console.error);
       return;
@@ -1180,9 +1190,7 @@ function setupSettings() {
   const doneButton = document.querySelector("#tutorial-done");
   const { refresh: updateAvatarPanel, showSpells } = setupAvatarPanel(avatarPanel);
   refreshAvatarPanel = (items) => updateAvatarPanel(items, playerRole);
-  skillPanel = setupSkillPanel(OBR, () => avatar, (key) =>
-    typeof key === "string" && /^[a-z]$/.test(key) && key !== "z" && !Object.hasOwn(movementKeys, key),
-    showSpells, (text) => sendChatNotice?.(text));
+  skillPanel = setupSkillPanel(OBR, () => avatar, showSpells, (text) => sendChatNotice?.(text));
   const refreshSkillGrants = setupSkillGrants(OBR);
   const loadoutTab = document.querySelector("#skill-loadout-tab");
   const statsTab = document.querySelector("#skill-stats-tab");
@@ -1281,6 +1289,9 @@ function setupSettings() {
 
   function showTutorial() {
     select(-1);
+    for (const label of tutorialPanel.querySelectorAll("[data-binding]")) {
+      label.textContent = shortcutLabel(label.dataset.binding);
+    }
     tutorialPanel.hidden = false;
     tutorialPanel.querySelector("h2").focus();
   }
@@ -1301,6 +1312,7 @@ function setupSettings() {
   });
   skillsTab.addEventListener("click", () => select(4));
   function openFromShortcut(mode) {
+    if (mode === "toggle-move") mode = tokenControl ? "chat" : "move";
     select(0);
     if (mode === "chat") {
       tokenFocusHandoff = undefined;
@@ -1310,9 +1322,22 @@ function setupSettings() {
     pendingChatShortcut = mode;
     void refresh();
   }
+  const showKeyboard = () => openKeyboard(OBR);
+  for (const id of ["open-keyboard", "edit-skill-keys"]) {
+    document.getElementById(id)?.addEventListener("click", () => void showKeyboard().catch(console.error));
+  }
+  const roomKeys = {
+    "hotbar-toggle": () => sendHotbarCommand(OBR, "toggle"),
+    "hotbar-mode": () => sendHotbarCommand(OBR, "mode"),
+    keyboard: showKeyboard,
+    "move-mode": () => combatWindow
+      ? (tokenControl ? focusChatFromCombat() : resumeCombatControls({ combatKey: true }))
+      : openFromShortcut("toggle-move"),
+    "combat-log": () => { if (!combatWindow) combatOpenButton.click(); },
+  };
+  window.addEventListener("storage", updateMoveModeLabel);
   document.addEventListener("keydown", (event) => {
-    if (!event.target.closest?.("input:not([type=checkbox]), textarea, select, [contenteditable], dialog") &&
-        handleHotbarKey(OBR, event)) return;
+    if (handleRoomKey(OBR, event, roomKeys)) return;
     if (combatWindow && event.key !== "F2" && event.target.closest?.("dialog")) return;
     if (!["F1", "F2", "F3", "F4"].includes(event.key) || event.ctrlKey || event.altKey ||
         event.metaKey || event.shiftKey || event.isComposing) return;

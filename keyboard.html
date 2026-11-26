@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Overhead Chat keyboard settings</title>
+  <link rel="stylesheet" href="./keyboard.css?v=2.11.0">
+  <script type="module" src="./keyboard-editor.js?v=2.11.0"></script>
+</head>
+<body>
+  <main>
+    <header>
+      <div><h1>Keyboard settings</h1><p>Drag an action to a key, or select it and press a shortcut.</p></div>
+      <button id="close" type="button" aria-label="Close keyboard settings">✕</button>
+    </header>
+    <div class="editor">
+      <section class="board-panel" aria-label="Keyboard layout">
+        <div class="toolbar">
+          <div id="modifiers" aria-label="Show modifier layer"></div>
+          <button id="reset" type="button">Reset bindings</button>
+        </div>
+        <div id="fixed" aria-label="Fixed shortcuts"></div>
+        <div id="board" aria-label="Assignable keys"></div>
+        <div id="selection" class="selection" aria-label="Selected action"></div>
+        <p id="feedback" role="status" aria-live="polite"></p>
+      </section>
+      <aside id="sidebar" aria-labelledby="sidebar-title">
+        <h2 id="sidebar-title">Unassigned</h2>
+        <label class="filter-label">Find actions <input id="filter" type="search" placeholder="Search"></label>
+        <label class="show-all"><input id="show-all" type="checkbox"> Show assigned actions too</label>
+        <div id="actions"></div>
+      </aside>
+    </div>
+  </main>
+</body>
+</html>

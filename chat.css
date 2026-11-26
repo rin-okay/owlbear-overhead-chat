@@ -179,3 +179,13 @@ select { font: inherit; background: #181321; color: inherit; border: 1px solid #
 
 .roll-status { color: #ab9dbb; font-style: italic; }
 .roll-heading .message-text { display: inline; }
+
+#skill-key-summary {
+  display: grid;
+  gap: 3px;
+  margin: 5px 0;
+  padding: 0;
+  list-style: none;
+}
+#skill-key-summary:empty { display: none; }
+#skill-key-summary li { display: flex; justify-content: space-between; gap: 8px; }

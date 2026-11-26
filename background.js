@@ -13,13 +13,14 @@ import { chatParts, isRollCommand, rollSpans } from "./dice.js";
 import { queueDiscord } from "./discord.js?v=2.3.9";
 import { parseTray } from "./dice-replay.js";
 import { queueDicePopup, resetDicePopups } from "./dice-popup.js";
-import { setupSkillHost } from "./skill-host.js?v=2.10.2";
-import { setupHotbar } from "./hotbar.js?v=2.9.17";
-import { setupCombatLog } from "./combat-log.js?v=2.9.15";
-import { SKILL_CHANGED, skillConnections, skillGrantLabel } from "./skills.js?v=2.9.13";
+import { setupSkillHost } from "./skill-host.js?v=2.11.0";
+import { setupHotbar } from "./hotbar.js?v=2.11.0";
+import { openCombatLog, setupCombatLog } from "./combat-log.js?v=2.11.0";
+import { SKILL_CHANGED, skillConnections, skillGrantLabel } from "./skills.js?v=2.11.0";
 import { EMOTE, floatEmote, parseEmote } from "./emotes.js?v=2.7.22";
-import { setupHitMarkers } from "./hit-markers.js?v=2.10.2";
-import { requestChatShortcut } from "./chat-shortcut.js?v=2.6.4";
+import { setupHitMarkers } from "./hit-markers.js?v=2.11.0";
+import { requestChatShortcut } from "./chat-shortcut.js?v=2.11.0";
+import { openKeyboard, setupSceneKeys } from "./keyboard-shortcuts.js?v=2.11.0";
 import { setupChatRecovery } from "./chat-recovery.js?v=2.6.6";
 import { centerAvatar, setupCameraFollow } from "./avatar-viewport.js?v=2.7.9";
 
@@ -394,8 +395,6 @@ OBR.onReady(() => {
     ["F2", "move", "Move chat avatar (F2)", "./icon.svg"],
     ["F3", "center", "Center chat avatar (F3)", "./icon.svg"],
     ["F4", "follow", "Toggle camera follow mode (F4)", "./icon.svg"],
-    ["=", "bar-toggle", "Show or hide hotbar (=)", "./icon.svg"],
-    ["-", "bar-mode", "Switch hotbar mode (-)", "./icon.svg"],
   ]) {
     OBR.tool.create({
       id: "chat.overhead.shortcut." + mode,
@@ -404,12 +403,18 @@ OBR.onReady(() => {
       onClick() {
         if (mode === "follow") void cameraFollow.toggle().catch(report);
         else if (mode === "center") void centerAvatar(OBR).catch(report);
-        else if (mode === "bar-toggle" || mode === "bar-mode") void hotbar(mode.slice(4)).catch(report);
         else void openFromShortcut(mode).catch(report);
         return false;
       },
     }).catch(report);
   }
+  setupSceneKeys(OBR, {
+    "hotbar-toggle": () => hotbar("toggle"),
+    "hotbar-mode": () => hotbar("mode"),
+    keyboard: () => openKeyboard(OBR),
+    "move-mode": () => openFromShortcut("toggle-move"),
+    "combat-log": () => openCombatLog(OBR),
+  }, report);
   combatLog = setupCombatLog(OBR);
   setupSkillHost(OBR, buildImage, combatLog.record);
   setupChatRecovery(OBR, function* () {

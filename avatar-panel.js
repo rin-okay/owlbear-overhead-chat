@@ -1,6 +1,6 @@
 import OBR from "./obr.js";
 import { BUILTIN_EMOTES } from "./emotes.js?v=2.7.21";
-import { SKILLS, SPELLS } from "./skills.js?v=2.9.15";
+import { SKILLS, SPELLS } from "./skills.js?v=2.11.0";
 import { isPublicToken } from "./rules.js";
 import {
   savedAvatarSlots, saveAvatarSlot, savedAvatarMode, saveAvatarMode,

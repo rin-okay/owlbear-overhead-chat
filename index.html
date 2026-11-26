@@ -4,8 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>overhead chat</title>
-  <link rel="stylesheet" href="./chat.css?v=2.8.10">
-  <script type="module" src="./chat.js?v=2.10.2"></script>
+  <link rel="stylesheet" href="./chat.css?v=2.11.0">
+  <script type="module" src="./chat.js?v=2.11.0"></script>
 </head>
 <body>
   <main>
@@ -83,6 +83,7 @@
         <button id="export-appearance" type="button">export color settings</button>
       </div>
       <div class="appearance-actions">
+        <button id="open-keyboard" type="button" aria-haspopup="dialog" aria-keyshortcuts="F10">keyboard settings</button>
         <button id="open-tutorial" type="button" aria-controls="tutorial-panel">movement tutorial</button>
       </div>
     </section>
@@ -94,13 +95,13 @@
         <li><kbd>F2</kbd> opens chat in move mode for your saved avatar.</li>
         <li><kbd>F3</kbd> centers the view on your saved avatar at the current zoom.</li>
         <li><kbd>F4</kbd> toggles camera follow mode.</li>
-        <li><kbd>=</kbd> shows or hides the hotbar. <kbd>-</kbd> switches between skills and quickbar slots.</li>
-        <li>Use <kbd>WASD</kbd> or the arrow keys. Hold <kbd>Shift</kbd> for a half step.</li>
-        <li>In move mode, <kbd>Z</kbd> sets a map target. Move the marker with <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> and press <kbd>Space</kbd> to set it and return to move mode. Press <kbd>Z</kbd> again to clear it.</li>
+        <li><kbd>F10</kbd> opens keyboard settings. The hotbar keys default to the two positions to the right of 0.</li>
+        <li>Use <kbd data-binding="move-up">W</kbd><kbd data-binding="move-left">A</kbd><kbd data-binding="move-down">S</kbd><kbd data-binding="move-right">D</kbd> or the alternate movement keys. By default, hold <kbd>Shift</kbd> for a half step.</li>
+        <li>In move mode, <kbd data-binding="target">Z</kbd> sets a map target. Move the marker with your movement keys and press <kbd data-binding="confirm">Space</kbd> to set it. Use the targeting shortcut again to clear it.</li>
         <li>Misty Step and Shatter open targeting one tile ahead if they need a target.</li>
         <li>With quickcast enabled, press a skill hotkey while moving the target marker to cast there and clear the marker.</li>
-        <li>Hold <kbd>Shift</kbd> and press the hotkey for Bless, Magic Missile, Burning Hands, Shatter, or Fireball, then choose the spell level on the number row. <kbd>Esc</kbd> cancels the level prompt.</li>
-        <li><kbd>Q</kbd> / <kbd>E</kbd> turn 15°, or 90° with <kbd>Shift</kbd>. <kbd>R</kbd> flips, and <kbd>Esc</kbd> exits move mode.</li>
+        <li>Hold <kbd>Shift</kbd> and press the hotkey for Bless, Magic Missile, Burning Hands, Shatter, or Fireball, then choose the spell level on the number row. <kbd data-binding="cancel">Esc</kbd> cancels the level prompt.</li>
+        <li><kbd data-binding="rotate-left">Q</kbd> / <kbd data-binding="rotate-right">E</kbd> turn 15°. <kbd data-binding="quarter-left">Shift+Q</kbd> / <kbd data-binding="quarter-right">Shift+E</kbd> turn 90°. <kbd data-binding="mirror">R</kbd> flips. <kbd data-binding="cancel">Esc</kbd> exits move mode.</li>
         <li>Select one other character token on the map and press a skill hotkey to aim at it.</li>
       </ul>
       <h3>move around the map</h3>
@@ -116,12 +117,12 @@
         <button id="avatar-change" type="button" aria-pressed="true" aria-controls="avatar-change-panel">quickbar</button>
       </div>
       <div id="avatar-talk-panel" hidden>
-        <p>Press 1–9 in move mode to switch to the assigned token.</p>
+        <p>Use the assigned Quickbar shortcuts in move mode to switch between tokens 1–9.</p>
         <div id="avatar-slots"></div>
         <p role="status"></p>
       </div>
       <div id="avatar-change-panel">
-        <p>Assign avatar art, an emote, or a granted spell to slots 1–9 and 0. Press the slot number in move mode. Slot 0 defaults to Sleep (AFK).</p>
+        <p>Assign avatar art, an emote, or a granted spell to slots 1–9 and 0. Use the slot’s assigned shortcut in move mode. Slot 0 defaults to Sleep (AFK).</p>
         <div id="avatar-scene-art" hidden>
           <label for="avatar-art-source">choose an image from one of your scene items</label>
           <select id="avatar-art-source"></select>
@@ -145,18 +146,8 @@
         </div>
         <label class="skill-field">melee weapon <select id="skill-weapon" disabled></select></label>
         <label class="skill-field" hidden>ranged weapon <select id="skill-ranged-weapon" disabled></select></label>
-        <label class="skill-field" hidden>melee weapon attack <select id="skill-bind-spear" aria-label="melee weapon attack key"></select></label>
-        <label class="skill-field" hidden>ranged weapon attack <select id="skill-bind-ranged" aria-label="ranged weapon attack key"></select></label>
-        <label class="skill-field" hidden>magic missile <select id="skill-bind-missile" aria-label="magic missile key"></select></label>
-        <label class="skill-field" hidden>burning hands <select id="skill-bind-burning-hands" aria-label="burning hands key"></select></label>
-        <label class="skill-field" hidden>fire bolt <select id="skill-bind-fire-bolt" aria-label="fire bolt key"></select></label>
-        <label class="skill-field" hidden>fireball <select id="skill-bind-fireball" aria-label="fireball key"></select></label>
-        <label class="skill-field" hidden>bless <select id="skill-bind-bless" aria-label="bless key"></select></label>
-        <label class="skill-field" hidden>shield <select id="skill-bind-shield" aria-label="shield key"></select></label>
-        <label class="skill-field" hidden>heart <select id="skill-bind-heart" aria-label="heart key"></select></label>
-        <label class="skill-field" hidden>eldritch blast <select id="skill-bind-eldritch-blast" aria-label="eldritch blast key"></select></label>
-        <label class="skill-field" hidden>misty step <select id="skill-bind-misty-step" aria-label="misty step key"></select></label>
-        <label class="skill-field" hidden>shatter <select id="skill-bind-shatter" aria-label="shatter key"></select></label>
+        <button type="button" id="edit-skill-keys" aria-haspopup="dialog">edit skill shortcuts</button>
+        <ul id="skill-key-summary" aria-label="Assigned skill shortcuts"></ul>
         <p id="skill-settings-status" class="skill-feedback" role="status"></p>
       </section>
       <section id="player-stats" aria-label="avatar stats" hidden>

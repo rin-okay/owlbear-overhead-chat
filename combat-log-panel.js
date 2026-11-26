@@ -1,5 +1,6 @@
+import { actionForEvent, keyboardProfile } from "./key-bindings.js?v=2.11.0";
 import OBR from "./obr.js";
-import { COMBAT_POPOVER, damageNotation, formatCombatDamage, openCombatChannel } from "./combat-log.js?v=2.9.4";
+import { COMBAT_POPOVER, damageNotation, formatCombatDamage, openCombatChannel } from "./combat-log.js?v=2.11.0";
 import { appliedCombatDamage, applyForgeDamage, forgeHpKey, hasForgeHp, undoForgeDamage } from "./forge-hp.js?v=2.9.7";
 
 const combatWindow = document.querySelector("#combat-window");
@@ -203,7 +204,7 @@ function saveControl(entry, hit) {
   button.addEventListener("click", () => roll("normal"));
   button.addEventListener("contextmenu", openMenu);
   button.addEventListener("keydown", (event) => {
-    if (event.altKey && event.key === "ArrowDown") {
+    if (actionForEvent(keyboardProfile(OBR).bindings, event)?.id === "save-options") {
       event.stopPropagation();
       openMenu(event);
     }

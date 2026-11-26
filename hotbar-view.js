@@ -1,9 +1,12 @@
 import OBR from "./obr.js";
 import { AVATAR, canSpeak, isPublicToken } from "./rules.js";
 import { savedAvatar, savedAvatarMode, savedAvatarSlots, savedQuickbarSlots } from "./session.js?v=2.9.16";
-import { SKILLS, SKILL_CHANGED, SKILL_REQUEST, SKILL_RESULT, readSkills, skillBinding, skillConnections } from "./skills.js?v=2.9.16";
-import { handleHotbarKey, hotbarMode, MAX_HOTBAR_SLOTS, MIN_HOTBAR_SLOTS, resizeHotbar } from "./hotbar.js?v=2.9.17";
+import { SKILLS, SKILL_CHANGED, SKILL_REQUEST, SKILL_RESULT, skillConnections } from "./skills.js?v=2.11.0";
+import { hotbarMode, MIN_HOTBAR_SLOTS, resizeHotbar, sendHotbarCommand } from "./hotbar.js?v=2.11.0";
 import { BUILTIN_EMOTES } from "./emotes.js?v=2.7.21";
+
+import { bindingLabel, keyboardProfile } from "./key-bindings.js?v=2.11.0";
+import { handleRoomKey, openKeyboard } from "./keyboard-shortcuts.js?v=2.11.0";
 
 const PRIORITY = "fghjklxcvbnmtyuiop";
 const ICONS = {
@@ -23,22 +26,21 @@ function skillSlot(key, id, unavailable = false) {
   return { key, name: SHORT_NAMES[id] ?? SKILLS[id].name, icon: ICONS[id] ?? "✦", unavailable };
 }
 
-function skillSlots(available, bindings) {
-  const slots = [{ key: "z", name: "target", icon: "⊕" }];
-  const byKey = new Map(available.filter((id) => Object.hasOwn(SKILLS, id))
-    .map((id) => [skillBinding(id, bindings, (key) => typeof key === "string" &&
-      key.length === 1 && PRIORITY.includes(key)), id]));
-  for (const key of PRIORITY) {
-    if (slots.length >= MAX_HOTBAR_SLOTS) break;
-    if (byKey.has(key)) slots.push(skillSlot(key, byKey.get(key)));
+function skillSlots(available, label) {
+  const slots = [{ key: label("target"), name: "target", icon: "⊕" }];
+  const order = (id) => SKILLS[id].key ? PRIORITY.indexOf(SKILLS[id].key) : PRIORITY.length;
+  const ordered = Object.keys(SKILLS).sort((leftId, rightId) => order(leftId) - order(rightId));
+  for (const id of ordered) {
+    const key = label("skill-" + id);
+    if (key && available.includes(id)) slots.push(skillSlot(key, id));
   }
   while (slots.length < MIN_HOTBAR_SLOTS) slots.push({});
   return slots;
 }
 
-function quickbarSlots(available, talkIds, tokens) {
+function quickbarSlots(available, talkIds, tokens, label) {
   return savedQuickbarSlots().map((slot, index) => {
-    const key = String((index + 1) % 10);
+    const key = label("slot-" + (index + 1) % 10);
     if (talkIds && index < 9) {
       const id = talkIds[index];
       const token = tokens.get(id);
@@ -61,18 +63,19 @@ function quickbarSlots(available, talkIds, tokens) {
 function render(available, role, tokens) {
   const quickbar = hotbarMode(OBR) === "quickbar";
   const talkIds = role === "GM" && savedAvatarMode() === "talk" ? savedAvatarSlots() : null;
-  const slots = quickbar ? quickbarSlots(available, talkIds, tokens)
-    : skillSlots(available, readSkills(OBR, "player").bindings);
+  const { bindings, layout } = keyboardProfile(OBR);
+  const label = (id) => bindings[id] ? bindingLabel(bindings[id], layout) : "";
+  const slots = quickbar ? quickbarSlots(available, talkIds, tokens, label) : skillSlots(available, label);
   list.style.setProperty("--slot-count", slots.length);
   list.setAttribute("aria-label", quickbar ? "Quickbar slots" : "Skill hotbar");
   list.replaceChildren(...slots.map(({ key, name, icon, image, unavailable }) => {
     const slot = document.createElement("li");
     slot.className = "slot" + (!name ? " empty" : unavailable ? " unavailable" : "");
-    slot.setAttribute("aria-label", name ? key.toUpperCase() + " " + name + (unavailable ? ", unavailable" : "")
+    slot.setAttribute("aria-label", name ? (key ? key + " " : "") + name + (unavailable ? ", unavailable" : "")
       : key ? key + " empty" : "empty");
     if (key) {
       const label = document.createElement("kbd");
-      label.textContent = key.toUpperCase();
+      label.textContent = key;
       slot.append(label);
     }
     const graphic = document.createElement("span");
@@ -184,7 +187,12 @@ OBR.onReady(() => {
         previous.get(id)?.image?.url !== next.get(id)?.image?.url)) redraw();
   });
   window.addEventListener("storage", redraw);
-  document.addEventListener("keydown", (event) => handleHotbarKey(OBR, event));
+  const roomKeys = {
+    "hotbar-toggle": () => sendHotbarCommand(OBR, "toggle"),
+    "hotbar-mode": () => sendHotbarCommand(OBR, "mode"),
+    keyboard: () => openKeyboard(OBR),
+  };
+  document.addEventListener("keydown", (event) => handleRoomKey(OBR, event, roomKeys));
   redraw();
   reload();
 });

@@ -48,15 +48,6 @@ export function sendHotbarCommand(obr, command) {
   return obr.broadcast.sendMessage(HOTBAR_COMMAND, { command }, { destination: "LOCAL" });
 }
 
-export function handleHotbarKey(obr, event) {
-  if (event.defaultPrevented || event.isComposing || event.ctrlKey || event.altKey ||
-      event.metaKey || event.shiftKey || (event.key !== "=" && event.key !== "-")) return false;
-  event.preventDefault();
-  event.stopPropagation();
-  if (!event.repeat) void sendHotbarCommand(obr, event.key === "=" ? "toggle" : "mode").catch(console.error);
-  return true;
-}
-
 export function setupHotbar(obr) {
   let visible = false;
   let pending = Promise.resolve();
@@ -65,7 +56,7 @@ export function setupHotbar(obr) {
     const [width, height] = await Promise.all([obr.viewport.getWidth(), obr.viewport.getHeight()]);
     const left = hotbarOrientation(obr) === "left";
     const compact = !hotbarShowsLabels(obr);
-    const url = new URL("./hotbar.html?v=2.9.17", import.meta.url);
+    const url = new URL("./hotbar.html?v=2.11.0", import.meta.url);
     if (left) url.searchParams.set("position", "left");
     if (compact) url.searchParams.set("labels", "off");
     await obr.popover.open({
