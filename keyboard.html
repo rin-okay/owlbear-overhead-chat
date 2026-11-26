@@ -4,8 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Overhead Chat keyboard settings</title>
-  <link rel="stylesheet" href="./keyboard.css?v=2.11.2">
-  <script type="module" src="./keyboard-editor.js?v=2.11.2"></script>
+  <link rel="stylesheet" href="./keyboard.css?v=2.11.3">
+  <script type="module" src="./keyboard-editor.js?v=2.11.3"></script>
 </head>
 <body>
   <main>
@@ -26,8 +26,10 @@
       </section>
       <aside id="sidebar" aria-labelledby="sidebar-title">
         <h2 id="sidebar-title">Unassigned</h2>
-        <label class="filter-label">Find actions <input id="filter" type="search" placeholder="Search"></label>
-        <label class="show-all"><input id="show-all" type="checkbox"> Show assigned actions too</label>
+        <div id="binding-filters">
+          <label class="filter-label">Find actions <input id="filter" type="search" placeholder="Search"></label>
+          <label class="show-all"><input id="show-all" type="checkbox"> Show assigned actions too</label>
+        </div>
         <div id="actions"></div>
       </aside>
     </div>

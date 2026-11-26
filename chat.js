@@ -10,8 +10,8 @@ import {
 } from "./session.js?v=2.9.16";
 
 import { drawBubble, normalizeAppearance, prepareBubbleFont } from "./appearance.js?v=2.7.9";
-import { setupDiscordPanel } from "./discord-panel.js?v=2.11.2";
-import { damageNotation, openCombatLog, saveNotation } from "./combat-log.js?v=2.11.2";
+import { setupDiscordPanel } from "./discord-panel.js?v=2.11.3";
+import { damageNotation, openCombatLog, saveNotation } from "./combat-log.js?v=2.11.3";
 import { aimsAtLocation, artworkFacingAngle, MAX_CAST_LEVEL, SKILLS } from "./skills.js?v=2.11.0";
 import { ABILITIES, readTokenStats } from "./stats.js?v=2.8.5";
 import { setupAvatarPanel } from "./avatar-panel.js?v=2.11.0";
@@ -26,9 +26,9 @@ import { readMovementGrid, stepAvatar, turnAvatar } from "./movement.js?v=2.7.5"
 import { rollSpans, validateRollSpans } from "./dice.js";
 import { rollWithRumble } from "./rumble.js?v=2.9.4";
 import { rollWithNativeDice } from "./native-dice.js";
-import { hotbarOrientation, hotbarShowsLabels, sendHotbarCommand, setHotbarLabels, setHotbarOrientation } from "./hotbar.js?v=2.11.2";
+import { hotbarOrientation, hotbarShowsLabels, sendHotbarCommand, setHotbarLabels, setHotbarOrientation } from "./hotbar.js?v=2.11.3";
 import { actionForChord, actionForEvent, bindingLabel, eventChord, keyIdentity, keyboardProfile, modifierMask } from "./key-bindings.js?v=2.11.2";
-import { handleRoomKey, openKeyboard } from "./keyboard-shortcuts.js?v=2.11.2";
+import { handleRoomKey, openKeyboard } from "./keyboard-shortcuts.js?v=2.11.3";
 
 const combatView = new URLSearchParams(location.search).has("combat-log");
 const combatWindow = combatView ? document.querySelector("#combat-window") : null;

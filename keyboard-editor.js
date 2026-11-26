@@ -3,7 +3,7 @@ import {
   KEY_ACTIONS, KEYBOARD_ROWS, FIXED_KEYS, MODIFIERS, assignBinding, bindingLabel, browserLayout, eventChord,
   keyLabel, readKeyboard, resolveBindings, writeKeyboard,
 } from "./key-bindings.js?v=2.11.2";
-import { KEYBOARD_MODAL } from "./keyboard-shortcuts.js?v=2.11.2";
+import { KEYBOARD_MODAL } from "./keyboard-shortcuts.js?v=2.11.3";
 
 OBR.onReady(() => {
   const board = document.querySelector("#board");
