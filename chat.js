@@ -10,12 +10,12 @@ import {
 } from "./session.js?v=2.9.16";
 
 import { drawBubble, normalizeAppearance, prepareBubbleFont } from "./appearance.js?v=2.7.9";
-import { setupDiscordPanel } from "./discord-panel.js?v=2.11.6";
-import { damageNotation, openCombatLog, saveNotation } from "./combat-log.js?v=2.11.6";
+import { setupDiscordPanel } from "./discord-panel.js?v=2.11.7";
+import { damageNotation, openCombatLog, saveNotation } from "./combat-log.js?v=2.11.7";
 import { aimsAtLocation, artworkFacingAngle, MAX_CAST_LEVEL, SKILLS } from "./skills.js?v=2.11.0";
 import { ABILITIES, readTokenStats } from "./stats.js?v=2.8.5";
-import { setupAvatarPanel } from "./avatar-panel.js?v=2.11.0";
-import { setupSkillGrants, setupSkillPanel } from "./skill-panel.js?v=2.11.4";
+import { setupAvatarPanel } from "./avatar-panel.js?v=2.11.7";
+import { setupSkillGrants, setupSkillPanel } from "./skill-panel.js?v=2.11.7";
 import { setupStatsEditor } from "./stats-panel.js?v=2.8.5";
 import { EMOTE } from "./emotes.js?v=2.7.21";
 import { setupTargeting } from "./targeting.js?v=2.10.2";
@@ -42,13 +42,13 @@ const input = document.querySelector("#message");
 const send = form.querySelector("[type=submit]");
 const moveButton = form.querySelector("#move-avatar");
 const combatOpenButton = document.querySelector("#combat-log-open");
-const viewNav = document.querySelector("header nav");
+const chatMain = document.querySelector("main");
 const moveModeLabel = form.querySelector("#move-mode-label");
 const moveWarning = form.querySelector("#move-warning");
 const status = document.querySelector("#status");
 
 if (combatWindow) {
-  document.querySelector("main").hidden = true;
+  chatMain.hidden = true;
   combatWindow.hidden = false;
   document.body.classList.add("combat-view");
   const stylesheet = document.createElement("link");
@@ -754,14 +754,13 @@ function useSkillKey(mode, skill, upcast, aim, heldModifiers) {
 }
 
 function viewTab(target) {
-  const tab = target?.closest?.("button[aria-pressed][aria-controls]");
-  if (tab?.parentElement === viewNav) return tab;
+  return target?.closest?.("main nav > button[aria-pressed][aria-controls]");
 }
 
-viewNav.addEventListener("click", (event) => {
+chatMain.addEventListener("click", (event) => {
   if (tokenControl) viewTab(event.target)?.focus({ preventScroll: true });
 }, true);
-viewNav.addEventListener("focusout", (event) => {
+chatMain.addEventListener("focusout", (event) => {
   if (viewTab(event.target)) stopRotation(tokenControl);
 });
 
@@ -850,10 +849,10 @@ form.addEventListener("keyup", handleControlKeyUp);
 form.addEventListener("keydown", (event) => {
   if (event.target === input || (event.target === moveButton && tokenControl)) handleControlKeyDown(event);
 });
-viewNav.addEventListener("keydown", (event) => {
+chatMain.addEventListener("keydown", (event) => {
   if (tokenControl && viewTab(event.target)) handleControlKeyDown(event);
 });
-viewNav.addEventListener("keyup", (event) => {
+chatMain.addEventListener("keyup", (event) => {
   if (viewTab(event.target)) handleControlKeyUp(event);
 });
 

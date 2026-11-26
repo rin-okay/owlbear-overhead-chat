@@ -77,9 +77,11 @@ export function setupSkillPanel(obr, getAvatar, showSpells, showChatNotice) {
     const { bindings, layout } = keyboardProfile(obr);
     bindingsList.replaceChildren(...available.map((id) => {
       const row = document.createElement("li");
+      const name = document.createElement("span");
+      name.textContent = SKILLS[id].name;
       const key = document.createElement("kbd");
       key.textContent = bindingLabel(bindings["skill-" + id], layout);
-      row.append(SKILLS[id].name + " ", key);
+      row.append(name, key);
       return row;
     }));
   }

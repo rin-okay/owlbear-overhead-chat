@@ -4,8 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>overhead chat</title>
-  <link rel="stylesheet" href="./chat.css?v=2.11.1">
-  <script type="module" src="./chat.js?v=2.11.6"></script>
+  <link rel="stylesheet" href="./chat.css?v=2.11.7">
+  <script type="module" src="./chat.js?v=2.11.7"></script>
 </head>
 <body>
   <main>
@@ -58,7 +58,8 @@
     </form>
     </div>
     <section id="settings-panel" aria-label="chat settings" hidden>
-      <form>
+      <form class="settings-group" aria-labelledby="appearance-settings-heading">
+        <h2 id="appearance-settings-heading">chat appearance</h2>
         <label>Display name <input name="name" type="text" maxlength="32" placeholder="Use character name"></label>
         <div class="colors">
           <label>Bubble border <input name="border" type="color"></label>
@@ -78,32 +79,21 @@
           </label>
           <label>Font size <input name="size" type="number" min="10" max="28" step="1" required></label>
         </div>
+        <div id="bubble-preview" aria-label="bubble preview"></div>
+        <div class="settings-actions">
+          <button id="reset-appearance" type="button">Reset to default</button>
+          <button id="export-appearance" type="button">export color settings</button>
+        </div>
       </form>
-      <label class="discord-enabled"><input id="follow-camera" type="checkbox" aria-keyshortcuts="F4"> camera follow mode</label>
-      <div class="appearance-actions">
-        <button id="center-chat-avatar" type="button" aria-keyshortcuts="F3">center avatar</button>
-      </div>
-      <label>hotbar position
-        <select id="hotbar-orientation">
-          <option value="bottom">bottom (horizontal)</option>
-          <option value="left">left (vertical)</option>
-        </select>
-      </label>
-      <label class="discord-enabled"><input id="hotbar-labels" type="checkbox" checked> show labels on hotbar</label>
-      <div class="appearance-actions">
-        <button id="toggle-hotbar" type="button">show / hide hotbar</button>
-        <button id="switch-hotbar-mode" type="button">switch hotbar mode</button>
-      </div>
-      <label class="discord-enabled"><input id="quickcast" type="checkbox" checked> quickcast at target marker</label>
-      <div id="bubble-preview" aria-label="bubble preview"></div>
-      <div class="appearance-actions">
-        <button id="reset-appearance" type="button">Reset to default</button>
-        <button id="export-appearance" type="button">export color settings</button>
-      </div>
-      <div class="appearance-actions">
-        <button id="open-keyboard" type="button" aria-haspopup="dialog" aria-keyshortcuts="F10">keyboard settings</button>
-        <button id="open-tutorial" type="button" aria-controls="tutorial-panel">movement tutorial</button>
-      </div>
+      <section class="settings-group" aria-labelledby="movement-settings-heading">
+        <h2 id="movement-settings-heading">movement and targeting</h2>
+        <label class="discord-enabled"><input id="follow-camera" type="checkbox" aria-keyshortcuts="F4"> camera follow mode</label>
+        <label class="discord-enabled"><input id="quickcast" type="checkbox" checked> quickcast at target marker</label>
+        <div class="settings-actions">
+          <button id="center-chat-avatar" type="button" aria-keyshortcuts="F3">center avatar</button>
+          <button id="open-tutorial" type="button" aria-controls="tutorial-panel">movement tutorial</button>
+        </div>
+      </section>
     </section>
     <section id="tutorial-panel" aria-labelledby="tutorial-title" hidden>
       <h2 id="tutorial-title" tabindex="-1">getting around</h2>
@@ -130,10 +120,11 @@
       <button id="tutorial-done" type="button">continue to chat</button>
     </section>
     <section id="avatar-panel" aria-label="avatar slots" hidden>
-      <div class="avatar-modes" role="group" aria-label="avatar hotkey mode">
+      <nav class="avatar-modes" aria-label="avatar views">
         <button id="avatar-talk" type="button" aria-pressed="false" aria-controls="avatar-talk-panel" hidden>talk as</button>
         <button id="avatar-change" type="button" aria-pressed="true" aria-controls="avatar-change-panel">quickbar</button>
-      </div>
+        <button id="avatar-bindings" type="button" aria-pressed="false" aria-controls="avatar-bindings-panel">bindings</button>
+      </nav>
       <div id="avatar-talk-panel" hidden>
         <p>Use the assigned Quickbar shortcuts in move mode to switch between tokens 1–9.</p>
         <div id="avatar-slots"></div>
@@ -150,6 +141,23 @@
         <p role="status"></p>
         <div id="avatar-art-slots"></div>
       </div>
+      <section id="avatar-bindings-panel" aria-label="bindings" hidden>
+        <button id="open-keyboard" type="button" aria-haspopup="dialog" aria-keyshortcuts="F10">keyboard settings</button>
+        <section class="settings-group" aria-labelledby="hotbar-settings-heading">
+          <h2 id="hotbar-settings-heading">hotbar</h2>
+          <label>hotbar position
+            <select id="hotbar-orientation">
+              <option value="bottom">bottom (horizontal)</option>
+              <option value="left">left (vertical)</option>
+            </select>
+          </label>
+          <label class="discord-enabled"><input id="hotbar-labels" type="checkbox" checked> show labels on hotbar</label>
+          <div class="settings-actions">
+            <button id="toggle-hotbar" type="button">show / hide hotbar</button>
+            <button id="switch-hotbar-mode" type="button">switch hotbar mode</button>
+          </div>
+        </section>
+      </section>
     </section>
     <section id="skills-panel" aria-label="skills" hidden>
       <nav id="skills-views" aria-label="skills views">
@@ -164,9 +172,9 @@
         </div>
         <label class="skill-field">melee weapon <select id="skill-weapon" disabled></select></label>
         <label class="skill-field" hidden>ranged weapon <select id="skill-ranged-weapon" disabled></select></label>
-        <button type="button" id="edit-skill-keys" aria-haspopup="dialog">edit skill shortcuts</button>
-        <ul id="skill-key-summary" aria-label="Assigned skill shortcuts"></ul>
         <p id="skill-settings-status" class="skill-feedback" role="status"></p>
+        <ul id="skill-key-summary" aria-label="Available skills and shortcuts"></ul>
+        <button type="button" id="edit-skill-keys" aria-haspopup="dialog">edit skill shortcuts</button>
       </section>
       <section id="player-stats" aria-label="avatar stats" hidden>
         <form class="stats-form">

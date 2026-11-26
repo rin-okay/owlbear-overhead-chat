@@ -13,6 +13,11 @@ export function setupAvatarPanel(panel) {
   const changePanel = panel.querySelector("#avatar-change-panel");
   const talkButton = panel.querySelector("#avatar-talk");
   const changeButton = panel.querySelector("#avatar-change");
+  const views = [
+    ["talk", talkButton, talkPanel],
+    ["change", changeButton, changePanel],
+    ["bindings", panel.querySelector("#avatar-bindings"), panel.querySelector("#avatar-bindings-panel")],
+  ];
   const status = talkPanel.querySelector("[role=status]");
   let canTalk = false;
   const selects = Array.from({ length: 9 }, (_, index) => {
@@ -32,20 +37,21 @@ export function setupAvatarPanel(panel) {
 
   const showSpells = setupQuickbar(changePanel);
 
-  function showMode(mode) {
-    const change = mode === "change";
-    talkButton.setAttribute("aria-pressed", String(!change));
-    changeButton.setAttribute("aria-pressed", String(change));
-    talkPanel.hidden = change;
-    changePanel.hidden = !change;
+  let activeView = "change";
+  function selectView(mode) {
+    activeView = mode;
+    for (const [id, button, view] of views) {
+      button.setAttribute("aria-pressed", String(id === mode));
+      view.hidden = id !== mode;
+    }
   }
 
-  for (const [button, mode] of [[talkButton, "talk"], [changeButton, "change"]]) {
+  for (const [mode, button] of views) {
     button.addEventListener("click", () => {
-      if (!canTalk) return;
-      saveAvatarMode(mode);
-      showMode(mode);
-      void loadTokens();
+      if (mode === "talk" && !canTalk) return;
+      if (canTalk && mode !== "bindings") saveAvatarMode(mode);
+      selectView(mode);
+      if (mode === "talk") void loadTokens();
     });
   }
   const refresh = (items, role) => {
@@ -53,7 +59,7 @@ export function setupAvatarPanel(panel) {
     if (gm !== canTalk) {
       canTalk = gm;
       talkButton.hidden = !gm;
-      showMode(gm ? savedAvatarMode() : "change");
+      if (activeView !== "bindings") selectView(gm ? savedAvatarMode() : "change");
       ++revision;
     }
     return loadTokens(items);
