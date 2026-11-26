@@ -1,4 +1,7 @@
-import { bindingLabel, keyboardProfile } from "./key-bindings.js?v=2.11.4";
+import {
+  KEY_ACTIONS, actionForChord, assignBinding, bindingLabel, bindingStorageKey,
+  eventChord, keyboardProfile, keyIdentity, writeKeyboard,
+} from "./key-bindings.js?v=2.11.9";
 import { setupStatsEditor } from "./stats-panel.js?v=2.8.5";
 import { isPublicToken } from "./rules.js";
 import { isProjectileToken } from "./projectile-collision.js?v=2.9.10";
@@ -18,7 +21,7 @@ function facingFor(settings, token) {
   return FACINGS.some(([angle]) => angle === facing) ? facing : 0;
 }
 
-export function setupSkillPanel(obr, getAvatar, showSpells, showChatNotice) {
+export function setupSkillPanel(obr, getAvatar, showSpells, showChatNotice, onBindingsChanged) {
   const playerPanel = document.querySelector("#player-skills");
   const playerStatus = document.querySelector("#skill-settings-status");
   const castStatus = document.querySelector("#skill-cast-status");
@@ -29,6 +32,9 @@ export function setupSkillPanel(obr, getAvatar, showSpells, showChatNotice) {
   const portrait = preview.querySelector("img");
   const arrow = preview.querySelector("span");
   const bindingsList = playerPanel.querySelector("#skill-key-summary");
+  const bindingStatus = playerPanel.querySelector("#skill-binding-status");
+  let capture;
+  let capturedKey;
   const pending = new Map();
   let preferences = readSkills(obr, "player");
   let avatar;
@@ -72,20 +78,116 @@ export function setupSkillPanel(obr, getAvatar, showSpells, showChatNotice) {
     renderBindings();
   }
 
+  function showBindingStatus(message = "") {
+    if (bindingStatus) bindingStatus.textContent = message;
+  }
+
+  function stopCapture(message) {
+    if (!capture) return;
+    const { action, button, key } = capture;
+    capture = undefined;
+    const { bindings, layout } = keyboardProfile(obr);
+    button.setAttribute("aria-pressed", "false");
+    key.textContent = bindingLabel(bindings[action], layout);
+    showBindingStatus(message);
+  }
+
   function renderBindings() {
     if (!bindingsList) return;
+    const focusedSkill = document.activeElement?.dataset?.skillBinding;
+    stopCapture();
     const { bindings, layout } = keyboardProfile(obr);
-    bindingsList.replaceChildren(...available.map((id) => {
+    const rows = available.map((id) => {
       const row = document.createElement("li");
+      const button = document.createElement("button");
+      button.type = "button";
+      button.dataset.skillBinding = id;
+      button.setAttribute("aria-pressed", "false");
       const name = document.createElement("span");
       name.textContent = SKILLS[id].name;
+      const action = "skill-" + id;
       const key = document.createElement("kbd");
-      key.textContent = bindingLabel(bindings["skill-" + id], layout);
-      row.append(name, key);
+      key.textContent = bindingLabel(bindings[action], layout);
+      button.append(name, key);
+      button.addEventListener("blur", () => {
+        if (capture?.button === button) stopCapture();
+      });
+      button.addEventListener("click", () => {
+        const cancel = capture?.button === button;
+        stopCapture();
+        if (cancel) return;
+        capture = { action, button, key };
+        button.focus({ preventScroll: true });
+        button.setAttribute("aria-pressed", "true");
+        key.textContent = "press a key";
+        showBindingStatus("Press a key for " + name.textContent + ". Escape cancels.");
+      });
+      row.append(button);
       return row;
-    }));
+    });
+    bindingsList.replaceChildren(...rows);
+    if (focusedSkill) rows[available.indexOf(focusedSkill)]?.firstElementChild.focus({ preventScroll: true });
   }
-  if (bindingsList) window.addEventListener("storage", renderBindings);
+
+  if (bindingsList) {
+    window.addEventListener("storage", (event) => {
+      if (event.key === null || event.key === bindingStorageKey(obr)) renderBindings();
+    });
+    window.addEventListener("blur", () => {
+      capturedKey = undefined;
+      stopCapture();
+    });
+    window.addEventListener("keydown", (event) => {
+      const physicalKey = keyIdentity(event);
+      if (physicalKey && physicalKey === capturedKey && event.repeat) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        return;
+      }
+      if (!capture || document.activeElement !== capture.button || capture.button.closest("[hidden]")) {
+        stopCapture();
+        return;
+      }
+      if (event.defaultPrevented || event.isComposing || event.keyCode === 229) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      if (event.repeat) return;
+      if (physicalKey === "Escape") {
+        capturedKey = physicalKey;
+        stopCapture("Shortcut assignment canceled.");
+        return;
+      }
+      const next = eventChord(event);
+      if (!next || next.modifiers !== 0) {
+        showBindingStatus("Press a base key without modifiers. Function keys are fixed.");
+        return;
+      }
+
+      const { action } = capture;
+      const { bindings, overrides, layout } = keyboardProfile(obr);
+      const replaced = actionForChord(bindings, next);
+      const nextLayout = event.key?.length > 0 && event.key.length < 8 &&
+        !["Dead", "Unidentified"].includes(event.key)
+        ? { ...layout, [next.code]: event.key === " " ? "Space" : event.key } : layout;
+      capturedKey = physicalKey;
+      try {
+        writeKeyboard(obr, { overrides: assignBinding(overrides, action, next), layout: nextLayout });
+      } catch {
+        stopCapture("Your browser couldn’t save the binding.");
+        return;
+      }
+      renderBindings();
+      const displacement = replaced && replaced.id !== action ? " " + replaced.label + " is now unassigned." : "";
+      showBindingStatus(KEY_ACTIONS[action].label + " → " + bindingLabel(next, nextLayout) + "." + displacement);
+      onBindingsChanged?.();
+    }, true);
+    window.addEventListener("keyup", (event) => {
+      if (!capturedKey || keyIdentity(event) !== capturedKey) return;
+      capturedKey = undefined;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+    }, true);
+  }
 
   for (const [angle, label] of FACINGS) facing.add(new Option(label, angle));
   facing.addEventListener("change", () => {
