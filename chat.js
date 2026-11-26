@@ -10,11 +10,11 @@ import {
 } from "./session.js?v=2.9.16";
 
 import { drawBubble, normalizeAppearance, prepareBubbleFont } from "./appearance.js?v=2.7.9";
-import { setupDiscordPanel } from "./discord-panel.js?v=2.11.7";
-import { damageNotation, openCombatLog, saveNotation } from "./combat-log.js?v=2.11.7";
+import { setupDiscordPanel } from "./discord-panel.js?v=2.11.8";
+import { damageNotation, openCombatLog, saveNotation } from "./combat-log.js?v=2.11.8";
 import { aimsAtLocation, artworkFacingAngle, MAX_CAST_LEVEL, SKILLS } from "./skills.js?v=2.11.0";
 import { ABILITIES, readTokenStats } from "./stats.js?v=2.8.5";
-import { setupAvatarPanel } from "./avatar-panel.js?v=2.11.7";
+import { setupAvatarPanel } from "./avatar-panel.js?v=2.11.8";
 import { setupSkillGrants, setupSkillPanel } from "./skill-panel.js?v=2.11.7";
 import { setupStatsEditor } from "./stats-panel.js?v=2.8.5";
 import { EMOTE } from "./emotes.js?v=2.7.21";
@@ -754,7 +754,7 @@ function useSkillKey(mode, skill, upcast, aim, heldModifiers) {
 }
 
 function viewTab(target) {
-  return target?.closest?.("main nav > button[aria-pressed][aria-controls]");
+  return target?.closest?.("main :is(nav, .avatar-modes) > button[aria-pressed][aria-controls]");
 }
 
 chatMain.addEventListener("click", (event) => {

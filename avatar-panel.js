@@ -16,8 +16,12 @@ export function setupAvatarPanel(panel) {
   const views = [
     ["talk", talkButton, talkPanel],
     ["change", changeButton, changePanel],
-    ["bindings", panel.querySelector("#avatar-bindings"), panel.querySelector("#avatar-bindings-panel")],
   ];
+  // A cached popover can still have the two-tab markup after the JavaScript updates.
+  const bindingsButton = panel.querySelector("#avatar-bindings");
+  const bindingsPanel = panel.querySelector("#avatar-bindings-panel");
+  if (bindingsButton && bindingsPanel) views.push(["bindings", bindingsButton, bindingsPanel]);
+
   const status = talkPanel.querySelector("[role=status]");
   let canTalk = false;
   const selects = Array.from({ length: 9 }, (_, index) => {
