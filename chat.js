@@ -10,7 +10,7 @@ import {
 } from "./session.js?v=2.9.16";
 
 import { drawBubble, normalizeAppearance, prepareBubbleFont } from "./appearance.js?v=2.7.9";
-import { setupDiscordPanel } from "./discord-panel.js?v=2.11.16";
+import { setupDiscordPanel } from "./discord-panel.js?v=2.11.17";
 import { damageNotation, openCombatLog, saveNotation, toggleCombatLog } from "./combat-log.js?v=2.11.16";
 import { aimsAtLocation, artworkFacingAngle, MAX_CAST_LEVEL, SKILLS } from "./skills.js?v=2.11.12";
 import { ABILITIES, readTokenStats } from "./stats.js?v=2.8.5";
@@ -308,7 +308,7 @@ async function refresh() {
     if (version !== refreshVersion) return;
 
     const shouldFocus = token && token.id !== avatar?.id;
-    if (tokenControl && !tokenControl.switching && tokenId && tokenId !== tokenControl.tokenId) stopTokenControl();
+    if (tokenControl && !tokenControl.switching && tokenId !== tokenControl.tokenId) stopTokenControl();
     avatar = token ?? null;
     selectedAvatarId = tokenId ?? null;
     observedToken = observed ?? null;

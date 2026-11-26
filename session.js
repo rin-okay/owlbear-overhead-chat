@@ -17,7 +17,8 @@ export function savedAvatar() {
 
 export function saveAvatar(tokenId) {
   try {
-    localStorage.setItem(avatarKey(), tokenId);
+    if (tokenId === null) localStorage.removeItem(avatarKey());
+    else localStorage.setItem(avatarKey(), tokenId);
   } catch {
     // Player metadata still shares the selection within this room session.
   }

@@ -8,7 +8,7 @@ import { BUBBLE_LINE_HEIGHT, drawBubble, drawFloatingBubble, fonts, normalizeApp
 import { canvasPaths } from "./bubble-paths.js?v=2.5.1";
 import { FLOAT_LINE, placeFloatingBubbles } from "./floating-layout.js?v=2.5.1";
 import { ABILITIES, readTokenStats } from "./stats.js?v=2.8.5";
-import { openSessionChannel, saveAvatar } from "./session.js?v=2.7.9";
+import { openSessionChannel, savedAvatar, saveAvatar } from "./session.js?v=2.11.17";
 import { chatParts, isRollCommand, rollSpans } from "./dice.js";
 import { queueDiscord } from "./discord.js?v=2.3.9";
 import { parseTray } from "./dice-replay.js";
@@ -563,41 +563,76 @@ OBR.onReady(() => {
     }
   });
 
-  OBR.contextMenu.create({
-    id: "chat.overhead.set-avatar.v1",
-    icons: [{
-      icon: new URL("./toolbar-chat.svg", import.meta.url).href,
-      label: "Set as avatar",
-      filter: {
-        min: 1,
-        max: 1,
-        permissions: ["UPDATE"],
+  const avatarMenuId = "chat.overhead.set-avatar.v1";
+  const avatarIcon = new URL("./toolbar-chat.svg", import.meta.url).href;
+  const activeAvatar = (metadata) => (metadata[AVATAR]?.tokenId ?? savedAvatar()) || null;
+  let registeredAvatar;
+  let menuRegistered = false;
+  let avatarMenuWork = Promise.resolve();
+
+  async function toggleAvatar({ items }) {
+    if (items.length !== 1) return;
+    const [token] = items;
+    let remove = false;
+    try {
+      remove = activeAvatar(await OBR.player.getMetadata()) === token.id;
+      if (remove) {
+        // An explicit empty ID also disables the saved-avatar fallback in older panels.
+        await OBR.player.setMetadata({ [AVATAR]: { tokenId: "" } });
+        saveAvatar(null);
+        updateAvatarMenu(null);
+        return;
+      }
+
+      const [role, permissions] = await Promise.all([OBR.player.getRole(), OBR.room.getPermissions()]);
+      if (!canSpeak({ role, id: OBR.player.id }, token, permissions)) {
+        await OBR.notification.show("Choose a visible character token you can update.");
+        return;
+      }
+
+      await OBR.player.setMetadata({ [AVATAR]: { tokenId: token.id } });
+      saveAvatar(token.id);
+      updateAvatarMenu(token.id);
+      await OBR.action.open();
+    } catch (error) {
+      report(error);
+      await OBR.notification.show(remove ? "Couldn’t remove your chat avatar." : "Couldn’t set your chat avatar. Try again.");
+    }
+  }
+
+  function updateAvatarMenu(tokenId) {
+    avatarMenuWork = avatarMenuWork.then(async () => {
+      if (menuRegistered && registeredAvatar === tokenId) return;
+      if (menuRegistered) {
+        await OBR.contextMenu.remove(avatarMenuId);
+        menuRegistered = false;
+      }
+      const setFilter = {
+        min: 1, max: 1, permissions: ["UPDATE"],
         every: [
           { key: "type", value: "IMAGE" },
           { key: "layer", value: "CHARACTER" },
           { key: "visible", value: true },
         ],
-      },
-    }],
-    async onClick({ items }) {
-      const [token] = items;
-      try {
-        const [role, permissions] = await Promise.all([
-          OBR.player.getRole(),
-          OBR.room.getPermissions(),
-        ]);
-        if (items.length !== 1 || !canSpeak({ role, id: OBR.player.id }, token, permissions)) {
-          await OBR.notification.show("Choose a visible character token you can update.");
-          return;
-        }
+      };
+      if (tokenId) setFilter.every.push({ key: "id", value: tokenId, operator: "!=" });
+      const icons = [{ icon: avatarIcon, label: "Set as avatar", filter: setFilter }];
+      if (tokenId) icons.push({
+        icon: avatarIcon, label: "Remove avatar",
+        filter: { min: 1, max: 1, every: [{ key: "id", value: tokenId }] },
+      });
+      await OBR.contextMenu.create({ id: avatarMenuId, icons, onClick: toggleAvatar });
+      menuRegistered = true;
+      registeredAvatar = tokenId;
+    }).catch(report);
+  }
 
-        saveAvatar(token.id);
-        await OBR.player.setMetadata({ [AVATAR]: { tokenId: token.id } });
-        await OBR.action.open();
-      } catch (error) {
-        report(error);
-        await OBR.notification.show("Couldn’t set your chat avatar. Try again.");
-      }
-    },
+  let avatarObserved = false;
+  OBR.player.onChange(({ metadata }) => {
+    avatarObserved = true;
+    updateAvatarMenu(activeAvatar(metadata));
+  });
+  void OBR.player.getMetadata().then((metadata) => {
+    if (!avatarObserved) updateAvatarMenu(activeAvatar(metadata));
   }).catch(report);
 });
