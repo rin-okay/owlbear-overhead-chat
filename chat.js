@@ -10,7 +10,7 @@ import {
 } from "./session.js?v=2.9.16";
 
 import { drawBubble, normalizeAppearance, prepareBubbleFont } from "./appearance.js?v=2.7.9";
-import { setupDiscordPanel } from "./discord-panel.js?v=2.11.13";
+import { setupDiscordPanel } from "./discord-panel.js?v=2.11.14";
 import { damageNotation, openCombatLog, saveNotation, toggleCombatLog } from "./combat-log.js?v=2.11.13";
 import { aimsAtLocation, artworkFacingAngle, MAX_CAST_LEVEL, SKILLS } from "./skills.js?v=2.11.12";
 import { ABILITIES, readTokenStats } from "./stats.js?v=2.8.5";
@@ -842,7 +842,13 @@ function handleControlKeyDown(event) {
   }
   if (combatWindow || action?.id !== "send") return;
   event.preventDefault();
-  if (!event.repeat) form.requestSubmit();
+  if (event.repeat) return;
+  if (!controlsInactive && !input.value.trim() && !moveButton.disabled) {
+    modeExitKey = physicalKey;
+    startTokenControl();
+  } else {
+    form.requestSubmit();
+  }
 }
 
 async function focusChatFromCombat() {
