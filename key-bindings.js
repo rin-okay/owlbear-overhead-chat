@@ -82,12 +82,18 @@ add("keyboard", "Open keyboard settings", "Slash", room);
 add("move-mode", "Toggle move mode", null, room);
 add("combat-log", "Open combat log", null, room);
 
+add("look-mode", "Toggle look mode", null, { group: "Movement" });
+
 for (const [dir, label, letter, arrow, offset] of [
   ["up", "up", "KeyW", "ArrowUp", [0, -1]], ["left", "left", "KeyA", "ArrowLeft", [-1, 0]],
   ["down", "down", "KeyS", "ArrowDown", [0, 1]], ["right", "right", "KeyD", "ArrowRight", [1, 0]],
 ]) {
   add("move-" + dir, "Move / aim " + label, letter, { group: "Movement", offset });
-  add("arrow-" + dir, "Move " + label + " (alternate)", arrow, { group: "Movement", offset, alternate: true });
+  add("arrow-" + dir, "Move " + label + " (alternate)", null, { group: "Movement", offset, alternate: true });
+  add("camera-" + dir, "Pan camera " + label, arrow, { group: "Movement", cameraOffset: offset });
+  add("alt-camera-" + dir, "Pan camera " + label + " (Alt + movement)", null, {
+    group: "Movement", cameraOffset: offset, base: "move-" + dir, modifiers: ALT,
+  });
   const half = offset.map((value) => value / 2);
   add("half-" + dir, "Half-step " + label, null, { group: "Movement", offset: half, half: true, base: "move-" + dir, modifiers: SHIFT });
   add("half-arrow-" + dir, "Half-step " + label + " (alternate)", null, {
@@ -105,7 +111,7 @@ add("target", "Open / clear targeting", "KeyZ", { group: "Targeting and chat" })
 add("confirm", "Confirm aim / return to chat", "Space", { group: "Targeting and chat" });
 add("cancel", "Cancel / exit move mode", "Escape", { group: "Targeting and chat" });
 add("send", "Send chat / exit move mode", "Enter", { group: "Targeting and chat" });
-add("save-options", "Open combat save options", null, { group: "Targeting and chat", base: "arrow-down", modifiers: ALT });
+add("save-options", "Open combat save options", null, { group: "Targeting and chat", base: "arrow-down", fallbackBase: "camera-down", modifiers: ALT });
 for (const digit of "1234567890") {
   add("slot-" + digit, "Quickbar " + digit + " / choice " + digit, "Digit" + digit, { group: "Quickbar", digit });
   add("aim-slot-" + digit, "Aim quickbar spell " + digit, null, {
@@ -193,7 +199,7 @@ export function resolveBindings(overrides = {}) {
   }
   for (const action of commands) {
     if (Object.hasOwn(bindings, action.id)) continue;
-    const base = bindings[action.base];
+    const base = bindings[action.base] ?? bindings[action.fallbackBase];
     place(action.id, base ? chord(base.code, action.modifiers) : null);
   }
   return bindings;

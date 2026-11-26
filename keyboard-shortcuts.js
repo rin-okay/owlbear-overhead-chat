@@ -1,4 +1,4 @@
-import { actionForEvent, editableTarget, keyboardProfile } from "./key-bindings.js?v=2.11.12";
+import { actionForEvent, editableTarget, keyboardProfile } from "./key-bindings.js?v=2.11.16";
 
 export const KEYBOARD_MODAL = "chat.overhead.keyboard";
 
@@ -54,7 +54,7 @@ export async function openKeyboard(obr, onClose) {
   };
   try {
     const [width, height] = await Promise.all([obr.viewport.getWidth(), obr.viewport.getHeight()]);
-    const url = new URL("./keyboard.html?v=2.11.12", import.meta.url);
+    const url = new URL("./keyboard.html?v=2.11.16", import.meta.url);
     url.searchParams.set(KEYBOARD_SESSION, session);
     await obr.modal.open({
       id: KEYBOARD_MODAL, url: url.href,

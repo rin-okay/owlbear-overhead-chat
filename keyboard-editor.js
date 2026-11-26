@@ -2,8 +2,8 @@ import OBR from "./obr.js";
 import {
   KEY_ACTIONS, KEYBOARD_KEYS, INTERNATIONAL_KEYS, FIXED_KEYS, MODIFIERS, actionForEvent, assignBinding, bindingLabel, browserLayout, editableTarget, eventChord,
   keyLabel, readKeyboard, resolveBindings, writeKeyboard,
-} from "./key-bindings.js?v=2.11.12";
-import { connectKeyboardEditor, isFixedKeyboardShortcut, KEYBOARD_MODAL } from "./keyboard-shortcuts.js?v=2.11.12";
+} from "./key-bindings.js?v=2.11.16";
+import { connectKeyboardEditor, isFixedKeyboardShortcut, KEYBOARD_MODAL } from "./keyboard-shortcuts.js?v=2.11.16";
 
 OBR.onReady(() => {
   const board = document.querySelector("#board");

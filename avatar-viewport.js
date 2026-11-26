@@ -22,6 +22,27 @@ async function centerViewport(viewport, center, view, active = () => true) {
   view.position = { x, y };
 }
 
+function manualCameraKey(obr) {
+  return JSON.stringify(["chat.overhead.manual-camera.v1", obr.room.id, obr.player.id]);
+}
+
+function resumeCameraFollow(obr) {
+  try { sessionStorage.removeItem(manualCameraKey(obr)); } catch {}
+}
+
+function manualCameraPan(obr, tokenId) {
+  try { return sessionStorage.getItem(manualCameraKey(obr)) === tokenId; } catch { return false; }
+}
+
+export async function panCameraStep(obr, tokenId, [x, y], active) {
+  const [position, scale, dpi] = await Promise.all([
+    obr.viewport.getPosition(), obr.viewport.getScale(), obr.scene.grid.getDpi(),
+  ]);
+  if (!active() || ![position?.x, position?.y, scale, dpi].every(Number.isFinite) || scale <= 0 || dpi <= 0) return;
+  try { sessionStorage.setItem(manualCameraKey(obr), tokenId); } catch {}
+  await obr.viewport.setPosition({ x: position.x - x * dpi * scale, y: position.y - y * dpi * scale });
+}
+
 export async function centerAvatar(obr) {
   if (!await obr.scene.isReady()) return;
   const id = avatarId(await obr.player.getMetadata());
@@ -29,6 +50,7 @@ export async function centerAvatar(obr) {
   const [token] = await obr.scene.items.getItems([id]);
   if (!isPublicToken(token)) return;
   const { center } = await obr.scene.items.getItemBounds([id]);
+  resumeCameraFollow(obr);
   await centerViewport(obr.viewport, center, await readViewport(obr.viewport));
 }
 
@@ -66,6 +88,7 @@ export async function prepareKeyboardPan(obr, tokenId) {
 
   return async (delta, moveToken) => {
     if (!cameraFollowEnabled(obr)) return moveToken();
+    resumeCameraFollow(obr);
     const key = keyboardPanKey(obr);
     const lease = JSON.stringify({ tokenId, until: Date.now() + 350 });
     try {
@@ -89,6 +112,7 @@ export function cameraFollowPreference(obr, onChange) {
   const key = cameraFollowKey(obr);
   const get = () => cameraFollowEnabled(obr);
   function set(enabled) {
+    resumeCameraFollow(obr);
     localStorage.setItem(key, String(enabled));
     onChange(enabled);
   }
@@ -154,7 +178,7 @@ export function setupCameraFollow(obr) {
         center = bounds?.center ?? null;
       }
       if (!center) return;
-      if (keyboardPanPending(obr, id)) {
+      if (manualCameraPan(obr, id) || keyboardPanPending(obr, id)) {
         view = undefined;
         return;
       }
@@ -164,7 +188,7 @@ export function setupCameraFollow(obr) {
         view = nextView;
         viewReadAt = Date.now();
       }
-      await centerViewport(obr.viewport, center, view, () => active() && !keyboardPanPending(obr, id));
+      await centerViewport(obr.viewport, center, view, () => active() && !manualCameraPan(obr, id) && !keyboardPanPending(obr, id));
     } catch (error) {
       if (active()) {
         center = null;
@@ -192,6 +216,7 @@ export function setupCameraFollow(obr) {
     const position = next?.position;
     const translated = oldPosition?.x !== position?.x || oldPosition?.y !== position?.y;
     if (nextPose === pose && !translated) return;
+    if (oldPosition && position && translated && manualCameraPan(obr, id)) resumeCameraFollow(obr);
     if (center && nextPose && nextPose === pose && oldPosition && position) {
       // With the same shape and rotation, the bounds center moves by the token's exact delta.
       center = { x: center.x + position.x - oldPosition.x, y: center.y + position.y - oldPosition.y };
@@ -205,6 +230,7 @@ export function setupCameraFollow(obr) {
   });
   obr.scene.onReadyChange((value) => {
     ready = value;
+    if (!value) resumeCameraFollow(obr);
     invalidate();
   });
   let avatarChanged = false;

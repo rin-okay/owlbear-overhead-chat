@@ -10,25 +10,25 @@ import {
 } from "./session.js?v=2.9.16";
 
 import { drawBubble, normalizeAppearance, prepareBubbleFont } from "./appearance.js?v=2.7.9";
-import { setupDiscordPanel } from "./discord-panel.js?v=2.11.15";
-import { damageNotation, openCombatLog, saveNotation, toggleCombatLog } from "./combat-log.js?v=2.11.15";
+import { setupDiscordPanel } from "./discord-panel.js?v=2.11.16";
+import { damageNotation, openCombatLog, saveNotation, toggleCombatLog } from "./combat-log.js?v=2.11.16";
 import { aimsAtLocation, artworkFacingAngle, MAX_CAST_LEVEL, SKILLS } from "./skills.js?v=2.11.12";
 import { ABILITIES, readTokenStats } from "./stats.js?v=2.8.5";
 import { setupAvatarPanel } from "./avatar-panel.js?v=2.11.12";
-import { setupSkillGrants, setupSkillPanel } from "./skill-panel.js?v=2.11.12";
+import { setupSkillGrants, setupSkillPanel } from "./skill-panel.js?v=2.11.16";
 import { setupStatsEditor } from "./stats-panel.js?v=2.8.5";
 import { EMOTE } from "./emotes.js?v=2.7.21";
 import { setupTargeting } from "./targeting.js?v=2.11.15";
 import { listenForChatShortcut, requestChatShortcut } from "./chat-shortcut.js?v=2.11.0";
-import { cameraFollowPreference, centerAvatar, prepareKeyboardPan } from "./avatar-viewport.js?v=2.7.9";
+import { cameraFollowPreference, centerAvatar, panCameraStep, prepareKeyboardPan } from "./avatar-viewport.js?v=2.11.16";
 
 import { readMovementGrid, stepAvatar, turnAvatar } from "./movement.js?v=2.7.5";
 import { rollSpans, validateRollSpans } from "./dice.js";
 import { rollWithRumble } from "./rumble.js?v=2.9.4";
 import { rollWithNativeDice } from "./native-dice.js";
-import { hotbarOrientation, hotbarShowsLabels, sendHotbarCommand, setHotbarLabels, setHotbarOrientation } from "./hotbar.js?v=2.11.12";
-import { actionForChord, actionForEvent, bindingLabel, editableTarget, eventChord, keyIdentity, keyboardProfile, modifierMask } from "./key-bindings.js?v=2.11.12";
-import { handleRoomKey, openKeyboard } from "./keyboard-shortcuts.js?v=2.11.12";
+import { hotbarOrientation, hotbarShowsLabels, sendHotbarCommand, setHotbarLabels, setHotbarOrientation } from "./hotbar.js?v=2.11.16";
+import { actionForChord, actionForEvent, bindingLabel, editableTarget, eventChord, keyIdentity, keyboardProfile, modifierMask } from "./key-bindings.js?v=2.11.16";
+import { handleRoomKey, openKeyboard } from "./keyboard-shortcuts.js?v=2.11.16";
 
 const combatView = new URLSearchParams(location.search).has("combat-log");
 const combatWindow = combatView ? document.querySelector("#combat-window") : null;
@@ -55,7 +55,7 @@ if (combatWindow) {
   stylesheet.rel = "stylesheet";
   stylesheet.href = new URL("./combat-log.css?v=2.9.16", import.meta.url).href;
   document.head.append(stylesheet);
-  void import("./combat-log-panel.js?v=2.11.12")
+  void import("./combat-log-panel.js?v=2.11.16")
     .then(({ setCombatRollers }) => setCombatRollers(rollCombatSave, rollCombatDamage)).catch(console.error);
 }
 
@@ -457,7 +457,11 @@ async function moveAvatar(mode) {
   try {
     while (mode === tokenControl && !mode.switching && mode.actions.length) {
       const tokenId = mode.tokenId;
-      const { offset, rotation, mirror, artwork, onApplied, skill, targetLocation, spellLevel, emote } = mode.actions.shift();
+      const { offset, cameraOffset, rotation, mirror, artwork, onApplied, skill, targetLocation, spellLevel, emote } = mode.actions.shift();
+      if (cameraOffset) {
+        await panCameraStep(OBR, tokenId, cameraOffset, () => mode === tokenControl && !mode.switching);
+        continue;
+      }
       const [{ token }, grid, pan] = await Promise.all([
         getAvatar(),
         offset ? (mode.movementGrid ??= readMovementGrid(OBR.scene.grid)) : undefined,
@@ -671,6 +675,7 @@ function updateMoveModeLabel() {
   const spell = SKILLS[tokenControl?.upcast?.skill];
   const aimedSpell = SKILLS[targeting?.pendingCast()?.skill];
   moveModeLabel.textContent = controlsInactive ? "controls inactive · press F1 to chat or F2 to move"
+    : tokenControl?.looking ? "look mode · movement keys pan · esc to return"
     : question || targeting?.feedback() || (spell ? `${spell.name} level · choices ${spell.spellLevel}–${spell.maxCastLevel ?? MAX_CAST_LEVEL} · ${cancel} to cancel`
     : aimedSpell ? `${aimedSpell.name} · move marker · ${confirm} to cast`
     : targeting?.editing() ? `target · move marker · ${confirm} to set${quickcastEnabled ? " or press a skill key" : ""}`
@@ -804,6 +809,22 @@ function handleControlKeyDown(event) {
     return;
   }
   const action = controlAction(event);
+  const mode = tokenControl;
+  if (mode && (action?.id === "look-mode" || mode.looking && (physicalKey === "Escape" || action?.id === "cancel"))) {
+    event.preventDefault();
+    if (!event.repeat && !mode.switching) {
+      stopRotation(mode);
+      mode.looking = !mode.looking;
+      updateMoveModeLabel();
+    }
+    return;
+  }
+  const cameraOffset = action?.cameraOffset ?? (mode?.looking ? action?.offset : undefined);
+  if (mode && cameraOffset) {
+    event.preventDefault();
+    if (!mode.switching && mode.actions.length < 4) queueAvatarAction(mode, { cameraOffset });
+    return;
+  }
   if (handleProjectileCount(event) || handleSpellLevelKey(event) || handleAimKey(event, action) || handleTargetKey(event, action)) {
     event.preventDefault();
     return;
@@ -907,17 +928,14 @@ if (combatWindow) {
     if (event.defaultPrevented || !combatKeyTarget(event.target) ||
         event.target.closest?.("input, textarea, select, [contenteditable], [popover]:popover-open") ||
         event.isComposing || event.keyCode === 229) return;
-    if (handleProjectileCount(event)) {
-      event.preventDefault();
-      return;
-    }
-    if (controlAction(event)?.id === "confirm" && !targeting?.editing() && !tokenControl?.upcast) {
+    if (controlAction(event)?.id === "confirm" && !targeting?.editing() && !tokenControl?.upcast &&
+        !tokenControl?.projectilePrompt) {
       event.preventDefault();
       if (!event.repeat) void focusChatFromCombat().catch(console.error);
       return;
     }
     // Enter activates the focused Apply or Undo button as usual.
-    if (event.key === "Enter" && event.target.closest("button, input")) return;
+    if (event.key === "Enter" && !tokenControl?.projectilePrompt && event.target.closest("button, input")) return;
     if (!tokenControl && !combatModePaused) resumeCombatControls({ combatKey: true });
     if (tokenControl) handleControlKeyDown(event);
   });

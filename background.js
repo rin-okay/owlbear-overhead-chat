@@ -14,15 +14,15 @@ import { queueDiscord } from "./discord.js?v=2.3.9";
 import { parseTray } from "./dice-replay.js";
 import { queueDicePopup, resetDicePopups } from "./dice-popup.js";
 import { setupSkillHost } from "./skill-host.js?v=2.11.15";
-import { setupHotbar } from "./hotbar.js?v=2.11.12";
-import { setupCombatLog } from "./combat-log.js?v=2.11.12";
+import { setupHotbar } from "./hotbar.js?v=2.11.16";
+import { setupCombatLog } from "./combat-log.js?v=2.11.16";
 import { SKILL_CHANGED, skillConnections, skillGrantLabel } from "./skills.js?v=2.11.12";
 import { EMOTE, floatEmote, parseEmote } from "./emotes.js?v=2.7.22";
 import { setupHeartProjectiles } from "./heart-spells.js?v=2.11.12";
 import { setupHitMarkers } from "./hit-markers.js?v=2.11.0";
 import { requestChatShortcut } from "./chat-shortcut.js?v=2.11.0";
 import { setupChatRecovery } from "./chat-recovery.js?v=2.6.6";
-import { setupCameraFollow } from "./avatar-viewport.js?v=2.7.9";
+import { setupCameraFollow } from "./avatar-viewport.js?v=2.11.16";
 
 const HISTORY_LIMIT = 1000;
 const HISTORY_PAGE_SIZE = 100;

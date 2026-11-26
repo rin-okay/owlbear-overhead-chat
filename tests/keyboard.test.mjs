@@ -23,12 +23,25 @@ test("targeting, half steps, rotation, quickbar and spell chords use the same re
   assert.equal(command("KeyZ", "w"), "target");
   assert.equal(command("Space", " "), "confirm");
   assert.equal(command("KeyD", "D", { shiftKey: true }), "half-right");
-  assert.equal(command("ArrowUp", "ArrowUp"), "arrow-up");
+  assert.equal(command("ArrowUp", "ArrowUp"), "camera-up");
   assert.equal(command("KeyE", "E", { shiftKey: true }), "quarter-right");
   assert.equal(command("KeyG", "g", { ctrlKey: true, shiftKey: true }), "aim-upcast-missile");
   assert.equal(command("Digit0", "à", { ctrlKey: true }), "aim-slot-0");
   assert.equal(command("ArrowDown", "ArrowDown", { altKey: true }), "save-options");
   assert.equal(command("Enter", "Enter", { shiftKey: true }), undefined);
+});
+
+test("camera shortcuts are independently assignable and Alt follows movement", () => {
+  assert.equal(command("KeyW", "∑", { altKey: true }), "alt-camera-up");
+  assert.equal(command("ArrowLeft", "ArrowLeft"), "camera-left");
+  assert.equal(resolveBindings()["look-mode"], null);
+  let overrides = assignBinding({}, "move-up", { code: "KeyP", modifiers: 0 });
+  overrides = assignBinding(overrides, "camera-left", { code: "Numpad4", modifiers: 0 });
+  overrides = assignBinding(overrides, "look-mode", { code: "Tab", modifiers: 0 });
+  assert.equal(command("KeyP", "π", { altKey: true }, overrides), "alt-camera-up");
+  assert.equal(command("Numpad4", "4", {}, overrides), "camera-left");
+  assert.equal(command("ArrowLeft", "ArrowLeft", {}, overrides), undefined);
+  assert.equal(command("Tab", "Tab", {}, overrides), "look-mode");
 });
 
 test("overwrite, explicit unassign and migration leave a single owner for each chord", () => {

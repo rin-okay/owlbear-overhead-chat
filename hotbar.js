@@ -56,7 +56,7 @@ export function setupHotbar(obr) {
     const [width, height] = await Promise.all([obr.viewport.getWidth(), obr.viewport.getHeight()]);
     const left = hotbarOrientation(obr) === "left";
     const compact = !hotbarShowsLabels(obr);
-    const url = new URL("./hotbar.html?v=2.11.12", import.meta.url);
+    const url = new URL("./hotbar.html?v=2.11.16", import.meta.url);
     if (left) url.searchParams.set("position", "left");
     if (compact) url.searchParams.set("labels", "off");
     await obr.popover.open({

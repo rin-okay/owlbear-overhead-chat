@@ -1,7 +1,7 @@
 import {
   KEY_ACTIONS, actionForChord, assignBinding, bindingLabel, bindingStorageKey,
   eventChord, keyboardProfile, keyIdentity, writeKeyboard,
-} from "./key-bindings.js?v=2.11.12";
+} from "./key-bindings.js?v=2.11.16";
 import { setupStatsEditor } from "./stats-panel.js?v=2.8.5";
 import { isPublicToken } from "./rules.js";
 import { isProjectileToken } from "./projectile-collision.js?v=2.9.10";

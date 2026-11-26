@@ -1,6 +1,6 @@
-import { actionForEvent, keyboardProfile } from "./key-bindings.js?v=2.11.12";
+import { actionForEvent, keyboardProfile } from "./key-bindings.js?v=2.11.16";
 import OBR from "./obr.js";
-import { COMBAT_POPOVER, damageNotation, formatCombatDamage, openCombatChannel } from "./combat-log.js?v=2.11.12";
+import { COMBAT_POPOVER, damageNotation, formatCombatDamage, openCombatChannel } from "./combat-log.js?v=2.11.16";
 import { appliedCombatDamage, applyForgeDamage, forgeHpKey, hasForgeHp, undoForgeDamage } from "./forge-hp.js?v=2.9.7";
 
 const combatWindow = document.querySelector("#combat-window");
