@@ -1360,11 +1360,14 @@ function setupSettings() {
     try {
       await openKeyboard(OBR, () => {
         keyboardMoveMode = undefined;
-        if (!mode || tokenControl !== mode) return;
-        const focusTarget = moveButton.closest("[hidden]") ? chatMain : moveButton;
-        chatMain.tabIndex = -1;
-        window.focus();
-        focusTarget.focus({ preventScroll: true });
+        // Let Owlbear finish removing the modal's focus trap first.
+        requestAnimationFrame(() => {
+          if (!mode || tokenControl !== mode) return;
+          const focusTarget = moveButton.closest("[hidden]") ? chatMain : moveButton;
+          chatMain.tabIndex = -1;
+          window.focus();
+          focusTarget.focus({ preventScroll: true });
+        });
       });
     } catch (error) {
       keyboardMoveMode = undefined;
