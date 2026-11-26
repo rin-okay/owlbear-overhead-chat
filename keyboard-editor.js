@@ -1,9 +1,9 @@
 import OBR from "./obr.js";
 import {
-  KEY_ACTIONS, KEYBOARD_KEYS, INTERNATIONAL_KEYS, FIXED_KEYS, MODIFIERS, assignBinding, bindingLabel, browserLayout, eventChord,
+  KEY_ACTIONS, KEYBOARD_KEYS, INTERNATIONAL_KEYS, FIXED_KEYS, MODIFIERS, actionForEvent, assignBinding, bindingLabel, browserLayout, editableTarget, eventChord,
   keyLabel, readKeyboard, resolveBindings, writeKeyboard,
-} from "./key-bindings.js?v=2.11.4";
-import { KEYBOARD_MODAL } from "./keyboard-shortcuts.js?v=2.11.4";
+} from "./key-bindings.js?v=2.11.9";
+import { connectKeyboardEditor, isFixedKeyboardShortcut, KEYBOARD_MODAL } from "./keyboard-shortcuts.js?v=2.11.10";
 
 OBR.onReady(() => {
   const board = document.querySelector("#board");
@@ -226,8 +226,14 @@ OBR.onReady(() => {
     }));
   }
 
-  const close = () => void OBR.modal.close(KEYBOARD_MODAL).catch(console.error);
-  document.querySelector("#close").addEventListener("click", close);
+  const notifyClosing = connectKeyboardEditor();
+  const close = () => {
+    notifyClosing();
+    void OBR.modal.close(KEYBOARD_MODAL).catch(console.error);
+  };
+  const closeButton = document.querySelector("#close");
+  closeButton.addEventListener("click", close);
+  closeButton.focus({ preventScroll: true });
   document.querySelector("#reset").addEventListener("click", () => {
     selected = undefined;
     capturing = false;
@@ -239,10 +245,16 @@ OBR.onReady(() => {
   dropTarget(document.querySelector("#sidebar"), (id) => assign(id, null));
 
   document.addEventListener("keydown", (event) => {
-    if (!capturing) {
-      if (!event.defaultPrevented && event.key === "Escape") close();
+    if (event.defaultPrevented || event.isComposing || event.keyCode === 229) return;
+    const toggle = isFixedKeyboardShortcut(event) ||
+      !capturing && !editableTarget(event.target) && actionForEvent(bindings, event)?.id === "keyboard";
+    if (toggle || !capturing && event.key === "Escape") {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      if (!event.repeat) close();
       return;
     }
+    if (!capturing) return;
     event.preventDefault();
     event.stopImmediatePropagation();
     if (event.repeat) return;

@@ -37,7 +37,7 @@ The GM can turn on **habbo hotel mode** in the **gm** tab for pixel-style bubble
 
 ## Keyboard settings
 
-Open **avatar → bindings → keyboard settings** or press **F10** while chat or the hotbar has focus. The physical slash-position shortcut works in those panels when you are outside a text field. F1–F4 and F10 are fixed. The editor saves per player, room, and browser. Existing skill hotkeys migrate automatically. Shift+Enter still adds a new line with the default chat binding.
+Open **avatar → bindings → keyboard settings** or press **F10** while chat or the hotbar has focus. The physical slash-position shortcut works in those panels when you are outside a text field. Use the same shortcut, F10, Escape, or the Close button to close the editor. Closing it returns focus to active Move mode. F1–F4 and F10 are fixed. The editor saves per player, room, and browser. Existing skill hotkeys migrate automatically. Shift+Enter still adds a new line with the default chat binding.
 
 Drag an action from **Unassigned** onto the keyboard, or double-click its name and press a key without modifiers. The old action on that key moves to Unassigned. Drag an assigned action to the sidebar or use **Unassign** to clear it. Select Shift, Ctrl, Alt, or Ctrl+Shift above the keyboard to preview its shortcuts. Movement, targeting, chat, hotbar, spells, quickbar slots and their prompt choices all use the same bindings. A quickbar binding also supplies that numbered choice in spell-level and projectile prompts. Modifier shortcuts always follow their base key.
 

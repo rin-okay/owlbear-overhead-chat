@@ -6,7 +6,7 @@ import { hotbarMode, MIN_HOTBAR_SLOTS, resizeHotbar, sendHotbarCommand } from ".
 import { BUILTIN_EMOTES } from "./emotes.js?v=2.7.21";
 
 import { bindingLabel, keyboardProfile } from "./key-bindings.js?v=2.11.4";
-import { handleRoomKey, openKeyboard } from "./keyboard-shortcuts.js?v=2.11.4";
+import { handleRoomKey, openKeyboard } from "./keyboard-shortcuts.js?v=2.11.10";
 
 const PRIORITY = "fghjklxcvbnmtyuiop";
 const ICONS = {

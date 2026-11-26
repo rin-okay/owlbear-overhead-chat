@@ -14,7 +14,7 @@ import { queueDiscord } from "./discord.js?v=2.3.9";
 import { parseTray } from "./dice-replay.js";
 import { queueDicePopup, resetDicePopups } from "./dice-popup.js";
 import { setupSkillHost } from "./skill-host.js?v=2.11.4";
-import { setupHotbar } from "./hotbar.js?v=2.11.4";
+import { setupHotbar } from "./hotbar.js?v=2.11.10";
 import { setupCombatLog } from "./combat-log.js?v=2.11.5";
 import { SKILL_CHANGED, skillConnections, skillGrantLabel } from "./skills.js?v=2.11.0";
 import { EMOTE, floatEmote, parseEmote } from "./emotes.js?v=2.7.22";

@@ -10,8 +10,8 @@ import {
 } from "./session.js?v=2.9.16";
 
 import { drawBubble, normalizeAppearance, prepareBubbleFont } from "./appearance.js?v=2.7.9";
-import { setupDiscordPanel } from "./discord-panel.js?v=2.11.9";
-import { damageNotation, openCombatLog, saveNotation } from "./combat-log.js?v=2.11.9";
+import { setupDiscordPanel } from "./discord-panel.js?v=2.11.10";
+import { damageNotation, openCombatLog, saveNotation } from "./combat-log.js?v=2.11.10";
 import { aimsAtLocation, artworkFacingAngle, MAX_CAST_LEVEL, SKILLS } from "./skills.js?v=2.11.0";
 import { ABILITIES, readTokenStats } from "./stats.js?v=2.8.5";
 import { setupAvatarPanel } from "./avatar-panel.js?v=2.11.9";
@@ -28,7 +28,7 @@ import { rollWithRumble } from "./rumble.js?v=2.9.4";
 import { rollWithNativeDice } from "./native-dice.js";
 import { hotbarOrientation, hotbarShowsLabels, sendHotbarCommand, setHotbarLabels, setHotbarOrientation } from "./hotbar.js?v=2.11.4";
 import { actionForChord, actionForEvent, bindingLabel, editableTarget, eventChord, keyIdentity, keyboardProfile, modifierMask } from "./key-bindings.js?v=2.11.9";
-import { handleRoomKey, openKeyboard } from "./keyboard-shortcuts.js?v=2.11.9";
+import { handleRoomKey, openKeyboard } from "./keyboard-shortcuts.js?v=2.11.10";
 
 const combatView = new URLSearchParams(location.search).has("combat-log");
 const combatWindow = combatView ? document.querySelector("#combat-window") : null;
@@ -71,6 +71,7 @@ let tokenControl;
 let controlsInactive = false;
 let tokenFocusHandoff;
 let panelDialogHandoff;
+let keyboardMoveMode;
 let pendingChatShortcut;
 let combatAvatarId;
 let combatModePaused = false;
@@ -776,7 +777,7 @@ chatMain.addEventListener("focusout", () => stopRotation(tokenControl));
 window.addEventListener("blur", () => {
   const handoff = panelDialogHandoff;
   panelDialogHandoff = undefined;
-  if (tokenControl && handoff?.mode === tokenControl) stopRotation(tokenControl);
+  if (tokenControl && (keyboardMoveMode === tokenControl || handoff?.mode === tokenControl)) stopRotation(tokenControl);
   else suspendTokenControl(!combatWindow);
 });
 window.addEventListener("pagehide", () => suspendTokenControl());
@@ -1353,7 +1354,23 @@ function setupSettings() {
     pendingChatShortcut = mode;
     void refresh();
   }
-  const showKeyboard = () => openPanelDialog(() => openKeyboard(OBR));
+  async function showKeyboard() {
+    const mode = tokenControl;
+    keyboardMoveMode = mode;
+    try {
+      await openKeyboard(OBR, () => {
+        keyboardMoveMode = undefined;
+        if (!mode || tokenControl !== mode) return;
+        const focusTarget = moveButton.closest("[hidden]") ? chatMain : moveButton;
+        chatMain.tabIndex = -1;
+        window.focus();
+        focusTarget.focus({ preventScroll: true });
+      });
+    } catch (error) {
+      keyboardMoveMode = undefined;
+      throw error;
+    }
+  }
   for (const id of ["open-keyboard", "edit-skill-keys"]) {
     document.getElementById(id)?.addEventListener("click", () => void showKeyboard().catch(console.error));
   }
