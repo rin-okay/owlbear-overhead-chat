@@ -72,7 +72,7 @@ function wallDistance(origin, direction, a, b) {
   return distance > EPSILON ? distance : Infinity;
 }
 
-function tokenCircle(token, dpi) {
+export function tokenCircle(token, dpi) {
   if (!validPoint(token.position)) return;
   const { width, height } = token.image ?? {};
   const { dpi: imageDpi, offset } = token.grid ?? {};

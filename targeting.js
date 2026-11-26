@@ -1,4 +1,5 @@
 import { buildPath, Command } from "./obr.js";
+import { fetchSpellTargets, nextTarget, reachableTargets, targetGeometry } from "./target-cycle.js?v=2.11.15";
 
 const report = (error) => console.warn("Overhead Chat target selection", error);
 const validPoint = (point) => Number.isFinite(point?.x) && Number.isFinite(point?.y);
@@ -61,8 +62,46 @@ export function setupTargeting(obr, onChange) {
   async function setPoint(state, point) {
     const snapped = await obr.scene.grid.snapPosition(point, 1, false, true);
     if (current !== state || !state.editing || !validPoint(snapped)) return;
-    state.point = snapped;
-    draw(state, snapped);
+    place(state, snapped);
+  }
+
+  function place(state, point) {
+    state.point = point;
+    state.feedback = undefined;
+    draw(state, point);
+    onChange();
+  }
+
+  function cycle(direction) {
+    const state = current;
+    if (!state?.editing || state.consuming) return;
+    const cast = state.pendingCast;
+    void enqueue(state, async () => {
+      if (!state.point || state.pendingCast !== cast) return;
+      try {
+        const [geometry, allowed] = await Promise.all([
+          targetGeometry(obr, state.tokenId),
+          cast ? fetchSpellTargets(obr, state.tokenId, cast) : undefined,
+        ]);
+        if (current !== state || !state.editing || state.pendingCast !== cast) return;
+        const candidates = reachableTargets(geometry, state.tokenId)
+          .filter(({ id }) => !allowed || allowed.has(id));
+        const origin = state.cycleOrigin ?? state.point;
+        const target = nextTarget(candidates, origin, state.snappedTarget, direction);
+        if (!target) {
+          state.feedback = "no reachable targets";
+          onChange();
+          return;
+        }
+        state.cycleOrigin = origin;
+        state.snappedTarget = target.id;
+        place(state, target.center);
+      } catch (error) {
+        if (current !== state || !state.editing || state.pendingCast !== cast) return;
+        state.feedback = error.message || "couldn’t check reachable targets";
+        onChange();
+      }
+    });
   }
 
   async function confirm() {
@@ -87,7 +126,7 @@ export function setupTargeting(obr, onChange) {
 
   function start(tokenId, heading, pendingCast) {
     if (current) return;
-    const state = { editing: true, pendingCast, work: Promise.resolve() };
+    const state = { tokenId, editing: true, pendingCast, work: Promise.resolve() };
     current = state;
     onChange();
     void enqueue(state, async () => {
@@ -127,6 +166,9 @@ export function setupTargeting(obr, onChange) {
   function aim(tokenId, heading, pendingCast) {
     if (current && !current.consuming) {
       current.pendingCast = pendingCast;
+      current.feedback = undefined;
+      current.cycleOrigin = undefined;
+      current.snappedTarget = undefined;
       current.editing = true;
       onChange();
       return;
@@ -139,7 +181,8 @@ export function setupTargeting(obr, onChange) {
   window.addEventListener("pagehide", clear, { once: true });
 
   return {
-    start, aim, toggle, clear, confirm, consumeLocation,
+    start, aim, toggle, clear, confirm, consumeLocation, cycle,
+    feedback: () => current?.feedback,
     editing: () => Boolean(current?.editing),
     pendingCast: () => current?.pendingCast,
     location: () => current && !current.editing ? current.point : undefined,
@@ -148,10 +191,12 @@ export function setupTargeting(obr, onChange) {
       if (!state?.editing || state.consuming) return;
       void enqueue(state, async () => {
         if (!state.point) return;
-        await setPoint(state, {
+        const point = {
           x: state.point.x + offset[0] * state.dpi,
           y: state.point.y + offset[1] * state.dpi,
-        });
+        };
+        if (state.snappedTarget) place(state, point);
+        else await setPoint(state, point);
       });
     },
   };

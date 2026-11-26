@@ -49,6 +49,8 @@ Click **combat log** in Overhead Chat to open the bottom-right panel. It stays o
 
 For each damaging hit, the GM can choose **full**, **half** (rounded down), or **custom** and apply damage to the target’s mapped current HP in Forge!. The custom choice opens an amount dialog. Press Enter to confirm and apply. Hits with no extension damage roll accept a custom amount. Set current HP on the Forge! unit first. After applying, the check mark confirms the update and **⟲** adds that hit’s applied amount back to current HP.
 
+In targeting mode, press Tab or Shift+Tab to snap to reachable tokens. The cycle starts nearest your marker, skips blocked targets, and checks the active spell’s range and targeting rules when one is ready. Use the movement keys to aim beside a snapped token, then confirm the marker’s final position.
+
 ## Skill hotkeys with Embers
 
 Heart Shot marks one hit target. It uses level 1, 2, or 3 to apply heart marker 3, 2, or 1 respectively. Heart Fireball is a level-3 spell. It bursts into a heart circle and applies marker 3 to affected targets. Both spells are available through GM grants. Assign their initial shortcuts in Loadout or Keyboard Settings.

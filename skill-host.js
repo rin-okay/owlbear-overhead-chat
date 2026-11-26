@@ -1,3 +1,4 @@
+import { reachableTargets, targetGeometry } from "./target-cycle.js?v=2.11.15";
 import { addHeartEffects } from "./heart-spells.js?v=2.11.12";
 import { setupBless } from "./bless.js?v=2.9.14";
 import { combatDamage } from "./combat-log.js?v=2.11.12";
@@ -75,7 +76,7 @@ export function setupSkillHost(obr, buildImage, recordCombat) {
   obr.broadcast.onMessage(SKILL_REQUEST, async ({ connectionId, data }) => {
     if (typeof data?.requestId !== "string" || !/^[a-f0-9-]{36}$/i.test(data.requestId) ||
         typeof data.tokenId !== "string" || !data.tokenId || data.tokenId.length > 128 ||
-        (data.type !== "list" && (data.type !== "cast" || !Object.hasOwn(SKILLS, data.skill)))) return;
+        (data.type !== "list" && (!["cast", "targets"].includes(data.type) || !Object.hasOwn(SKILLS, data.skill)))) return;
     const version = sceneVersion;
     const answer = (result) => obr.broadcast.sendMessage(SKILL_RESULT, {
       ...result, connectionId, requestId: data.requestId, tokenId: data.tokenId,
@@ -109,6 +110,19 @@ export function setupSkillHost(obr, buildImage, recordCombat) {
       }
       const skill = SKILLS[data.skill];
       const granted = result.skills.includes(data.skill);
+      if (data.type === "targets") {
+        const level = skill.upcast ? data.spellLevel ?? skill.spellLevel : skill.spellLevel;
+        if (!granted || !aimsAtLocation(data.skill) || (!Number.isInteger(level) && level !== undefined) ||
+            level < skill.spellLevel || level > Math.min(skill.maxCastLevel ?? MAX_CAST_LEVEL, readTokenStats(token).details.spellLevel)) {
+          await answer({ reachableIds: [] });
+          return;
+        }
+        const geometry = await targetGeometry(obr, token.id);
+        if (version === sceneVersion) {
+          await answer({ reachableIds: reachableTargets(geometry, token.id, data.skill, config).map(({ id }) => id) });
+        }
+        return;
+      }
       const maxSpellLevel = readTokenStats(token).details.spellLevel;
       const canActivateShield = granted && maxSpellLevel >= skill.spellLevel;
       // A shield can still be removed after the grant is revoked or the cap is lowered.

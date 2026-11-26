@@ -10,15 +10,15 @@ import {
 } from "./session.js?v=2.9.16";
 
 import { drawBubble, normalizeAppearance, prepareBubbleFont } from "./appearance.js?v=2.7.9";
-import { setupDiscordPanel } from "./discord-panel.js?v=2.11.14";
-import { damageNotation, openCombatLog, saveNotation, toggleCombatLog } from "./combat-log.js?v=2.11.13";
+import { setupDiscordPanel } from "./discord-panel.js?v=2.11.15";
+import { damageNotation, openCombatLog, saveNotation, toggleCombatLog } from "./combat-log.js?v=2.11.15";
 import { aimsAtLocation, artworkFacingAngle, MAX_CAST_LEVEL, SKILLS } from "./skills.js?v=2.11.12";
 import { ABILITIES, readTokenStats } from "./stats.js?v=2.8.5";
 import { setupAvatarPanel } from "./avatar-panel.js?v=2.11.12";
 import { setupSkillGrants, setupSkillPanel } from "./skill-panel.js?v=2.11.12";
 import { setupStatsEditor } from "./stats-panel.js?v=2.8.5";
 import { EMOTE } from "./emotes.js?v=2.7.21";
-import { setupTargeting } from "./targeting.js?v=2.10.2";
+import { setupTargeting } from "./targeting.js?v=2.11.15";
 import { listenForChatShortcut, requestChatShortcut } from "./chat-shortcut.js?v=2.11.0";
 import { cameraFollowPreference, centerAvatar, prepareKeyboardPan } from "./avatar-viewport.js?v=2.7.9";
 
@@ -671,7 +671,7 @@ function updateMoveModeLabel() {
   const spell = SKILLS[tokenControl?.upcast?.skill];
   const aimedSpell = SKILLS[targeting?.pendingCast()?.skill];
   moveModeLabel.textContent = controlsInactive ? "controls inactive · press F1 to chat or F2 to move"
-    : question || (spell ? `${spell.name} level · choices ${spell.spellLevel}–${spell.maxCastLevel ?? MAX_CAST_LEVEL} · ${cancel} to cancel`
+    : question || targeting?.feedback() || (spell ? `${spell.name} level · choices ${spell.spellLevel}–${spell.maxCastLevel ?? MAX_CAST_LEVEL} · ${cancel} to cancel`
     : aimedSpell ? `${aimedSpell.name} · move marker · ${confirm} to cast`
     : targeting?.editing() ? `target · move marker · ${confirm} to set${quickcastEnabled ? " or press a skill key" : ""}`
     : targeting?.location() ? "move mode · target set" : "move mode enabled");
@@ -1403,6 +1403,16 @@ function setupSettings() {
   }
   window.addEventListener("storage", updateMoveModeLabel);
   document.addEventListener("keydown", (event) => {
+    if (!event.defaultPrevented && !event.isComposing && event.keyCode !== 229 &&
+        event.code === "Tab" && !event.ctrlKey && !event.altKey && !event.metaKey &&
+        tokenControl && !tokenControl.switching && targeting?.editing() &&
+        !event.target.closest?.("dialog, [popover]:popover-open") &&
+        (event.target === input || !editableTarget(event.target))) {
+      event.preventDefault();
+      event.stopPropagation();
+      if (!event.repeat) targeting.cycle(event.shiftKey ? -1 : 1);
+      return;
+    }
     if (handleRoomKey(OBR, event, roomKeys)) return;
     if (combatWindow && event.key !== "F2" && event.target.closest?.("dialog")) return;
     if (!["F1", "F2", "F3", "F4"].includes(event.key) || event.ctrlKey || event.altKey ||
