@@ -1,7 +1,7 @@
 import {
   KEY_ACTIONS, actionForChord, assignBinding, bindingLabel, bindingStorageKey,
   eventChord, keyboardProfile, keyIdentity, writeKeyboard,
-} from "./key-bindings.js?v=2.11.9";
+} from "./key-bindings.js?v=2.11.12";
 import { setupStatsEditor } from "./stats-panel.js?v=2.8.5";
 import { isPublicToken } from "./rules.js";
 import { isProjectileToken } from "./projectile-collision.js?v=2.9.10";
@@ -10,7 +10,7 @@ import { readTokenStats } from "./stats.js?v=2.8.5";
 import {
   DEFAULT_WEAPON, FACINGS, FRIENDLY_FIRE_MODES, RANGED_WEAPONS, SKILLS, SKILL_CHANGED, SKILL_REQUEST, SKILL_RESULT, SPELLS, TEAMS, WEAPONS,
   aimsAtLocation, availableRangedWeapons, availableSpells, availableWeapons, friendlyFireMode, readSkills, skillConnections, spellParameter, tokenTeams, validSpellParameter, writeSkills,
-} from "./skills.js?v=2.11.0";
+} from "./skills.js?v=2.11.12";
 
 function characterLabel(token) {
   return token.name || "unnamed character";

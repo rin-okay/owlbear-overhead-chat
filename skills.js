@@ -87,6 +87,16 @@ export const SKILLS = {
   shield: { name: "shield", key: "l", spellLevel: 1 },
   sleep: { name: "sleep (afk)", key: "", spellLevel: 0 },
   heart: { name: "heart", key: "p", effect: "generic.marker.heart.3" },
+  "heart-shot": {
+    name: "heart shot", key: "", spellLevel: 1, maxCastLevel: 3, upcast: true, heartMarker: true,
+    effect: "generic.ui.icon.heart", range: 8,
+  },
+  "heart-fireball": {
+    name: "heart fireball", key: "", spellLevel: 3, heartMarker: true,
+    effect: "generic.ui.icon.heart", range: 30,
+    impact: { effect: "generic.template.circle.heart", visibleRadiusFraction: 0.5 },
+    parameter: { label: "radius (in cells)", min: 1, defaultValue: 4 },
+  },
   // Keep the original skill ID so existing bindings and clients still work.
   spear: { name: "melee weapon attack", key: "f", meleeReach: 1 },
   ranged: { name: "ranged weapon attack", key: "n", range: 30, hitDelay: 800 },

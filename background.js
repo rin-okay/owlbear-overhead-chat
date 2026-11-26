@@ -13,11 +13,12 @@ import { chatParts, isRollCommand, rollSpans } from "./dice.js";
 import { queueDiscord } from "./discord.js?v=2.3.9";
 import { parseTray } from "./dice-replay.js";
 import { queueDicePopup, resetDicePopups } from "./dice-popup.js";
-import { setupSkillHost } from "./skill-host.js?v=2.11.4";
-import { setupHotbar } from "./hotbar.js?v=2.11.10";
-import { setupCombatLog } from "./combat-log.js?v=2.11.5";
-import { SKILL_CHANGED, skillConnections, skillGrantLabel } from "./skills.js?v=2.11.0";
+import { setupSkillHost } from "./skill-host.js?v=2.11.12";
+import { setupHotbar } from "./hotbar.js?v=2.11.12";
+import { setupCombatLog } from "./combat-log.js?v=2.11.12";
+import { SKILL_CHANGED, skillConnections, skillGrantLabel } from "./skills.js?v=2.11.12";
 import { EMOTE, floatEmote, parseEmote } from "./emotes.js?v=2.7.22";
+import { setupHeartProjectiles } from "./heart-spells.js?v=2.11.12";
 import { setupHitMarkers } from "./hit-markers.js?v=2.11.0";
 import { requestChatShortcut } from "./chat-shortcut.js?v=2.11.0";
 import { setupChatRecovery } from "./chat-recovery.js?v=2.6.6";
@@ -381,6 +382,7 @@ function queueSpeech(event) {
 
 OBR.onReady(() => {
   setupHitMarkers(OBR, buildLabel, buildPath, Command);
+  setupHeartProjectiles(OBR);
   setupCameraFollow(OBR);
   setupHotbar(OBR);
   let shortcutRevision = 0;

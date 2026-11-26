@@ -1,5 +1,6 @@
+import { addHeartEffects } from "./heart-spells.js?v=2.11.12";
 import { setupBless } from "./bless.js?v=2.9.14";
-import { combatDamage } from "./combat-log.js?v=2.11.4";
+import { combatDamage } from "./combat-log.js?v=2.11.12";
 import { isShieldGraphic, readShieldGraphics, setupShield } from "./shield.js?v=2.9.15";
 import { setupSleep } from "./sleep.js?v=2.9.15";
 import { canSpeak, MELEE_HIT_TIMING, normalizeMeleeHitTiming, ROLL_DAMAGE_FROM_COMBAT_LOG } from "./rules.js?v=2.9.4";
@@ -15,7 +16,7 @@ import {
 import {
   DEFAULT_WEAPON, EMBERS_EFFECTS, MAX_CAST_LEVEL, MELEE_DURATION_MS, RANGED_WEAPONS, SKILLS, SKILL_REQUEST, SKILL_RESULT, WEAPONS,
   aimsAtLocation, availableRangedWeapons, availableSkills, availableWeapons, friendlyFireMode, readSkills, skillConnections, skillEffect, spellParameter, tokenTeams, turnToHeading,
-} from "./skills.js?v=2.11.0";
+} from "./skills.js?v=2.11.12";
 
 function aimAtTarget(source, target, range = 0, passThrough = false, maxRange = Infinity) {
   if (![target?.center?.x, target?.center?.y].every(Number.isFinite)) return;
@@ -128,8 +129,9 @@ export function setupSkillHost(obr, buildImage, recordCombat) {
       }
       const missile = data.skill === "missile";
       const spellLevel = skill.upcast && data.spellLevel !== undefined ? data.spellLevel : skill.spellLevel;
-      if (skill.upcast && (!Number.isInteger(spellLevel) || spellLevel < skill.spellLevel || spellLevel > MAX_CAST_LEVEL)) {
-        await answer({ ...result, error: `Choose a ${skill.name} spell level from ${skill.spellLevel} to ${MAX_CAST_LEVEL}.` });
+      const castLimit = skill.maxCastLevel ?? MAX_CAST_LEVEL;
+      if (skill.upcast && (!Number.isInteger(spellLevel) || spellLevel < skill.spellLevel || spellLevel > castLimit)) {
+        await answer({ ...result, error: `Choose a ${skill.name} spell level from ${skill.spellLevel} to ${castLimit}.` });
         return;
       }
       if (spellLevel > maxSpellLevel && !removingShield) {
@@ -369,7 +371,7 @@ export function setupSkillHost(obr, buildImage, recordCombat) {
             });
           }
         } else {
-          const maxRange = eldritch || ranged ? skill.range * dpi : Infinity;
+          const maxRange = eldritch || ranged || skill.heartMarker ? skill.range * dpi : Infinity;
           const projectileSpell = projectile && Number.isInteger(skill.spellLevel);
           const targetId = selectedBeams[0]?.id ?? data.targetId;
           const pointAim = aimAtTarget(source, { center: data.targetLocation }, 0, false, maxRange);
@@ -434,6 +436,10 @@ export function setupSkillHost(obr, buildImage, recordCombat) {
         for (let index = 1; index < dartCount; index++) {
           instructions.push({ ...instruction, delay: index * MAGIC_MISSILE_INTERVAL });
         }
+      }
+      if (skill.heartMarker) {
+        await addHeartEffects(obr, instructions, skill, spellLevel, hitTokens, dpi);
+        if (version !== sceneVersion) return;
       }
       let damageRolls;
       let damageFormula;
@@ -510,7 +516,7 @@ export function setupSkillHost(obr, buildImage, recordCombat) {
           const [damage, ...missileFollowUps] = damageRolls;
           await sendMarkers(skill.hitDelay, damage, { missileFollowUps });
         }
-      } else if (version === sceneVersion && hitTokenIds.length && !meleeHit) {
+      } else if (version === sceneVersion && hitTokenIds.length && !meleeHit && !skill.heartMarker) {
         const formula = ranged ? rangedDamageFormula(token) : spellDamageFormula(skill, token, spellLevel);
         if (manual) damageFormula = formula;
         else if (formula) damageRolls = [ranged ? rollRangedDamage(token) : rollSpellDamage(formula)];

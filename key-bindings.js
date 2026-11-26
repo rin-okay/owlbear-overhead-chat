@@ -1,4 +1,4 @@
-import { SKILLS, aimsAtLocation, readSkills } from "./skills.js?v=2.11.0";
+import { SKILLS, aimsAtLocation, readSkills } from "./skills.js?v=2.11.12";
 
 const SHIFT = 1;
 const CTRL = 2;
