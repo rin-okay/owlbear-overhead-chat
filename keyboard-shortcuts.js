@@ -1,4 +1,4 @@
-import { actionForEvent, editableTarget, keyboardProfile } from "./key-bindings.js?v=2.11.5";
+import { actionForEvent, editableTarget, keyboardProfile } from "./key-bindings.js?v=2.11.9";
 
 export const KEYBOARD_MODAL = "chat.overhead.keyboard";
 

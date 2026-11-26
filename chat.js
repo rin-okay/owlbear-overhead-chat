@@ -10,11 +10,11 @@ import {
 } from "./session.js?v=2.9.16";
 
 import { drawBubble, normalizeAppearance, prepareBubbleFont } from "./appearance.js?v=2.7.9";
-import { setupDiscordPanel } from "./discord-panel.js?v=2.11.8";
-import { damageNotation, openCombatLog, saveNotation } from "./combat-log.js?v=2.11.8";
+import { setupDiscordPanel } from "./discord-panel.js?v=2.11.9";
+import { damageNotation, openCombatLog, saveNotation } from "./combat-log.js?v=2.11.9";
 import { aimsAtLocation, artworkFacingAngle, MAX_CAST_LEVEL, SKILLS } from "./skills.js?v=2.11.0";
 import { ABILITIES, readTokenStats } from "./stats.js?v=2.8.5";
-import { setupAvatarPanel } from "./avatar-panel.js?v=2.11.8";
+import { setupAvatarPanel } from "./avatar-panel.js?v=2.11.9";
 import { setupSkillGrants, setupSkillPanel } from "./skill-panel.js?v=2.11.7";
 import { setupStatsEditor } from "./stats-panel.js?v=2.8.5";
 import { EMOTE } from "./emotes.js?v=2.7.21";
@@ -27,8 +27,8 @@ import { rollSpans, validateRollSpans } from "./dice.js";
 import { rollWithRumble } from "./rumble.js?v=2.9.4";
 import { rollWithNativeDice } from "./native-dice.js";
 import { hotbarOrientation, hotbarShowsLabels, sendHotbarCommand, setHotbarLabels, setHotbarOrientation } from "./hotbar.js?v=2.11.4";
-import { actionForChord, actionForEvent, bindingLabel, eventChord, keyIdentity, keyboardProfile, modifierMask } from "./key-bindings.js?v=2.11.5";
-import { handleRoomKey, openKeyboard } from "./keyboard-shortcuts.js?v=2.11.5";
+import { actionForChord, actionForEvent, bindingLabel, editableTarget, eventChord, keyIdentity, keyboardProfile, modifierMask } from "./key-bindings.js?v=2.11.9";
+import { handleRoomKey, openKeyboard } from "./keyboard-shortcuts.js?v=2.11.9";
 
 const combatView = new URLSearchParams(location.search).has("combat-log");
 const combatWindow = combatView ? document.querySelector("#combat-window") : null;
@@ -70,6 +70,7 @@ let refreshVersion = 0;
 let tokenControl;
 let controlsInactive = false;
 let tokenFocusHandoff;
+let panelDialogHandoff;
 let pendingChatShortcut;
 let combatAvatarId;
 let combatModePaused = false;
@@ -753,28 +754,32 @@ function useSkillKey(mode, skill, upcast, aim, heldModifiers) {
   else queueSkill(mode, skill);
 }
 
-function viewTab(target) {
-  return target?.closest?.("main :is(nav, .avatar-modes) > button[aria-pressed][aria-controls]");
+async function openPanelDialog(open) {
+  if (!tokenControl || combatWindow) return open();
+  const handoff = { mode: tokenControl };
+  panelDialogHandoff = handoff;
+  const clear = () => {
+    if (panelDialogHandoff === handoff) panelDialogHandoff = undefined;
+  };
+  try {
+    const result = await open();
+    // Owlbear can focus the new frame after acknowledging the open request.
+    setTimeout(clear, 1000);
+    return result;
+  } catch (error) {
+    clear();
+    throw error;
+  }
 }
 
-chatMain.addEventListener("click", (event) => {
-  if (tokenControl) viewTab(event.target)?.focus({ preventScroll: true });
-}, true);
-chatMain.addEventListener("focusout", (event) => {
-  if (viewTab(event.target)) stopRotation(tokenControl);
+chatMain.addEventListener("focusout", () => stopRotation(tokenControl));
+window.addEventListener("blur", () => {
+  const handoff = panelDialogHandoff;
+  panelDialogHandoff = undefined;
+  if (tokenControl && handoff?.mode === tokenControl) stopRotation(tokenControl);
+  else suspendTokenControl(!combatWindow);
 });
-
-moveButton.addEventListener("blur", (event) => {
-  stopRotation(tokenControl);
-  if (event.relatedTarget && event.relatedTarget !== input &&
-      !viewTab(event.relatedTarget) && !combatOpenButton?.contains(event.relatedTarget)) suspendTokenControl();
-});
-window.addEventListener("blur", () => suspendTokenControl(!combatWindow));
 window.addEventListener("pagehide", () => suspendTokenControl());
-document.addEventListener("pointerdown", (event) => {
-  if (!combatWindow && event.target !== input && !moveButton.contains(event.target) &&
-      !viewTab(event.target) && !combatOpenButton?.contains(event.target)) suspendTokenControl();
-});
 input.addEventListener("pointerdown", () => {
   tokenFocusHandoff = undefined;
   if (!tokenControl) setControlsInactive(false);
@@ -845,16 +850,23 @@ async function focusChatFromCombat() {
   requestChatShortcut(OBR, "chat");
 }
 
-form.addEventListener("keyup", handleControlKeyUp);
-form.addEventListener("keydown", (event) => {
-  if (event.target === input || (event.target === moveButton && tokenControl)) handleControlKeyDown(event);
-});
-chatMain.addEventListener("keydown", (event) => {
-  if (tokenControl && viewTab(event.target)) handleControlKeyDown(event);
-});
-chatMain.addEventListener("keyup", (event) => {
-  if (viewTab(event.target)) handleControlKeyUp(event);
-});
+if (!combatWindow) {
+  document.addEventListener("keydown", (event) => {
+    const target = event.target;
+    if (target === input) {
+      handleControlKeyDown(event);
+      return;
+    }
+    if (!tokenControl || target.closest?.("dialog, [popover]:popover-open") || editableTarget(target)) return;
+    const moveKeyTarget = target === moveButton || target.closest?.("nav > button[aria-controls], .avatar-modes > button[aria-controls]");
+    if (!moveKeyTarget && !tokenControl.upcast && !tokenControl.projectilePrompt && !targeting?.editing()) {
+      if (event.key === " " && target.closest?.("button, input[type=checkbox], input[type=radio]")) return;
+      if (event.key === "Enter" && target.closest?.("button, a[href]")) return;
+    }
+    handleControlKeyDown(event);
+  });
+  document.addEventListener("keyup", handleControlKeyUp);
+}
 
 function resumeCombatControls({ combatKey = false } = {}) {
   combatModePaused = false;
@@ -1207,7 +1219,7 @@ function setupSettings() {
   const tutorialPanel = document.querySelector("#tutorial-panel");
   const tutorialButton = document.querySelector("#open-tutorial");
   const doneButton = document.querySelector("#tutorial-done");
-  const { refresh: updateAvatarPanel, showSpells } = setupAvatarPanel(avatarPanel);
+  const { refresh: updateAvatarPanel, showSpells } = setupAvatarPanel(avatarPanel, openPanelDialog);
   refreshAvatarPanel = (items) => updateAvatarPanel(items, playerRole);
   skillPanel = setupSkillPanel(OBR, () => avatar, showSpells, (text) => sendChatNotice?.(text));
   const refreshSkillGrants = setupSkillGrants(OBR);
@@ -1341,7 +1353,7 @@ function setupSettings() {
     pendingChatShortcut = mode;
     void refresh();
   }
-  const showKeyboard = () => openKeyboard(OBR);
+  const showKeyboard = () => openPanelDialog(() => openKeyboard(OBR));
   for (const id of ["open-keyboard", "edit-skill-keys"]) {
     document.getElementById(id)?.addEventListener("click", () => void showKeyboard().catch(console.error));
   }
@@ -1407,10 +1419,7 @@ OBR.onReady(() => {
   targeting = setupTargeting(OBR, updateMoveModeLabel);
   const updateFontRole = setupSettings();
   combatOpenButton?.addEventListener("click", () => {
-    const wasMoving = Boolean(tokenControl);
-    if (wasMoving) stopTokenControl();
-    void openCombatLog(OBR).catch((error) => {
-      if (wasMoving) startTokenControl();
+    void openPanelDialog(() => openCombatLog(OBR)).catch((error) => {
       console.error("Overhead Chat could not open the combat log", error);
       void OBR.notification.show("Couldn’t open the combat log.");
     });

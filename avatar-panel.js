@@ -7,7 +7,7 @@ import {
   savedQuickbarSlots, saveQuickbarSlot,
 } from "./session.js?v=2.9.16";
 
-export function setupAvatarPanel(panel) {
+export function setupAvatarPanel(panel, openDialog = (open) => open()) {
   const list = panel.querySelector("#avatar-slots");
   const talkPanel = panel.querySelector("#avatar-talk-panel");
   const changePanel = panel.querySelector("#avatar-change-panel");
@@ -39,7 +39,7 @@ export function setupAvatarPanel(panel) {
   let revision = 0;
   let lastChoices;
 
-  const showSpells = setupQuickbar(changePanel);
+  const showSpells = setupQuickbar(changePanel, openDialog);
 
   let activeView = "change";
   function selectView(mode) {
@@ -100,7 +100,7 @@ export function setupAvatarPanel(panel) {
   }
 }
 
-function setupQuickbar(panel) {
+function setupQuickbar(panel, openDialog) {
   const list = panel.querySelector("#avatar-art-slots");
   const status = panel.querySelector("[role=status]");
   const slots = savedQuickbarSlots();
@@ -135,7 +135,8 @@ function setupQuickbar(panel) {
     try {
       let assets;
       try {
-        assets = await OBR.assets.downloadImages(false, undefined, kind === "avatar" ? "CHARACTER" : undefined);
+        assets = await openDialog(() =>
+          OBR.assets.downloadImages(false, undefined, kind === "avatar" ? "CHARACTER" : undefined));
       } catch {
         if (!await OBR.scene.isReady()) throw Error("Open a scene to choose an image from one of your tokens.");
         const tokens = await OBR.scene.items.getItems((item) => item.type === "IMAGE" &&

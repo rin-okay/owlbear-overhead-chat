@@ -137,7 +137,9 @@ export const FIXED_KEYS = [
 ];
 
 export function editableTarget(target) {
-  return Boolean(target?.closest?.("input, textarea, select, [contenteditable]:not([contenteditable=false]), [role=textbox]"));
+  return Boolean(target?.closest?.(
+    "input:not([type=checkbox], [type=radio], [type=button], [type=submit], [type=reset]), textarea, select, [contenteditable]:not([contenteditable=false]), [role=textbox]",
+  ));
 }
 
 export function keyIdentity(event) {
