@@ -12,11 +12,18 @@ export async function openCombatChannel(obr) {
   return new BroadcastChannel(JSON.stringify([COMBAT_POPOVER, obr.room.id, connectionId]));
 }
 
+export async function toggleCombatLog(obr, open = () => openCombatLog(obr)) {
+  // Owlbear exposes the dimensions of an existing popover through the host.
+  const width = await obr.popover.getWidth(COMBAT_POPOVER).catch(() => undefined);
+  if (Number.isFinite(width) && width > 0) return obr.popover.close(COMBAT_POPOVER);
+  return open();
+}
+
 export async function openCombatLog(obr) {
   const [width, height] = await Promise.all([obr.viewport.getWidth(), obr.viewport.getHeight()]);
   return obr.popover.open({
     id: COMBAT_POPOVER,
-    url: new URL("./index.html?v=2.11.12&combat-log=1", import.meta.url).href,
+    url: new URL("./index.html?v=2.11.13&combat-log=1", import.meta.url).href,
     width: Math.max(1, Math.min(380, width - 24)), height: Math.max(1, Math.min(340, height - 64)),
     anchorReference: "POSITION",
     anchorOrigin: { horizontal: "LEFT", vertical: "TOP" },

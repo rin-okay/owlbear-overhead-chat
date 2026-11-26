@@ -10,8 +10,8 @@ import {
 } from "./session.js?v=2.9.16";
 
 import { drawBubble, normalizeAppearance, prepareBubbleFont } from "./appearance.js?v=2.7.9";
-import { setupDiscordPanel } from "./discord-panel.js?v=2.11.12";
-import { damageNotation, openCombatLog, saveNotation } from "./combat-log.js?v=2.11.12";
+import { setupDiscordPanel } from "./discord-panel.js?v=2.11.13";
+import { damageNotation, openCombatLog, saveNotation, toggleCombatLog } from "./combat-log.js?v=2.11.13";
 import { aimsAtLocation, artworkFacingAngle, MAX_CAST_LEVEL, SKILLS } from "./skills.js?v=2.11.12";
 import { ABILITIES, readTokenStats } from "./stats.js?v=2.8.5";
 import { setupAvatarPanel } from "./avatar-panel.js?v=2.11.12";
@@ -1439,10 +1439,13 @@ OBR.onReady(() => {
   }
   targeting = setupTargeting(OBR, updateMoveModeLabel);
   const updateFontRole = setupSettings();
+  let combatLogToggle = Promise.resolve();
   combatOpenButton?.addEventListener("click", () => {
-    void openPanelDialog(() => openCombatLog(OBR)).catch((error) => {
-      console.error("Overhead Chat could not open the combat log", error);
-      void OBR.notification.show("Couldn’t open the combat log.");
+    combatLogToggle = combatLogToggle.then(() =>
+      toggleCombatLog(OBR, () => openPanelDialog(() => openCombatLog(OBR))),
+    ).catch((error) => {
+      console.error("Overhead Chat could not toggle the combat log", error);
+      void OBR.notification.show("Couldn’t toggle the combat log.").catch(console.error);
     });
   });
   setupMeleeHitTiming();
