@@ -2,11 +2,11 @@ import OBR from "./obr.js";
 import { AVATAR, canSpeak, isPublicToken } from "./rules.js";
 import { savedAvatar, savedAvatarMode, savedAvatarSlots, savedQuickbarSlots } from "./session.js?v=2.9.16";
 import { SKILLS, SKILL_CHANGED, SKILL_REQUEST, SKILL_RESULT, skillConnections } from "./skills.js?v=2.11.0";
-import { hotbarMode, MIN_HOTBAR_SLOTS, resizeHotbar, sendHotbarCommand } from "./hotbar.js?v=2.11.0";
+import { hotbarMode, MIN_HOTBAR_SLOTS, resizeHotbar, sendHotbarCommand } from "./hotbar.js?v=2.11.2";
 import { BUILTIN_EMOTES } from "./emotes.js?v=2.7.21";
 
-import { bindingLabel, keyboardProfile } from "./key-bindings.js?v=2.11.0";
-import { handleRoomKey, openKeyboard } from "./keyboard-shortcuts.js?v=2.11.0";
+import { bindingLabel, keyboardProfile } from "./key-bindings.js?v=2.11.2";
+import { handleRoomKey, openKeyboard } from "./keyboard-shortcuts.js?v=2.11.2";
 
 const PRIORITY = "fghjklxcvbnmtyuiop";
 const ICONS = {

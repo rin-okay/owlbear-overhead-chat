@@ -37,7 +37,7 @@ const plain = (code) => printed[code] ?? code.replace(/^(Key|Digit|Numpad)/, "")
 
 const commands = [];
 function add(id, label, code, props = {}) {
-  commands.push({ id, label, defaultKey: code ? chord(code, props.modifiers) : null, ...props });
+  commands.push({ id, label, defaultKey: code ? chord(code) : null, ...props });
 }
 const room = { group: "Room", scene: true };
 add("hotbar-toggle", "Show / hide hotbar", "Equal", room);
@@ -69,7 +69,7 @@ add("target", "Open / clear targeting", "KeyZ", { group: "Targeting and chat" })
 add("confirm", "Confirm aim / return to chat", "Space", { group: "Targeting and chat" });
 add("cancel", "Cancel / exit move mode", "Escape", { group: "Targeting and chat" });
 add("send", "Send chat / exit move mode", "Enter", { group: "Targeting and chat" });
-add("save-options", "Open combat save options", "ArrowDown", { group: "Targeting and chat", modifiers: ALT });
+add("save-options", "Open combat save options", null, { group: "Targeting and chat", base: "arrow-down", modifiers: ALT });
 for (const digit of "1234567890") {
   add("slot-" + digit, "Quickbar " + digit + " / choice " + digit, "Digit" + digit, { group: "Quickbar", digit });
   add("aim-slot-" + digit, "Aim quickbar spell " + digit, null, {
@@ -120,9 +120,13 @@ function signature(binding) {
   return binding && binding.code + ":" + binding.modifiers;
 }
 
-function valid(binding) {
-  return binding === null || codeSet.has(binding?.code) &&
-    Number.isInteger(binding.modifiers) && binding.modifiers >= 0 && binding.modifiers <= 15;
+function isBaseBinding(binding) {
+  return binding === null || codeSet.has(binding?.code) && binding.modifiers === 0;
+}
+
+function baseOverrides(overrides) {
+  return Object.fromEntries(Object.entries(overrides ?? {}).filter(([id, binding]) =>
+    Object.hasOwn(KEY_ACTIONS, id) && !KEY_ACTIONS[id].base && isBaseBinding(binding)));
 }
 
 export function legacyOverrides(legacy) {
@@ -144,7 +148,7 @@ export function resolveBindings(overrides = {}) {
     if (bindings[id]) occupied.add(key);
   }
   for (const action of commands) {
-    if (Object.hasOwn(overrides, action.id) && valid(overrides[action.id])) place(action.id, overrides[action.id]);
+    if (!action.base && Object.hasOwn(overrides, action.id) && isBaseBinding(overrides[action.id])) place(action.id, overrides[action.id]);
   }
   for (const action of commands) {
     if (!Object.hasOwn(bindings, action.id) && !action.base) place(action.id, action.defaultKey);
@@ -152,17 +156,17 @@ export function resolveBindings(overrides = {}) {
   for (const action of commands) {
     if (Object.hasOwn(bindings, action.id)) continue;
     const base = bindings[action.base];
-    place(action.id, base ? chord(base.code, base.modifiers | action.modifiers) : null);
+    place(action.id, base ? chord(base.code, action.modifiers) : null);
   }
   return bindings;
 }
 
 export function assignBinding(overrides, id, next) {
-  if (!Object.hasOwn(KEY_ACTIONS, id) || !valid(next)) return overrides;
+  if (!Object.hasOwn(KEY_ACTIONS, id) || KEY_ACTIONS[id].base || !isBaseBinding(next)) return overrides;
   const old = resolveBindings(overrides);
   const key = signature(next);
   const replaced = key && Object.keys(old).find((other) => other !== id && signature(old[other]) === key);
-  return { ...overrides, ...(replaced ? { [replaced]: null } : {}), [id]: next };
+  return { ...baseOverrides(overrides), ...(replaced ? { [replaced]: null } : {}), [id]: next };
 }
 
 export function actionForEvent(bindings, event) {
@@ -193,13 +197,13 @@ export function bindingStorageKey(obr) {
 export function readKeyboard(obr) {
   try {
     const saved = JSON.parse(localStorage.getItem(bindingStorageKey(obr)));
-    if (saved?.overrides && saved.layout) return saved;
+    if (saved?.overrides && saved.layout) return { overrides: baseOverrides(saved.overrides), layout: saved.layout };
   } catch {}
   return { overrides: legacyOverrides(readSkills(obr, "player").bindings), layout: {} };
 }
 
 export function writeKeyboard(obr, settings) {
-  localStorage.setItem(bindingStorageKey(obr), JSON.stringify(settings));
+  localStorage.setItem(bindingStorageKey(obr), JSON.stringify({ ...settings, overrides: baseOverrides(settings.overrides) }));
 }
 
 export async function browserLayout(keyboard = globalThis.navigator?.keyboard) {

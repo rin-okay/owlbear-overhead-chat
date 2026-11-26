@@ -28,7 +28,7 @@ button:hover, button[aria-pressed="true"], button.drop { border-color: var(--acc
 #fixed span { font-size: 11px; border: 1px solid var(--line); padding: 3px 6px; border-radius: 4px; }
 #board { overflow-x: auto; padding: 3px; }
 .key-row { display: flex; gap: 3px; width: max-content; margin-bottom: 3px; }
-.key { width: 39px; height: 42px; padding: 2px; display: grid; place-content: center; overflow: hidden; }
+.key { text-align: center; width: 39px; height: 42px; padding: 2px; display: grid; place-content: center; overflow: hidden; }
 .key kbd { font: 600 12px ui-monospace, monospace; line-height: 1; }
 .key small { display: block; font-size: 8px; margin-top: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }
 .key.bound { background: #3e3047; border-color: #83678c; }

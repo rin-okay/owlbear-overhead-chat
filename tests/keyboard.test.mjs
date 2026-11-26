@@ -46,13 +46,35 @@ test("overwrite, explicit unassign and migration leave a single owner for each c
   assert.deepEqual(assignBinding(overrides, "hotbar-toggle", { code: "F2", modifiers: 0 }), overrides);
 });
 
-test("derived spell bindings follow their base unless edited separately", () => {
+test("Shift, Ctrl and Alt variants always follow their base keys", () => {
   let overrides = assignBinding({}, "skill-missile", { code: "IntlBackslash", modifiers: 0 });
+  overrides = assignBinding(overrides, "arrow-down", { code: "KeyV", modifiers: 0 });
+  assert.equal(command("IntlBackslash", "<", { shiftKey: true }, overrides), "upcast-missile");
   assert.equal(command("IntlBackslash", "<", { ctrlKey: true }, overrides), "aim-missile");
   assert.equal(command("IntlBackslash", ">", { ctrlKey: true, shiftKey: true }, overrides), "aim-upcast-missile");
-  overrides = assignBinding(overrides, "aim-missile", { code: "Numpad5", modifiers: 0 });
-  assert.equal(command("Numpad5", "5", {}, overrides), "aim-missile");
-  assert.equal(command("IntlBackslash", "<", { ctrlKey: true }, overrides), undefined);
+  assert.equal(command("KeyV", "v", { altKey: true }, overrides), "save-options");
+  assert.equal(command("ArrowDown", "ArrowDown", { altKey: true }, overrides), undefined);
+  assert.equal(assignBinding(overrides, "aim-missile", { code: "Numpad5", modifiers: 0 }), overrides);
+  assert.equal(assignBinding(overrides, "aim-missile", null), overrides);
+  assert.equal(assignBinding(overrides, "skill-missile", { code: "KeyV", modifiers: 2 }), overrides);
+  assert.equal(command("IntlBackslash", "<", { ctrlKey: true }, assignBinding(overrides, "skill-missile", null)), undefined);
+});
+
+test("an older profile keeps plain assignments and ignores modified overrides", (t) => {
+  const { obr } = client(t, "old-profile");
+  localStorage.setItem(bindingStorageKey(obr), JSON.stringify({ overrides: {
+    "skill-missile": { code: "KeyT", modifiers: 0 },
+    "aim-missile": null,
+    "upcast-missile": { code: "KeyY", modifiers: 0 },
+    "hotbar-toggle": { code: "KeyY", modifiers: 2 },
+    "skill-fireball": null,
+  }, layout: {} }));
+  const { bindings, overrides } = keyboardProfile(obr);
+  assert.deepEqual(Object.keys(overrides), ["skill-missile", "skill-fireball"]);
+  assert.equal(bindings["aim-missile"].code, "KeyT");
+  assert.equal(bindings["upcast-missile"].code, "KeyT");
+  assert.equal(bindings["hotbar-toggle"].code, "Equal");
+  assert.equal(bindings["skill-fireball"], null);
 });
 
 test("IME, AltGr and modifier-only presses never dispatch gameplay", () => {

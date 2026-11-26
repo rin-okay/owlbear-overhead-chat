@@ -2,8 +2,8 @@ import OBR from "./obr.js";
 import {
   KEY_ACTIONS, KEYBOARD_ROWS, FIXED_KEYS, MODIFIERS, assignBinding, bindingLabel, browserLayout, eventChord,
   keyLabel, readKeyboard, resolveBindings, writeKeyboard,
-} from "./key-bindings.js?v=2.11.0";
-import { KEYBOARD_MODAL } from "./keyboard-shortcuts.js?v=2.11.0";
+} from "./key-bindings.js?v=2.11.2";
+import { KEYBOARD_MODAL } from "./keyboard-shortcuts.js?v=2.11.2";
 
 OBR.onReady(() => {
   const board = document.querySelector("#board");
@@ -17,6 +17,8 @@ OBR.onReady(() => {
   let { overrides, layout } = readKeyboard(OBR);
   let bindings = resolveBindings(overrides);
   let layer = 0;
+  const previewLayers = [...new Set(Object.values(KEY_ACTIONS).filter((action) => action.base).map((action) => action.modifiers))]
+    .sort((a, b) => a - b);
   let selected;
   let capturing = false;
 
@@ -45,11 +47,15 @@ OBR.onReady(() => {
   }
 
   function choose(id, capture = false) {
+    if (layer !== 0) {
+      layer = 0;
+      renderLayout();
+    }
     selected = id;
     capturing = capture;
     if (capture) {
       document.activeElement?.blur();
-      feedback.textContent = "Press a key or chord for " + KEY_ACTIONS[id].label + ".";
+      feedback.textContent = "Press a key without modifiers for " + KEY_ACTIONS[id].label + ".";
     } else {
       feedback.textContent = "Choose a key for " + KEY_ACTIONS[id].label + ".";
     }
@@ -61,11 +67,10 @@ OBR.onReady(() => {
 
   function assign(id, next) {
     const action = KEY_ACTIONS[id];
-    if (!action) return;
+    if (!action || action.base || layer !== 0) return;
     const replaced = next && occupant(next.code, next.modifiers);
     selected = id;
     capturing = false;
-    if (next) layer = next.modifiers;
     save(assignBinding(overrides, id, next), next
       ? action.label + " → " + bindingLabel(next, layout) + (replaced && replaced !== id ? ". " + KEY_ACTIONS[replaced].label + " is now unassigned." : ".")
       : action.label + " is now unassigned.");
@@ -102,9 +107,18 @@ OBR.onReady(() => {
   }
 
   function renderLayout() {
-    const toggles = [[0, "Plain"], ...MODIFIERS].map(([bit, label]) => {
-      const toggle = button(label, () => { layer = bit ? layer ^ bit : 0; renderLayout(); });
-      toggle.setAttribute("aria-pressed", String(bit ? Boolean(layer & bit) : layer === 0));
+    const toggles = [0, ...previewLayers].map((mask) => {
+      const label = mask ? MODIFIERS.filter(([bit]) => mask & bit).map(([, name]) => name).join("+") : "Plain";
+      const toggle = button(label, () => {
+        layer = mask;
+        selected = undefined;
+        capturing = false;
+        feedback.textContent = mask ? "Preview only. Change base bindings in Plain." : "";
+        renderLayout();
+        renderSidebar();
+        paintSelection();
+      });
+      toggle.setAttribute("aria-pressed", String(mask === layer));
       return toggle;
     });
     layers.replaceChildren(...toggles);
@@ -115,8 +129,8 @@ OBR.onReady(() => {
       for (const code of row) {
         const id = occupant(code, layer);
         const action = KEY_ACTIONS[id];
-        const key = button("", () => {
-          if (selected && selected !== id) assign(selected, { code, modifiers: layer });
+        const key = layer ? document.createElement("span") : button("", () => {
+          if (selected && selected !== id) assign(selected, { code, modifiers: 0 });
           else if (id) choose(id);
         });
         key.className = "key" + (id ? " bound" : "");
@@ -131,10 +145,12 @@ OBR.onReady(() => {
           const name = document.createElement("small");
           name.textContent = action.label;
           key.append(name);
-          dragSource(key, id);
-          if (id === selected) key.setAttribute("aria-pressed", "true");
+          if (!layer) {
+            dragSource(key, id);
+            if (id === selected) key.setAttribute("aria-pressed", "true");
+          }
         }
-        dropTarget(key, (source) => assign(source, { code, modifiers: layer }));
+        if (!layer) dropTarget(key, (source) => assign(source, { code, modifiers: 0 }));
         line.append(key);
       }
       return line;
@@ -145,8 +161,8 @@ OBR.onReady(() => {
 
   function renderSidebar() {
     const query = filter.value.trim().toLowerCase();
-    const actions = Object.values(KEY_ACTIONS).filter(({ id, label, group }) =>
-      (showAll.checked || !bindings[id]) && (label + " " + group).toLowerCase().includes(query));
+    const actions = Object.values(KEY_ACTIONS).filter(({ id, label, group, base }) =>
+      !base && (showAll.checked || !bindings[id]) && (label + " " + group).toLowerCase().includes(query));
     const groups = new Map();
     for (const action of actions) {
       if (!groups.has(action.group)) groups.set(action.group, []);
@@ -230,7 +246,11 @@ OBR.onReady(() => {
       if (/^F\d+$/.test(event.code || event.key)) feedback.textContent = "Function keys are fixed. Press another key.";
       return;
     }
-    if (next.modifiers === 0 && event.key?.length > 0 && event.key.length < 8 && !["Dead", "Unidentified"].includes(event.key)) {
+    if (next.modifiers !== 0) {
+      feedback.textContent = "Modifier shortcuts follow their base key. Press a key without modifiers.";
+      return;
+    }
+    if (event.key?.length > 0 && event.key.length < 8 && !["Dead", "Unidentified"].includes(event.key)) {
       layout = { ...layout, [next.code]: event.key === " " ? "Space" : event.key };
     }
     assign(selected, next);
