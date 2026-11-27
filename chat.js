@@ -10,8 +10,8 @@ import {
 } from "./session.js?v=2.9.16";
 
 import { drawBubble, normalizeAppearance, prepareBubbleFont } from "./appearance.js?v=2.7.9";
-import { setupDiscordPanel } from "./discord-panel.js?v=2.11.19";
-import { damageNotation, openCombatLog, saveNotation, toggleCombatLog } from "./combat-log.js?v=2.11.19";
+import { setupDiscordPanel } from "./discord-panel.js?v=2.11.20";
+import { damageNotation, openCombatLog, saveNotation, toggleCombatLog } from "./combat-log.js?v=2.11.20";
 import { aimsAtLocation, artworkFacingAngle, MAX_CAST_LEVEL, SKILLS, turnToHeading } from "./skills.js?v=2.11.12";
 import { ABILITIES, readTokenStats } from "./stats.js?v=2.8.5";
 import { setupAvatarPanel } from "./avatar-panel.js?v=2.11.12";
@@ -463,10 +463,9 @@ async function moveAvatar(mode) {
         await panCameraStep(OBR, tokenId, cameraOffset, () => mode === tokenControl && !mode.switching);
         continue;
       }
-      const [{ token }, grid, pan] = await Promise.all([
+      const [{ token }, grid] = await Promise.all([
         getAvatar(),
         offset ? (mode.movementGrid ??= readMovementGrid(OBR.scene.grid)) : undefined,
-        offset ? prepareKeyboardPan(OBR, tokenId).catch(() => undefined) : undefined,
       ]);
       if (mode !== tokenControl || mode.switching || tokenId !== mode.tokenId) return;
       if (token?.id !== tokenId || token.locked) throw new Error("Avatar is unavailable or locked.");
@@ -488,17 +487,32 @@ async function moveAvatar(mode) {
         continue;
       }
 
+      const current = () => mode === tokenControl && !mode.switching && tokenId === mode.tokenId;
+      const canUpdate = (item) => current() && isPublicToken(item) && !item.locked;
+      if (autoMirrorToken && offset?.[0]) {
+        const heading = offset[0] < 0 ? 180 : 0;
+        const face = (item) => turnToHeading(item, skillPanel?.facingFor(item) ?? 0, heading);
+        const next = { ...token, scale: { ...token.scale } };
+        face(next);
+        if (next.rotation !== token.rotation || next.scale.x !== token.scale.x) {
+          // Apply the facing as its own scene update before sending the step.
+          await OBR.scene.items.updateItems([tokenId], ([item]) => {
+            if (canUpdate(item)) face(item);
+          });
+          if (!current()) return;
+        }
+      }
+
+      const pan = offset ? await prepareKeyboardPan(OBR, tokenId).catch(() => undefined) : undefined;
+      if (!current()) return;
       let applied = false;
       const changeToken = ([item]) => {
-        if (mode !== tokenControl || mode.switching || tokenId !== mode.tokenId || !isPublicToken(item) || item.locked) return;
+        if (!canUpdate(item)) return;
         if (artwork) {
           item.image = artwork.image;
           item.grid = artwork.grid;
         } else if (offset) {
           item.position = stepAvatar(item.position, offset, grid);
-          if (autoMirrorToken && offset[0]) {
-            turnToHeading(item, skillPanel?.facingFor(item) ?? 0, offset[0] < 0 ? 180 : 0);
-          }
         } else if (mirror) {
           item.scale.x = -item.scale.x;
         } else {
@@ -509,7 +523,7 @@ async function moveAvatar(mode) {
       if (pan) {
         const next = stepAvatar(token.position, offset, grid);
         await pan({ x: next.x - token.position.x, y: next.y - token.position.y },
-          () => OBR.scene.items.updateItems([token], changeToken));
+          () => OBR.scene.items.updateItems([tokenId], changeToken));
       } else {
         await OBR.scene.items.updateItems([tokenId], changeToken);
       }
