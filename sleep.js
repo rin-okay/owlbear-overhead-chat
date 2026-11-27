@@ -19,7 +19,7 @@ export function setupSleep(obr, buildImage) {
       if (!current()) return;
       if (active.length) {
         await obr.scene.items.deleteItems(active.map(({ id }) => id));
-        return;
+        return { active: false };
       }
 
       const [bounds, dpi] = await Promise.all([
@@ -36,6 +36,7 @@ export function setupSleep(obr, buildImage) {
         .attachedTo(caster.id).disableHit(true).locked(true).metadata({ [SLEEP]: true }).build();
       effect.disableAttachmentBehavior = ["COPY", "ROTATION"];
       await obr.scene.items.addItems([effect]);
+      return { active: true };
     } finally {
       updating.delete(caster.id);
     }

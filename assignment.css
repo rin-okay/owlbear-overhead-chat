@@ -76,3 +76,5 @@ aside summary { cursor: pointer; }
   .skills { grid-template-columns: 1fr; }
   aside:has(#customize:not([hidden])) { order: -1; }
 }
+
+#results .entry-actions { display: flex; align-items: center; gap: 6px; }

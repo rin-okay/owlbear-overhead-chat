@@ -1,7 +1,7 @@
 import OBR from "./obr.js";
 import { discordSettings, normalizeWebhook, saveDiscordSettings, sendDiscord } from "./discord.js?v=2.3.9";
 
-export function setupDiscordPanel(openChat, openGm) {
+export function setupDiscordPanel(openChat, openGm, version) {
   const tab = document.querySelector("#gm-tab");
   const panel = document.querySelector("#gm-panel");
   const discord = panel.querySelector("#discord-settings");
@@ -15,7 +15,6 @@ export function setupDiscordPanel(openChat, openGm) {
 
   function showVersion() {
     if (!versionLabel.hidden) return;
-    const version = new URL(import.meta.url).searchParams.get("v");
     if (!version) return;
     versionLabel.textContent = `version ${version}`;
     versionLabel.hidden = false;

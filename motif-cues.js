@@ -18,10 +18,25 @@ export function motifSoundEffects(storage = globalThis.localStorage) {
   return cues;
 }
 
-export function playWeaponSound(obr, id, name, caster, delay) {
-  // No source means Motif plays the cue without a map ripple. One loop overrides cue defaults.
-  return obr.broadcast.sendMessage(MOTIF_EFFECTS, {
-    instructions: [{ type: "effect", id, loops: 1, delay, effectProperties: {} }],
-    spellData: { name, caster },
-  }, { destination: "ALL" });
+export function playCombatSounds(obr, cues, name, caster) {
+  const instructions = cues.filter(({ id }) => id).map(({ id, delay }) => ({
+    type: "effect", id, loops: 1, delay, effectProperties: {},
+  }));
+  if (!instructions.length) return;
+  void obr.broadcast.sendMessage(MOTIF_EFFECTS, { instructions, spellData: { name, caster } },
+    { destination: "ALL" }).catch(console.warn);
+}
+
+export function updateSpellLoop(obr, key, sound, stopAfter) {
+  void obr.broadcast.sendMessage(ROOT + "/overhead-loop", { key, sound, stopAfter },
+    { destination: "ALL" }).catch(console.warn);
+}
+
+export function spellSoundCues(sounds, impactDelay) {
+  if (!sounds) return [];
+  const delay = (value) => Number.isInteger(value) && value >= 0 && value <= 10000 ? value : 0;
+  return [
+    { id: sounds.castSound, delay: delay(sounds.castDelay) },
+    ...(Number.isFinite(impactDelay) ? [{ id: sounds.hitSound, delay: impactDelay + delay(sounds.hitDelay) }] : []),
+  ];
 }

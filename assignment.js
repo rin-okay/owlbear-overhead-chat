@@ -1,9 +1,9 @@
 import OBR from "./obr.js";
 import { DEFAULT_WEAPON_DELAY, validWeaponDelay } from "./weapon-timing.js?v=3.2.2";
-import { ASSIGNMENT_MODAL } from "./assignment-window.js?v=3.2.2";
+import { ASSIGNMENT_MODAL } from "./assignment-window.js?v=3.2.3";
 import { CUSTOM_ID, DAMAGE_MODIFIERS, DAMAGE_TYPES, customSkill, isAbility, isWeapon, parseDamageDice } from "./combat-catalog.js?v=3.1.0";
 import { weaponDefinition } from "./melee-damage.js?v=3.1.0";
-import { motifSoundEffects } from "./motif-cues.js?v=3.1.0";
+import { motifSoundEffects } from "./motif-cues.js?v=3.2.3";
 import {
   DEFAULT_WEAPON, FRIENDLY_FIRE_MODES, RANGED_WEAPONS, SKILLS, SKILL_CHANGED, SPELLS, TEAMS, WEAPONS,
   availableCustomSkills, availableRangedWeapons, availableSpells, availableWeapons, friendlyFireMode,
@@ -75,6 +75,7 @@ function initialize(obr) {
   const results = byId("results");
   const customize = byId("customize");
   const editor = byId("definition");
+  const spellEditor = byId("spell-sounds");
   const fields = editor.elements;
   const feedback = byId("feedback");
   const menu = byId("entry-menu");
@@ -88,6 +89,7 @@ function initialize(obr) {
   let allowed = false;
   let saving = false;
   let editing;
+  let editingSpell;
   let customEntry;
   let menuEntry;
   let revision = 0;
@@ -117,7 +119,11 @@ function initialize(obr) {
     }
     closeMenu();
   };
-  for (const tab of views) tab.addEventListener("click", () => showView(tab.getAttribute("aria-controls")));
+  for (const tab of views) tab.addEventListener("click", () => {
+    const view = tab.getAttribute("aria-controls");
+    if (view === "create" && editingSpell) startDefinition();
+    showView(view);
+  });
 
   choices(friendly, FRIENDLY_FIRE_MODES.map((mode) => [mode, mode === "aoe" ? "Area effects only" : mode === "enabled" ? "Enabled" : "Disabled"]));
   choices(fields.damageType, DAMAGE_TYPES.map((type) => [type, type]));
@@ -148,7 +154,7 @@ function initialize(obr) {
       input.disabled = !allowed || !token.value || saving;
       input.checked = tokenTeams(config, token.value).includes(name);
     }
-    byId("save-definition").disabled = saving || !allowed;
+    byId("save-definition").disabled = byId("save-spell-sounds").disabled = saving || !allowed;
     showStats(tokens.get(token.value), allowed);
     for (const input of customize.elements) input.disabled = saving || !allowed;
     renderResults();
@@ -196,16 +202,19 @@ function initialize(obr) {
         check.title = "Quick grant with default settings";
       }
       row.append(check, label);
+      const actions = make("div", undefined, "entry-actions");
+      row.append(actions);
       if (styled) {
         const mark = make("span", "✓✧", "configured");
         mark.title = "Granted with custom settings";
         mark.setAttribute("aria-label", mark.title);
-        row.append(mark);
-      } else if (isWeapon(kind) || isAbility(kind)) {
+        actions.append(mark);
+      }
+      if (kind === "spell" || isWeapon(kind) || isAbility(kind)) {
         const edit = button("Edit", () => editDefinition(entry), "edit");
         edit.dataset.control = "edit";
         edit.setAttribute("aria-label", "Edit " + name);
-        row.append(edit);
+        actions.append(edit);
         row.addEventListener("contextmenu", (event) => {
           event.preventDefault();
           menuEntry = { entry, trigger: edit };
@@ -275,7 +284,14 @@ function initialize(obr) {
     });
   });
 
-  function editorType(animation, sound) {
+  function soundChoices(select, selected) {
+    const cues = motifSoundEffects();
+    if (selected && !cues.has(selected)) cues.set(selected, selected + " (unavailable)");
+    choices(select, [["", "None"], ...cues]);
+    select.value = selected ?? "";
+  }
+
+  function editorType(animation) {
     const kind = fields.kind.value;
     const weapon = isWeapon(kind);
     const usesWeapon = !weapon && fields.uses.value !== "none";
@@ -291,14 +307,13 @@ function initialize(obr) {
     const options = Object.entries(kind === "weapon" ? WEAPONS : RANGED_WEAPONS);
     choices(fields.animation, options);
     fields.animation.value = options.some(([id]) => id === animation) ? animation : options[0][0];
-    const cues = motifSoundEffects();
-    if (sound && !cues.has(sound)) cues.set(sound, sound + " (unavailable)");
-    choices(fields.sound, [["", "None"], ...cues]);
-    fields.sound.value = sound ?? "";
   }
 
   function startDefinition(entry) {
     editing = entry;
+    editingSpell = undefined;
+    editor.hidden = false;
+    spellEditor.hidden = true;
     editor.reset();
     const definition = entry && (isWeapon(entry.kind) ? weaponDefinition(config, entry.kind, entry.id) : config.catalog?.[entry.id]);
     fields.kind.disabled = Boolean(definition);
@@ -311,17 +326,46 @@ function initialize(obr) {
     fields.damageBonus.value = definition?.damageBonus ?? 0;
     fields.hitBonus.value = definition?.hitBonus ?? 0;
     fields.hitDelay.value = definition?.hitDelay ?? DEFAULT_WEAPON_DELAY;
-    fields.soundDelay.value = definition?.soundDelay ?? DEFAULT_WEAPON_DELAY;
+    fields.swingDelay.value = definition?.swingDelay ?? definition?.soundDelay ?? DEFAULT_WEAPON_DELAY;
+    fields.hitSoundDelay.value = definition?.hitSoundDelay ?? DEFAULT_WEAPON_DELAY;
+    soundChoices(fields.swingSound, definition?.swingSound ?? definition?.sound);
+    soundChoices(fields.hitSound, definition?.hitSound);
     fields.uses.value = definition?.uses ?? "none";
     fields.saveAbility.value = definition?.saveAbility ?? "";
     fields.range.value = definition?.range ?? 6;
-    editorType(definition?.animation, definition?.sound);
+    editorType(definition?.animation);
   }
   function editDefinition(entry) {
+    if (entry.kind === "spell") {
+      editingSpell = entry;
+      editor.hidden = true;
+      spellEditor.hidden = false;
+      const saved = config.spellSounds?.[entry.id];
+      for (const key of ["castSound", "hitSound", "loopSound"]) soundChoices(spellEditor.elements[key], saved?.[key]);
+      spellEditor.elements.castDelay.value = saved?.castDelay ?? 0;
+      spellEditor.elements.hitDelay.value = saved?.hitDelay ?? 0;
+      byId("spell-sound-title").textContent = "Edit " + entry.name + " sounds";
+      showView("create");
+      spellEditor.elements.castSound.focus();
+      return;
+    }
     startDefinition(entry);
     showView("create");
     fields.name.focus();
   }
+  byId("back-to-skills").addEventListener("click", () => { startDefinition(); showView("skills"); });
+  spellEditor.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const entry = editingSpell;
+    if (!entry || !SPELLS.includes(entry.id)) return;
+    const { castSound, castDelay, hitSound, hitDelay, loopSound } = spellEditor.elements;
+    const delays = [castDelay.valueAsNumber, hitDelay.valueAsNumber];
+    if (!delays.every((value) => Number.isInteger(value) && value >= 0 && value <= 10000)) return;
+    const sounds = { castSound: castSound.value, castDelay: delays[0],
+      hitSound: hitSound.value, hitDelay: delays[1], loopSound: loopSound.value };
+    void save((next) => { next.spellSounds = { ...next.spellSounds, [entry.id]: sounds }; },
+      { message: entry.name + " sounds saved." });
+  });
   menuEdit.addEventListener("click", () => { if (menuEntry) editDefinition(menuEntry.entry); });
   byId("new-definition").addEventListener("click", () => { startDefinition(); fields.name.focus(); });
   fields.kind.addEventListener("change", () => {
@@ -332,7 +376,7 @@ function initialize(obr) {
       fields.modifier.value = "str";
       fields.damageType.value = "slashing";
     }
-    editorType(undefined, fields.sound.value);
+    editorType();
   });
   fields.uses.addEventListener("change", () => editorType());
   editor.addEventListener("submit", (event) => {
@@ -356,9 +400,11 @@ function initialize(obr) {
           throw Error("Choose an animation and enter whole-number bonuses from −99 to 99.");
         }
         const hitDelay = fields.hitDelay.valueAsNumber;
-        const soundDelay = fields.soundDelay.valueAsNumber;
-        if (![hitDelay, soundDelay].every(validWeaponDelay)) throw Error("Enter whole percentages from 0 to 100 for both delays.");
-        Object.assign(definition, { modifier, damageBonus, hitBonus, animation, hitDelay, soundDelay, sound: fields.sound.value });
+        const swingDelay = fields.swingDelay.valueAsNumber;
+        const hitSoundDelay = fields.hitSoundDelay.valueAsNumber;
+        if (![hitDelay, swingDelay, hitSoundDelay].every(validWeaponDelay)) throw Error("Enter whole percentages from 0 to 100 for attack delays.");
+        Object.assign(definition, { modifier, damageBonus, hitBonus, animation, hitDelay,
+          swingDelay, hitSoundDelay, swingSound: fields.swingSound.value, hitSound: fields.hitSound.value });
       } else {
         Object.assign(definition, {
           uses: fields.uses.value, saveAbility: fields.saveAbility.value || undefined,

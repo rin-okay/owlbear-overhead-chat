@@ -74,7 +74,7 @@ export function setupShield(obr, buildImage) {
       if (!current()) return;
       if (active.length) {
         await obr.scene.items.deleteItems(active.map(({ id }) => id));
-        return;
+        return { active: false };
       }
       if (!canActivate) return "This avatar can’t cast Shield.";
 
@@ -95,6 +95,7 @@ export function setupShield(obr, buildImage) {
       effect.disableAttachmentBehavior = ["COPY", "ROTATION"];
       await obr.scene.items.addItems([effect]);
       if (current()) finishIntro(effect.id, deadline, current);
+      return { active: true };
     } finally {
       updating.delete(caster.id);
     }

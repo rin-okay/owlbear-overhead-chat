@@ -2,7 +2,7 @@ import OBR from "./obr.js";
 import { AVATAR, canSpeak, isPublicToken } from "./rules.js";
 import { savedAvatar, savedAvatarMode, savedAvatarSlots, savedQuickbarSlots } from "./session.js?v=2.9.16";
 import { SKILLS, SKILL_CHANGED, SKILL_REQUEST, SKILL_RESULT, rememberCustomSkills, skillConnections } from "./skills.js?v=3.1.0";
-import { hotbarMode, MIN_HOTBAR_SLOTS, openHotbarPlacement, resizeHotbar, sendHotbarCommand } from "./hotbar.js?v=3.2.2";
+import { hotbarMode, MIN_HOTBAR_SLOTS, sendHotbarCommand } from "./hotbar.js?v=3.2.3";
 import { BUILTIN_EMOTES } from "./emotes.js?v=2.7.21";
 
 import { bindingLabel, keyboardProfile } from "./key-bindings.js?v=3.1.0";
@@ -16,7 +16,6 @@ const ICONS = {
 };
 const SHORT_NAMES = { spear: "melee attack", ranged: "ranged attack" };
 const list = document.querySelector("#hotbar");
-const grip = document.querySelector("#hotbar-grip");
 const params = new URLSearchParams(location.search);
 const left = params.get("position") === "left";
 const compact = params.get("labels") === "off";
@@ -115,41 +114,11 @@ OBR.onReady(() => {
     const length = render(available, role, tokens);
     resizing = resizing.then(async () => {
       if (closed || initialLoadout || appliedLength === length) return;
-      await resizeHotbar(OBR, left, length, compact);
+      await sendHotbarCommand(OBR, "resize", { left, compact, slots: length });
       appliedLength = length;
     }).catch(console.error);
   };
   window.addEventListener("pagehide", () => { closed = true; }, { once: true });
-
-  const moveHotbar = (dx, dy, keyboard = false) => {
-    if (closed || !dx && !dy) return;
-    void sendHotbarCommand(OBR, "move", {
-      dx, dy, left, compact, keyboard, slots: list.children.length,
-    }).catch(console.error);
-  };
-  let openingPlacement = false;
-  grip.addEventListener("pointerdown", (event) => {
-    if (openingPlacement || !event.isPrimary || event.button !== 0) return;
-    event.preventDefault();
-    if (grip.hasPointerCapture(event.pointerId)) grip.releasePointerCapture(event.pointerId);
-    openingPlacement = true;
-    void openHotbarPlacement(OBR, {
-      left, compact, slots: list.children.length,
-      x: event.clientX, y: event.clientY, width: innerWidth, height: innerHeight,
-      screenX: event.screenX, screenY: event.screenY,
-    }).catch(console.error).finally(() => { openingPlacement = false; });
-  });
-  const arrows = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
-  grip.addEventListener("keydown", (event) => {
-    if (event.altKey || event.ctrlKey || event.metaKey || !Object.hasOwn(arrows, event.key)) return;
-    event.preventDefault();
-    event.stopPropagation();
-    if (event.repeat) return;
-    const [x, y] = arrows[event.key];
-    const step = event.shiftKey ? 4 : 16;
-    moveHotbar(x * step, y * step, true);
-  });
-  if (params.get("focus") === "grip") grip.focus({ preventScroll: true });
 
   async function refresh() {
     const current = ++revision;

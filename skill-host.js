@@ -1,9 +1,9 @@
 import { reachableTargets, targetGeometry } from "./target-cycle.js?v=3.1.0";
 import { addHeartEffects } from "./heart-spells.js?v=2.11.12";
-import { setupBless } from "./bless.js?v=2.9.14";
+import { setupBless } from "./bless.js?v=3.2.3";
 import { combatDamage } from "./combat-log.js?v=3.2.2";
-import { isShieldGraphic, readShieldGraphics, setupShield } from "./shield.js?v=2.9.15";
-import { setupSleep } from "./sleep.js?v=2.9.15";
+import { isShieldGraphic, readShieldGraphics, setupShield } from "./shield.js?v=3.2.3";
+import { setupSleep } from "./sleep.js?v=3.2.3";
 import { canSpeak, ROLL_DAMAGE_FROM_COMBAT_LOG } from "./rules.js?v=2.9.4";
 import {
   areaHits, clearSpellPath, coneHits, isProjectileToken, isProjectileWall, openMeleeDoor, projectileImpact, projectileTokenContainsPoint, teleportLandingClear,
@@ -11,7 +11,7 @@ import {
 import { HIT_MARKERS, MELEE_HIT_CUE } from "./hit-markers.js?v=3.1.0";
 import { attackDamageFormula, weaponDefinition } from "./melee-damage.js?v=3.1.0";
 import { CUSTOM_ID, rollAttackDamage } from "./combat-catalog.js?v=3.1.0";
-import { playWeaponSound } from "./motif-cues.js?v=3.2.2";
+import { playCombatSounds, spellSoundCues, updateSpellLoop } from "./motif-cues.js?v=3.2.3";
 import { weaponAnimationDuration, weaponDelay } from "./weapon-timing.js?v=3.2.2";
 import { readTokenStats } from "./stats.js?v=3.1.0";
 import {
@@ -180,24 +180,33 @@ export function setupSkillHost(obr, buildImage, recordCombat) {
         return;
       }
       lastCast.set(sender.id, now);
+      async function finishToggle(state, current) {
+        if (!current()) return;
+        if (state && typeof state === "object") {
+          const sounds = readSkills(obr, "gm").spellSounds?.[data.skill];
+          const loopKey = data.skill + ":" + encodeURIComponent(token.id);
+          if (!state.active || sounds?.loopSound) updateSpellLoop(obr, loopKey, state.active ? sounds.loopSound : undefined);
+          if (state.active) playCombatSounds(obr, spellSoundCues(sounds), skill.name, sender.id);
+          await logCast();
+        }
+        if (current()) await answer({ ...result, error: typeof state === "string" ? state : undefined });
+      }
       if (data.skill === "sleep") {
         const current = () => version === sceneVersion;
-        const error = await toggleSleep(token, current).catch((cause) => {
+        const state = await toggleSleep(token, current).catch((cause) => {
           console.error("Overhead Chat could not update Sleep (AFK)", cause);
           return "Couldn’t update Sleep (AFK).";
         });
-        if (!error) await logCast();
-        if (current()) await answer({ ...result, error });
+        await finishToggle(state, current);
         return;
       }
       if (data.skill === "shield") {
         const current = () => version === sceneVersion;
-        const error = await toggleShield(token, canActivateShield, current).catch((cause) => {
+        const state = await toggleShield(token, canActivateShield, current).catch((cause) => {
           console.error("Overhead Chat could not update Shield", cause);
           return "Couldn’t update Shield.";
         });
-        if (!error) await logCast();
-        if (current()) await answer({ ...result, error });
+        await finishToggle(state, current);
         return;
       }
       if (data.skill === "bless") {
@@ -208,12 +217,11 @@ export function setupSkillHost(obr, buildImage, recordCombat) {
           return;
         }
         const current = () => version === sceneVersion;
-        const error = await castBless(token, targets, config, spellLevel - skill.spellLevel, current).catch((cause) => {
+        const state = await castBless(token, targets, config, spellLevel - skill.spellLevel, current).catch((cause) => {
           console.error("Overhead Chat could not update Bless", cause);
           return "Couldn’t update Bless.";
         });
-        if (!error) await logCast();
-        if (current()) await answer({ ...result, error });
+        await finishToggle(state, current);
         return;
       }
       const projectile = Boolean(skill.range);
@@ -505,9 +513,21 @@ export function setupSkillHost(obr, buildImage, recordCombat) {
         await sendMarkers(cueDelay + 750, damageRolls?.[0], { useAnimationCue: true });
         if (version !== sceneVersion) return;
       }
-      if (equipped?.sound) {
-        void playWeaponSound(obr, equipped.sound, equipped.name, sender.id,
-          weaponDelay(animationDuration, equipped.soundDelay)).catch(console.warn);
+      if (equipped) {
+        playCombatSounds(obr, [
+          { id: equipped.swingSound ?? equipped.sound, delay: weaponDelay(animationDuration, equipped.swingDelay ?? equipped.soundDelay) },
+          ...(weaponHit ? [{ id: equipped.hitSound, delay: weaponDelay(animationDuration, equipped.hitSoundDelay) }] : []),
+        ], equipped.name, sender.id);
+      } else {
+        const sounds = latest.spellSounds?.[data.skill];
+        const baseImpact = skill.impact?.delay ?? skill.hitDelay ?? (skill.impact ? 800 : 0);
+        const firstDart = beamOutcomes?.find(({ hitId }) => hitId)?.firstDart ?? 0;
+        const impact = hitTokens.length ? baseImpact + (missile ? firstDart * MAGIC_MISSILE_INTERVAL : 0) : undefined;
+        playCombatSounds(obr, spellSoundCues(sounds, impact), skill.name, sender.id);
+        if (sounds?.loopSound) {
+          const tail = missile ? (spellLevel + 1) * MAGIC_MISSILE_INTERVAL : 0;
+          updateSpellLoop(obr, "cast:" + data.requestId, sounds.loopSound, Math.max(1000, baseImpact + tail + 900));
+        }
       }
       if (instruction.id) {
         await obr.broadcast.sendMessage(EMBERS_EFFECTS, {

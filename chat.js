@@ -1,4 +1,4 @@
-import { openAssignment } from "./assignment-window.js?v=3.2.2";
+import { openAssignment } from "./assignment-window.js?v=3.2.3";
 import OBR from "./obr.js";
 import {
   ABOVE_FOG, AVATAR, GENERAL_CHAT_ROOM, HABBO_MODE, HABBO_SCALE, ROLL_DAMAGE_FROM_COMBAT_LOG, RUMBLE_DICE, SPEECH,
@@ -11,8 +11,8 @@ import {
 } from "./session.js?v=2.9.16";
 
 import { drawBubble, normalizeAppearance, prepareBubbleFont } from "./appearance.js?v=2.7.9";
-import { setupDiscordPanel } from "./discord-panel.js?v=3.0.2";
-import { damageNotation, openCombatLog, saveNotation, toggleCombatLog } from "./combat-log.js?v=3.2.2";
+import { setupDiscordPanel } from "./discord-panel.js?v=3.2.3";
+import { damageNotation, openCombatLog, saveNotation, toggleCombatLog } from "./combat-log.js?v=3.2.3";
 import { aimsAtLocation, artworkFacingAngle, MAX_CAST_LEVEL, SKILLS, turnToHeading } from "./skills.js?v=3.1.0";
 import { ABILITIES, readTokenStats } from "./stats.js?v=3.1.0";
 import { setupAvatarPanel } from "./avatar-panel.js?v=3.1.0";
@@ -27,7 +27,7 @@ import { readMovementGrid, stepAvatar, turnAvatar } from "./movement.js?v=2.7.5"
 import { rollSpans, validateRollSpans } from "./dice.js";
 import { rollWithRumble } from "./rumble.js?v=3.1.0";
 import { rollWithNativeDice } from "./native-dice.js";
-import { hotbarOrientation, hotbarShowsLabels, sendHotbarCommand, setHotbarLabels, setHotbarOrientation } from "./hotbar.js?v=3.2.2";
+import { hotbarOrientation, hotbarShowsLabels, hotbarVerticalPosition, hotbarVerticalRange, sendHotbarCommand, setHotbarLabels, setHotbarOrientation, setHotbarVerticalPosition } from "./hotbar.js?v=3.2.3";
 import { actionForChord, actionForEvent, bindingLabel, editableTarget, eventChord, keyIdentity, keyboardProfile, modifierMask } from "./key-bindings.js?v=3.1.0";
 import { handleRoomKey, openKeyboard } from "./keyboard-shortcuts.js?v=3.1.0";
 
@@ -1214,6 +1214,25 @@ function setupSettings() {
   }
   const orientation = document.querySelector("#hotbar-orientation");
   const labels = document.querySelector("#hotbar-labels");
+  const vertical = document.querySelector("#hotbar-vertical-position");
+  const verticalValue = document.querySelector("#hotbar-vertical-value");
+  function updateVertical() {
+    const left = hotbarOrientation(OBR) === "left";
+    vertical.max = hotbarVerticalRange(left);
+    vertical.value = hotbarVerticalPosition(OBR, left);
+    showVerticalValue();
+  }
+  function showVerticalValue() {
+    verticalValue.value = vertical.value + "%";
+  }
+  if (vertical && verticalValue) {
+    updateVertical();
+    vertical.addEventListener("input", showVerticalValue);
+    vertical.addEventListener("change", () => {
+      setHotbarVerticalPosition(OBR, hotbarOrientation(OBR) === "left", vertical.valueAsNumber);
+      void sendHotbarCommand(OBR, "layout").catch(console.error);
+    });
+  }
   if (labels) {
     labels.checked = hotbarShowsLabels(OBR);
     labels.addEventListener("change", () => {
@@ -1225,6 +1244,7 @@ function setupSettings() {
     orientation.value = hotbarOrientation(OBR);
     orientation.addEventListener("change", () => {
       setHotbarOrientation(OBR, orientation.value);
+      if (vertical && verticalValue) updateVertical();
       void sendHotbarCommand(OBR, "layout").catch(console.error);
     });
   }
@@ -1439,7 +1459,7 @@ function setupSettings() {
     }
   }, true);
   if (!welcome && !combatWindow) listenForChatShortcut(OBR, openFromShortcut);
-  setupDiscordPanel(() => select(0), () => select(2));
+  setupDiscordPanel(() => select(0), () => select(2), new URL(import.meta.url).searchParams.get("v"));
   fields.addEventListener("submit", (event) => event.preventDefault());
   fields.addEventListener("input", () => {
     const values = Object.fromEntries(new FormData(fields));

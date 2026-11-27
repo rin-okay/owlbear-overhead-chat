@@ -153,7 +153,7 @@ export function setupBless(obr, buildImage) {
       const active = sceneItems.filter(isActiveGraphic);
       if (active.length) {
         await obr.scene.items.deleteItems(active.map(({ id }) => id));
-        return "";
+        return { active: false };
       }
 
       const dpi = await obr.scene.grid.getDpi();
@@ -198,7 +198,7 @@ export function setupBless(obr, buildImage) {
       intro.disableAttachmentBehavior = ["COPY", "ROTATION"];
       await obr.scene.items.addItems([intro]);
       if (current()) finishIntro(intro.id, caster.id, deadline, current);
-      return "";
+      return { active: true };
     } finally {
       casting.delete(caster.id);
     }

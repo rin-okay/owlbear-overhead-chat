@@ -4,8 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>GM assignment · Overhead Chat</title>
-  <link rel="stylesheet" href="./assignment.css?v=3.1.0">
-  <script type="module" src="./assignment.js?v=3.2.2"></script>
+  <link rel="stylesheet" href="./assignment.css?v=3.2.3">
+  <script type="module" src="./assignment.js?v=3.2.3"></script>
 </head>
 <body>
 <main>
@@ -70,9 +70,11 @@
           <label>Bonus damage <input name="damageBonus" type="number" min="-99" max="99" value="0" required></label>
           <label>Bonus to hit <input name="hitBonus" type="number" min="-99" max="99" value="0" required><small>Saved for future attack rolls.</small></label>
           <label>Animation <select name="animation"></select></label>
-          <label>Hit delay (%) <input name="hitDelay" type="number" min="0" max="100" step="1" value="45" required></label>
-          <label>Sound delay (%) <input name="soundDelay" type="number" min="0" max="100" step="1" value="45" required></label>
-          <label>Motif sound effect <select name="sound"></select></label>
+          <label>Damage marker delay (%) <input name="hitDelay" type="number" min="0" max="100" step="1" value="45" required></label>
+          <label>Swing sound effect <select name="swingSound"></select></label>
+          <label>Swing sound delay (%) <input name="swingDelay" type="number" min="0" max="100" step="1" value="45" required></label>
+          <label>Hit sound effect <select name="hitSound"></select></label>
+          <label>Hit sound delay (%) <input name="hitSoundDelay" type="number" min="0" max="100" step="1" value="45" required></label>
         </fieldset>
         <fieldset id="skill-fields" class="editor" aria-label="Skill settings" hidden>
           <label>Attack used <select name="uses"><option value="none">Standalone</option><option value="weapon">Current melee weapon</option><option value="ranged-weapon">Current ranged weapon</option></select></label>
@@ -82,6 +84,17 @@
         </fieldset>
         <p id="weapon-timing-help">0% is the start of the animation. 100% is the end.</p>
         <div class="form-actions"><button id="save-definition" type="submit">Save</button></div>
+      </form>
+      <form id="spell-sounds" hidden>
+        <div class="editor-heading"><h2 id="spell-sound-title"></h2><button type="button" id="back-to-skills">Back to skills</button></div>
+        <fieldset class="editor" aria-label="Motif sounds">
+          <label>Cast sound effect <select name="castSound"></select></label>
+          <label>Cast sound delay (ms) <input name="castDelay" type="number" min="0" max="10000" value="0" required></label>
+          <label>Hit sound effect <select name="hitSound"></select></label>
+          <label>Hit sound delay after impact (ms) <input name="hitDelay" type="number" min="0" max="10000" value="0" required></label>
+          <label>Loop sound effect <select name="loopSound"></select></label>
+        </fieldset>
+        <div class="form-actions"><button id="save-spell-sounds" type="submit">Save</button></div>
       </form>
     </section>
     <p id="feedback" role="status"></p>
