@@ -10,8 +10,8 @@ import {
 } from "./session.js?v=2.9.16";
 
 import { drawBubble, normalizeAppearance, prepareBubbleFont } from "./appearance.js?v=2.7.9";
-import { setupDiscordPanel } from "./discord-panel.js?v=3.0.0";
-import { damageNotation, openCombatLog, saveNotation, toggleCombatLog } from "./combat-log.js?v=3.0.0";
+import { setupDiscordPanel } from "./discord-panel.js?v=3.0.1";
+import { damageNotation, openCombatLog, saveNotation, toggleCombatLog } from "./combat-log.js?v=3.0.1";
 import { aimsAtLocation, artworkFacingAngle, MAX_CAST_LEVEL, SKILLS, turnToHeading } from "./skills.js?v=2.11.12";
 import { ABILITIES, readTokenStats } from "./stats.js?v=2.8.5";
 import { setupAvatarPanel } from "./avatar-panel.js?v=2.11.12";
@@ -494,12 +494,13 @@ async function moveAvatar(mode) {
         const face = (item) => turnToHeading(item, skillPanel?.facingFor(item) ?? 0, heading);
         const next = { ...token, scale: { ...token.scale } };
         face(next);
-        if (next.rotation !== token.rotation || next.scale.x !== token.scale.x) {
-          // Apply the facing as its own scene update before sending the step.
+        const mirrored = next.scale.x !== token.scale.x;
+        if (mirrored || next.rotation !== token.rotation) {
           await OBR.scene.items.updateItems([tokenId], ([item]) => {
             if (canUpdate(item)) face(item);
           });
           if (!current()) return;
+          if (mirrored) continue;
         }
       }
 
