@@ -86,6 +86,3 @@ aside summary { cursor: pointer; }
 .backup-footer { position: sticky; bottom: 0; display: flex; justify-content: flex-end; margin-top: 12px; padding-block: 4px; text-align: right; background: #1c1723; }
 .backup-footer summary { margin-left: auto; }
 .backup-footer .backup-menu { margin-bottom: 0; }
-
-.editor-tabs { display: flex; gap: 8px; margin-bottom: 14px; }
-#entry-menu:not([hidden]) { display: grid; gap: 4px; }

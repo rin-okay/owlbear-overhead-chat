@@ -47,15 +47,13 @@ function checkCatalog(catalog) {
         Object.hasOwn(stock, definition.animation) && validDice(definition.dice) &&
         DAMAGE_TYPES.includes(definition.damageType) && Object.hasOwn(DAMAGE_MODIFIERS, definition.modifier) &&
         bounded(definition.damageBonus, -99, 99) && bounded(definition.hitBonus, -99, 99) &&
-        ["sound", "swingSound", "hitSound", "missSound"].every(key => definition[key] === undefined || sound(definition[key])) &&
-        ["hitDelay", "soundDelay", "swingDelay", "hitSoundDelay", "missDelay"].every(key =>
+        ["sound", "swingSound", "hitSound"].every(key => definition[key] === undefined || sound(definition[key])) &&
+        ["hitDelay", "soundDelay", "swingDelay", "hitSoundDelay"].every(key =>
           definition[key] === undefined || validWeaponDelay(definition[key])),
         "Invalid weapon definition: " + name);
     } else {
       requireValid(CUSTOM_ID.test(id) && customSkill(definition) &&
-        (definition.dice == null || validDice(definition.dice)) &&
-        ["castSound", "hitSound", "missSound"].every(key => definition[key] === undefined || sound(definition[key])) &&
-        ["castDelay", "missDelay"].every(key => definition[key] === undefined || bounded(definition[key], 0, 10000)), "Invalid skill definition: " + name);
+        (definition.dice == null || validDice(definition.dice)), "Invalid skill definition: " + name);
     }
   }
   return catalog;
@@ -73,8 +71,7 @@ export function importCatalog(config, data) {
   for (const [id, cue] of Object.entries(data.spellSounds)) {
     requireValid(SPELLS.includes(id) && record(cue) &&
       ["castSound", "hitSound", "loopSound"].every(key => sound(cue[key])) &&
-      bounded(cue.castDelay, 0, 10000) && (cue.missSound === undefined || sound(cue.missSound)) &&
-      ["hitDelay", "missDelay"].every(key => cue[key] === undefined || bounded(cue[key], 0, 10000)), "Invalid spell sounds: " + id);
+      ["castDelay", "hitDelay"].every(key => bounded(cue[key], 0, 10000)), "Invalid spell sounds: " + id);
   }
   config.catalog = { ...config.catalog, ...catalog };
   config.spellSounds = { ...config.spellSounds, ...data.spellSounds };

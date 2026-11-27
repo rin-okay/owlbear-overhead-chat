@@ -4,7 +4,7 @@ const MENU = ASSIGNMENT_MODAL + "/menu";
 export async function openAssignment(obr, tokenId) {
   if (await obr.player.getRole() !== "GM") return;
   const [width, height] = await Promise.all([obr.viewport.getWidth(), obr.viewport.getHeight()]);
-  const url = new URL("./assignment.html?v=3.2.6", import.meta.url);
+  const url = new URL("./assignment.html?v=3.2.4", import.meta.url);
   if (tokenId) url.searchParams.set("token", tokenId);
   await obr.modal.open({
     id: ASSIGNMENT_MODAL, url: url.href, hidePaper: true,

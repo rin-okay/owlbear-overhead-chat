@@ -22,10 +22,9 @@ export function playCombatSounds(obr, cues, name, caster) {
   const instructions = cues.filter(({ id }) => id).map(({ id, delay }) => ({
     type: "effect", id, loops: 1, delay, effectProperties: {},
   }));
-  for (let offset = 0; offset < instructions.length; offset += 16) {
-    void obr.broadcast.sendMessage(MOTIF_EFFECTS, { instructions: instructions.slice(offset, offset + 16), spellData: { name, caster } },
-      { destination: "ALL" }).catch(console.warn);
-  }
+  if (!instructions.length) return;
+  void obr.broadcast.sendMessage(MOTIF_EFFECTS, { instructions, spellData: { name, caster } },
+    { destination: "ALL" }).catch(console.warn);
 }
 
 export function updateSpellLoop(obr, key, sound, stopAfter) {
@@ -33,9 +32,11 @@ export function updateSpellLoop(obr, key, sound, stopAfter) {
     { destination: "ALL" }).catch(console.warn);
 }
 
-export const areaSound = (skill) => Boolean(skill?.impact || skill?.cone || skill?.location === "area");
-export const soundDelayMs = (value) => Number.isInteger(value) && value >= 0 && value <= 10000 ? value : 0;
-
-export function hitSoundCues(id, count, delay = 0) {
-  return id ? Array.from({ length: count }, (_, index) => ({ id, delay: delay + index % 8 * 5 })) : [];
+export function spellSoundCues(sounds, impactDelay) {
+  if (!sounds) return [];
+  const delay = (value) => Number.isInteger(value) && value >= 0 && value <= 10000 ? value : 0;
+  return [
+    { id: sounds.castSound, delay: delay(sounds.castDelay) },
+    ...(Number.isFinite(impactDelay) ? [{ id: sounds.hitSound, delay: impactDelay + delay(sounds.hitDelay) }] : []),
+  ];
 }

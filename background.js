@@ -1,4 +1,4 @@
-import { setupAssignmentMenu } from "./assignment-window.js?v=3.2.6";
+import { setupAssignmentMenu } from "./assignment-window.js?v=3.2.4";
 import OBR, { buildImage, buildLabel, buildPath, Command } from "./obr.js?v=2.5.1";
 import {
   ABOVE_FOG, AVATAR, HABBO_MODE, HABBO_SCALE, SPEECH, BUBBLE_MS, GENERAL_CHAT_ROOM,
@@ -14,13 +14,13 @@ import { chatParts, isRollCommand, rollSpans } from "./dice.js";
 import { queueDiscord } from "./discord.js?v=2.3.9";
 import { parseTray } from "./dice-replay.js";
 import { queueDicePopup, resetDicePopups } from "./dice-popup.js";
-import { setupSkillHost } from "./skill-host.js?v=3.2.6";
-import { setupHotbar } from "./hotbar.js?v=3.2.5";
-import { resetCombatLogPopover, setupCombatLog } from "./combat-log.js?v=3.2.6";
+import { setupSkillHost } from "./skill-host.js?v=3.2.3";
+import { setupHotbar } from "./hotbar.js?v=3.2.7";
+import { resetCombatLogPopover, setupCombatLog } from "./combat-log.js?v=3.2.7";
 import { SKILL_CHANGED, skillConnections, skillGrantLabel } from "./skills.js?v=3.1.0";
 import { EMOTE, floatEmote, parseEmote } from "./emotes.js?v=2.7.22";
 import { setupHeartProjectiles } from "./heart-spells.js?v=2.11.12";
-import { setupHitMarkers } from "./hit-markers.js?v=3.2.6";
+import { setupHitMarkers } from "./hit-markers.js?v=3.1.0";
 import { requestChatShortcut } from "./chat-shortcut.js?v=2.11.0";
 import { setupChatRecovery } from "./chat-recovery.js?v=2.6.6";
 import { setupCameraFollow } from "./avatar-viewport.js?v=2.11.16";

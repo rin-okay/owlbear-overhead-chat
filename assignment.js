@@ -1,10 +1,10 @@
 import OBR from "./obr.js";
-import { CATALOG_BACKUP, TOKEN_BACKUP, catalogSnapshot, importCatalog, importToken, readBackup, saveBackup, tokenSnapshot } from "./assignment-backup.js?v=3.2.6";
+import { CATALOG_BACKUP, TOKEN_BACKUP, catalogSnapshot, importCatalog, importToken, readBackup, saveBackup, tokenSnapshot } from "./assignment-backup.js?v=3.2.4";
 import { DEFAULT_WEAPON_DELAY, validWeaponDelay } from "./weapon-timing.js?v=3.2.2";
-import { ASSIGNMENT_MODAL } from "./assignment-window.js?v=3.2.6";
+import { ASSIGNMENT_MODAL } from "./assignment-window.js?v=3.2.4";
 import { CUSTOM_ID, DAMAGE_MODIFIERS, DAMAGE_TYPES, customSkill, isAbility, isWeapon, parseDamageDice } from "./combat-catalog.js?v=3.1.0";
 import { weaponDefinition } from "./melee-damage.js?v=3.1.0";
-import { areaSound, motifSoundEffects } from "./motif-cues.js?v=3.2.6";
+import { motifSoundEffects } from "./motif-cues.js?v=3.2.3";
 import {
   DEFAULT_WEAPON, FRIENDLY_FIRE_MODES, RANGED_WEAPONS, SKILLS, SKILL_CHANGED, SPELLS, TEAMS, WEAPONS,
   availableCustomSkills, availableRangedWeapons, availableSpells, availableWeapons, friendlyFireMode,
@@ -81,7 +81,6 @@ function initialize(obr) {
   const feedback = byId("feedback");
   const menu = byId("entry-menu");
   const menuEdit = menu.querySelector("button");
-  const template = byId("create-template");
   const views = [...document.querySelectorAll("nav button")];
   const enable = byId("enable-skills");
   const friendly = byId("friendly-fire");
@@ -222,10 +221,9 @@ function initialize(obr) {
         row.addEventListener("contextmenu", (event) => {
           event.preventDefault();
           menuEntry = { entry, trigger: edit };
-          template.hidden = !isWeapon(kind);
+          menu.style.left = Math.max(0, Math.min(event.clientX || edit.getBoundingClientRect().left, innerWidth - 100)) + "px";
+          menu.style.top = Math.max(0, Math.min(event.clientY || edit.getBoundingClientRect().bottom, innerHeight - 55)) + "px";
           menu.hidden = false;
-          menu.style.left = Math.max(0, Math.min(event.clientX || edit.getBoundingClientRect().left, innerWidth - menu.offsetWidth - 4)) + "px";
-          menu.style.top = Math.max(0, Math.min(event.clientY || edit.getBoundingClientRect().bottom, innerHeight - menu.offsetHeight - 4)) + "px";
           menuEdit.focus();
         });
       }
@@ -296,28 +294,12 @@ function initialize(obr) {
     select.value = selected ?? "";
   }
 
-  const editorTabs = [...editor.querySelectorAll(".editor-tabs button")];
-  function selectEditorPane(active) {
-    for (const tab of editorTabs) {
-      const id = tab.getAttribute("aria-controls");
-      tab.setAttribute("aria-pressed", String(id === active));
-      byId(id).hidden = id !== active;
-    }
-  }
-  for (const tab of editorTabs) tab.addEventListener("click", () => selectEditorPane(tab.getAttribute("aria-controls")));
-  editor.addEventListener("invalid", (event) => {
-    const panel = event.target.closest("#definition-stats, #definition-effects");
-    if (panel?.hidden) selectEditorPane(panel.id);
-  }, true);
-
   function editorType(animation) {
     const kind = fields.kind.value;
     const weapon = isWeapon(kind);
     const usesWeapon = !weapon && fields.uses.value !== "none";
     byId("weapon-fields").hidden = byId("weapon-fields").disabled = !weapon;
     byId("weapon-timing-help").hidden = !weapon;
-    byId("weapon-effects").hidden = byId("weapon-effects").disabled = !weapon;
-    byId("skill-effects").hidden = byId("skill-effects").disabled = weapon;
     byId("skill-fields").hidden = byId("skill-fields").disabled = weapon;
     byId("cast-range").hidden = usesWeapon;
     fields.range.disabled = usesWeapon;
@@ -330,19 +312,17 @@ function initialize(obr) {
     fields.animation.value = options.some(([id]) => id === animation) ? animation : options[0][0];
   }
 
-  function startDefinition(entry, fromTemplate = false) {
-    editing = fromTemplate ? undefined : entry;
+  function startDefinition(entry) {
+    editing = entry;
     editingSpell = undefined;
     editor.hidden = false;
     spellEditor.hidden = true;
     editor.reset();
-    selectEditorPane("definition-stats");
     const definition = entry && (isWeapon(entry.kind) ? weaponDefinition(config, entry.kind, entry.id) : config.catalog?.[entry.id]);
-    fields.kind.disabled = Boolean(editing);
+    fields.kind.disabled = Boolean(definition);
     fields.kind.value = definition?.kind ?? "weapon";
-    byId("editor-title").textContent = fromTemplate ? "Create from " + definition.name :
-      definition ? "Edit " + definition.name : "Create a definition";
-    fields.name.value = fromTemplate ? definition.name.slice(0, 75) + " copy" : definition?.name ?? "";
+    byId("editor-title").textContent = definition ? "Edit " + definition.name : "Create a definition";
+    fields.name.value = definition?.name ?? "";
     fields.dice.value = definition?.dice ? definition.dice.count + "d" + definition.dice.sides : "";
     fields.damageType.value = definition?.damageType ?? "slashing";
     fields.modifier.value = definition?.modifier ?? "str";
@@ -350,15 +330,9 @@ function initialize(obr) {
     fields.hitBonus.value = definition?.hitBonus ?? 0;
     fields.hitDelay.value = definition?.hitDelay ?? DEFAULT_WEAPON_DELAY;
     fields.swingDelay.value = definition?.swingDelay ?? definition?.soundDelay ?? DEFAULT_WEAPON_DELAY;
-    fields.missDelay.value = definition?.missDelay ?? DEFAULT_WEAPON_DELAY;
-    fields.castDelay.value = definition?.castDelay ?? 0;
-    fields.skillMissDelay.value = definition && !isWeapon(definition.kind) ? definition.missDelay ?? 0 : 0;
+    fields.hitSoundDelay.value = definition?.hitSoundDelay ?? DEFAULT_WEAPON_DELAY;
     soundChoices(fields.swingSound, definition?.swingSound ?? definition?.sound);
     soundChoices(fields.hitSound, definition?.hitSound);
-    soundChoices(fields.missSound, definition?.missSound);
-    soundChoices(fields.castSound, definition?.castSound);
-    soundChoices(fields.skillHitSound, definition?.hitSound);
-    soundChoices(fields.skillMissSound, definition?.missSound);
     fields.uses.value = definition?.uses ?? "none";
     fields.saveAbility.value = definition?.saveAbility ?? "";
     fields.range.value = definition?.range ?? 6;
@@ -370,12 +344,9 @@ function initialize(obr) {
       editor.hidden = true;
       spellEditor.hidden = false;
       const saved = config.spellSounds?.[entry.id];
-      for (const key of ["castSound", "hitSound", "missSound", "loopSound"]) soundChoices(spellEditor.elements[key], saved?.[key]);
+      for (const key of ["castSound", "hitSound", "loopSound"]) soundChoices(spellEditor.elements[key], saved?.[key]);
       spellEditor.elements.castDelay.value = saved?.castDelay ?? 0;
-      spellEditor.elements.missDelay.value = saved?.missDelay ?? 0;
-      const area = areaSound(SKILLS[entry.id]);
-      byId("spell-miss-label").textContent = area ? "AoE" : "On miss";
-      byId("spell-miss-delay-label").textContent = area ? "AoE delay after burst (ms)" : "On miss delay after impact (ms)";
+      spellEditor.elements.hitDelay.value = saved?.hitDelay ?? 0;
       byId("spell-sound-title").textContent = "Edit " + entry.name + " sounds";
       showView("create");
       spellEditor.elements.castSound.focus();
@@ -390,23 +361,15 @@ function initialize(obr) {
     event.preventDefault();
     const entry = editingSpell;
     if (!entry || !SPELLS.includes(entry.id)) return;
-    const { castSound, castDelay, hitSound, missSound, missDelay, loopSound } = spellEditor.elements;
-    const delays = [castDelay.valueAsNumber, missDelay.valueAsNumber];
+    const { castSound, castDelay, hitSound, hitDelay, loopSound } = spellEditor.elements;
+    const delays = [castDelay.valueAsNumber, hitDelay.valueAsNumber];
     if (!delays.every((value) => Number.isInteger(value) && value >= 0 && value <= 10000)) return;
     const sounds = { castSound: castSound.value, castDelay: delays[0],
-      hitSound: hitSound.value, missSound: missSound.value, missDelay: delays[1], loopSound: loopSound.value };
+      hitSound: hitSound.value, hitDelay: delays[1], loopSound: loopSound.value };
     void save((next) => { next.spellSounds = { ...next.spellSounds, [entry.id]: sounds }; },
       { message: entry.name + " sounds saved." });
   });
   menuEdit.addEventListener("click", () => { if (menuEntry) editDefinition(menuEntry.entry); });
-  template.addEventListener("click", () => {
-    const entry = menuEntry?.entry;
-    if (!isWeapon(entry?.kind)) return;
-    startDefinition(entry, true);
-    showView("create");
-    fields.name.focus();
-    fields.name.select();
-  });
   byId("new-definition").addEventListener("click", () => { startDefinition(); fields.name.focus(); });
   fields.kind.addEventListener("change", () => {
     if (fields.kind.value === "ranged-weapon") {
@@ -441,14 +404,12 @@ function initialize(obr) {
         }
         const hitDelay = fields.hitDelay.valueAsNumber;
         const swingDelay = fields.swingDelay.valueAsNumber;
-        const missDelay = fields.missDelay.valueAsNumber;
-        if (![hitDelay, swingDelay, missDelay].every(validWeaponDelay)) throw Error("Enter whole percentages from 0 to 100 for attack delays.");
+        const hitSoundDelay = fields.hitSoundDelay.valueAsNumber;
+        if (![hitDelay, swingDelay, hitSoundDelay].every(validWeaponDelay)) throw Error("Enter whole percentages from 0 to 100 for attack delays.");
         Object.assign(definition, { modifier, damageBonus, hitBonus, animation, hitDelay,
-          swingDelay, missDelay, swingSound: fields.swingSound.value, hitSound: fields.hitSound.value, missSound: fields.missSound.value });
+          swingDelay, hitSoundDelay, swingSound: fields.swingSound.value, hitSound: fields.hitSound.value });
       } else {
         Object.assign(definition, {
-          castSound: fields.castSound.value, castDelay: fields.castDelay.valueAsNumber,
-          hitSound: fields.skillHitSound.value, missSound: fields.skillMissSound.value, missDelay: fields.skillMissDelay.valueAsNumber,
           uses: fields.uses.value, saveAbility: fields.saveAbility.value || undefined,
           ...(fields.uses.value === "none" ? { range: fields.range.valueAsNumber } : {}),
         });

@@ -1,5 +1,5 @@
 import { reachableTargets, targetGeometry } from "./target-cycle.js?v=3.1.0";
-import { addHeartEffects } from "./heart-spells.js?v=3.2.6";
+import { addHeartEffects } from "./heart-spells.js?v=2.11.12";
 import { setupBless } from "./bless.js?v=3.2.3";
 import { combatDamage } from "./combat-log.js?v=3.2.2";
 import { isShieldGraphic, readShieldGraphics, setupShield } from "./shield.js?v=3.2.3";
@@ -8,10 +8,10 @@ import { canSpeak, ROLL_DAMAGE_FROM_COMBAT_LOG } from "./rules.js?v=2.9.4";
 import {
   areaHits, clearSpellPath, coneHits, isProjectileToken, isProjectileWall, openMeleeDoor, projectileImpact, projectileTokenContainsPoint, teleportLandingClear,
 } from "./projectile-collision.js?v=2.10.2";
-import { HIT_MARKERS, MELEE_HIT_CUE } from "./hit-markers.js?v=3.2.6";
+import { HIT_MARKERS, MELEE_HIT_CUE } from "./hit-markers.js?v=3.1.0";
 import { attackDamageFormula, weaponDefinition } from "./melee-damage.js?v=3.1.0";
 import { CUSTOM_ID, rollAttackDamage } from "./combat-catalog.js?v=3.1.0";
-import { areaSound, hitSoundCues, playCombatSounds, soundDelayMs, updateSpellLoop } from "./motif-cues.js?v=3.2.6";
+import { playCombatSounds, spellSoundCues, updateSpellLoop } from "./motif-cues.js?v=3.2.3";
 import { weaponAnimationDuration, weaponDelay } from "./weapon-timing.js?v=3.2.2";
 import { readTokenStats } from "./stats.js?v=3.1.0";
 import {
@@ -186,7 +186,7 @@ export function setupSkillHost(obr, buildImage, recordCombat) {
           const sounds = readSkills(obr, "gm").spellSounds?.[data.skill];
           const loopKey = data.skill + ":" + encodeURIComponent(token.id);
           if (!state.active || sounds?.loopSound) updateSpellLoop(obr, loopKey, state.active ? sounds.loopSound : undefined);
-          if (state.active) playCombatSounds(obr, [{ id: sounds?.castSound, delay: soundDelayMs(sounds?.castDelay) }], skill.name, sender.id);
+          if (state.active) playCombatSounds(obr, spellSoundCues(sounds), skill.name, sender.id);
           await logCast();
         }
         if (current()) await answer({ ...result, error: typeof state === "string" ? state : undefined });
@@ -264,7 +264,6 @@ export function setupSkillHost(obr, buildImage, recordCombat) {
       let beamOutcomes;
       let missileBlocked = false;
       let doorId;
-      const missedProjectiles = [];
       if (checksHit) {
         if (!obstacles) {
           await answer({ ...result, error: "Couldn’t check the scene for walls and tokens. Try again." });
@@ -352,8 +351,6 @@ export function setupSkillHost(obr, buildImage, recordCombat) {
               }
             } else instructions.push({ ...instruction, effectProperties });
             const hitId = impact.hitTokenIds[0];
-            if (!hitId) missedProjectiles.push(...Array.from({ length: count }, (_, i) =>
-              missile ? (firstDart + i) * MAGIC_MISSILE_INTERVAL : i % 8 * 5));
             const key = hitId ? `hit:${hitId}` : `miss:${selected.id}`;
             const previous = outcomes.get(key);
             if (previous) {
@@ -481,16 +478,13 @@ export function setupSkillHost(obr, buildImage, recordCombat) {
           instructions.push({ ...instruction, delay: index * MAGIC_MISSILE_INTERVAL });
         }
       }
-      let heartImpact;
       if (skill.heartMarker) {
-        heartImpact = await addHeartEffects(obr, instructions, skill, spellLevel, hitTokens, dpi);
+        await addHeartEffects(obr, instructions, skill, spellLevel, hitTokens, dpi);
         if (version !== sceneVersion) return;
       }
       let damageRolls;
       let damageFormula;
       const weaponHit = Boolean(equipped && hitTokenIds.length);
-      const sounds = skill.custom ? latest.catalog?.[data.skill] : latest.spellSounds?.[data.skill];
-      const hitSound = sounds?.hitSound || equipped?.hitSound;
       const animationDuration = equipped && weaponAnimationDuration(equipped, instruction.effectProperties, dpi);
       const metadata = hitTokenIds.length ? await obr.room.getMetadata().catch(() => ({})) : {};
       if (version !== sceneVersion) return;
@@ -498,7 +492,7 @@ export function setupSkillHost(obr, buildImage, recordCombat) {
       const sendMarkers = (delay, damage, {
         useAnimationCue = false, missileFollowUps, dartCount, tokenIds = hitTokenIds, requestId = data.requestId,
       } = {}) => obr.broadcast.sendMessage(HIT_MARKERS, {
-        requestId, tokenIds, delay, useAnimationCue, hitSound,
+        requestId, tokenIds, delay, useAnimationCue,
         splat: manual && !missileBlocked && !damage?.blocked,
         ...(damage ? { damage } : {}),
         ...(missileFollowUps ? { missileFollowUps } : {}),
@@ -522,25 +516,14 @@ export function setupSkillHost(obr, buildImage, recordCombat) {
       if (equipped) {
         playCombatSounds(obr, [
           { id: equipped.swingSound ?? equipped.sound, delay: weaponDelay(animationDuration, equipped.swingDelay ?? equipped.soundDelay) },
-          { id: sounds?.castSound, delay: soundDelayMs(sounds?.castDelay) },
-          ...(!weaponHit ? [{
-            id: sounds?.missSound || equipped.missSound,
-            delay: sounds?.missSound
-              ? weaponDelay(animationDuration, equipped.hitDelay) + soundDelayMs(sounds.missDelay)
-              : weaponDelay(animationDuration, equipped.missDelay),
-          }] : []),
+          ...(weaponHit ? [{ id: equipped.hitSound, delay: weaponDelay(animationDuration, equipped.hitSoundDelay) }] : []),
         ], equipped.name, sender.id);
       } else {
-        const baseImpact = heartImpact?.duration ?? skill.impact?.delay ?? skill.hitDelay ?? 0;
-        const misses = areaSound(skill) ? [0] : beamOutcomes ? missedProjectiles :
-          checksHit && skill.location !== "teleport" && !hitTokens.length
-            ? Array.from({ length: missile ? spellLevel + 2 : 1 }, (_, i) => i * MAGIC_MISSILE_INTERVAL)
-            : [];
-        playCombatSounds(obr, [
-          { id: sounds?.castSound, delay: soundDelayMs(sounds?.castDelay) },
-          ...misses.map(offset => ({ id: sounds?.missSound, delay: baseImpact + offset + soundDelayMs(sounds?.missDelay) })),
-          ...hitSoundCues(hitSound, heartImpact?.markerCount ?? 0, baseImpact),
-        ], skill.name, sender.id);
+        const sounds = latest.spellSounds?.[data.skill];
+        const baseImpact = skill.impact?.delay ?? skill.hitDelay ?? (skill.impact ? 800 : 0);
+        const firstDart = beamOutcomes?.find(({ hitId }) => hitId)?.firstDart ?? 0;
+        const impact = hitTokens.length ? baseImpact + (missile ? firstDart * MAGIC_MISSILE_INTERVAL : 0) : undefined;
+        playCombatSounds(obr, spellSoundCues(sounds, impact), skill.name, sender.id);
         if (sounds?.loopSound) {
           const tail = missile ? (spellLevel + 1) * MAGIC_MISSILE_INTERVAL : 0;
           updateSpellLoop(obr, "cast:" + data.requestId, sounds.loopSound, Math.max(1000, baseImpact + tail + 900));
