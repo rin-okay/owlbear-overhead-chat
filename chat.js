@@ -10,9 +10,9 @@ import {
 } from "./session.js?v=2.9.16";
 
 import { drawBubble, normalizeAppearance, prepareBubbleFont } from "./appearance.js?v=2.7.9";
-import { setupDiscordPanel } from "./discord-panel.js?v=2.11.17";
-import { damageNotation, openCombatLog, saveNotation, toggleCombatLog } from "./combat-log.js?v=2.11.16";
-import { aimsAtLocation, artworkFacingAngle, MAX_CAST_LEVEL, SKILLS } from "./skills.js?v=2.11.12";
+import { setupDiscordPanel } from "./discord-panel.js?v=2.11.18";
+import { damageNotation, openCombatLog, saveNotation, toggleCombatLog } from "./combat-log.js?v=2.11.18";
+import { aimsAtLocation, artworkFacingAngle, MAX_CAST_LEVEL, SKILLS, turnToHeading } from "./skills.js?v=2.11.12";
 import { ABILITIES, readTokenStats } from "./stats.js?v=2.8.5";
 import { setupAvatarPanel } from "./avatar-panel.js?v=2.11.12";
 import { setupSkillGrants, setupSkillPanel } from "./skill-panel.js?v=2.11.16";
@@ -83,6 +83,7 @@ let skillPanel;
 let showPlayerStats;
 let targeting;
 let quickcastEnabled = true;
+let autoMirrorToken = false;
 let showSkillsForRole;
 let moveWarningTimer;
 let moveWarningFade;
@@ -495,6 +496,9 @@ async function moveAvatar(mode) {
           item.grid = artwork.grid;
         } else if (offset) {
           item.position = stepAvatar(item.position, offset, grid);
+          if (autoMirrorToken && offset[0]) {
+            turnToHeading(item, skillPanel?.facingFor(item) ?? 0, offset[0] < 0 ? 180 : 0);
+          }
         } else if (mirror) {
           item.scale.x = -item.scale.x;
         } else {
@@ -1208,6 +1212,21 @@ function setupSettings() {
   const followCamera = settingsPanel.querySelector("#follow-camera");
   const cameraFollow = cameraFollowPreference(OBR, (enabled) => { followCamera.checked = enabled; });
   followCamera.addEventListener("change", () => cameraFollow.set(followCamera.checked));
+  const autoMirror = settingsPanel.querySelector("#auto-mirror-token");
+  if (autoMirror) {
+    const key = JSON.stringify(["chat.overhead.auto-mirror-token", OBR.room.id, OBR.player.id]);
+    try { autoMirrorToken = localStorage.getItem(key) === "on"; } catch {}
+    autoMirror.checked = autoMirrorToken;
+    autoMirror.addEventListener("change", () => {
+      autoMirrorToken = autoMirror.checked;
+      try { localStorage.setItem(key, autoMirrorToken ? "on" : "off"); } catch {}
+    });
+    window.addEventListener("storage", (event) => {
+      if (event.storageArea === localStorage && (event.key === key || event.key === null)) {
+        autoMirror.checked = autoMirrorToken = event.newValue === "on";
+      }
+    });
+  }
   const quickcast = document.querySelector("#quickcast");
   if (quickcast) {
     const key = JSON.stringify(["chat.overhead.quickcast", OBR.room.id, OBR.player.id]);
