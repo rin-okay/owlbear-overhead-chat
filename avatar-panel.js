@@ -1,4 +1,5 @@
 import OBR from "./obr.js";
+import { setupAvatarCreator } from "./avatar-creator.js?v=3.0.2";
 import { BUILTIN_EMOTES } from "./emotes.js?v=2.7.21";
 import { SKILLS, SPELLS } from "./skills.js?v=2.11.12";
 import { isPublicToken } from "./rules.js";
@@ -21,6 +22,13 @@ export function setupAvatarPanel(panel, openDialog = (open) => open()) {
   const bindingsButton = panel.querySelector("#avatar-bindings");
   const bindingsPanel = panel.querySelector("#avatar-bindings-panel");
   if (bindingsButton && bindingsPanel) views.push(["bindings", bindingsButton, bindingsPanel]);
+
+  const creatorButton = panel.querySelector("#avatar-creator");
+  const creatorPanel = panel.querySelector("#avatar-creator-panel");
+  if (creatorButton && creatorPanel) {
+    views.push(["creator", creatorButton, creatorPanel]);
+    setupAvatarCreator(creatorPanel, openDialog);
+  }
 
   const status = talkPanel.querySelector("[role=status]");
   let canTalk = false;
@@ -53,7 +61,7 @@ export function setupAvatarPanel(panel, openDialog = (open) => open()) {
   for (const [mode, button] of views) {
     button.addEventListener("click", () => {
       if (mode === "talk" && !canTalk) return;
-      if (canTalk && mode !== "bindings") saveAvatarMode(mode);
+      if (canTalk && (mode === "talk" || mode === "change")) saveAvatarMode(mode);
       selectView(mode);
       if (mode === "talk") void loadTokens();
     });
@@ -63,7 +71,7 @@ export function setupAvatarPanel(panel, openDialog = (open) => open()) {
     if (gm !== canTalk) {
       canTalk = gm;
       talkButton.hidden = !gm;
-      if (activeView !== "bindings") selectView(gm ? savedAvatarMode() : "change");
+      if (activeView === "talk" || activeView === "change") selectView(gm ? savedAvatarMode() : "change");
       ++revision;
     }
     return loadTokens(items);

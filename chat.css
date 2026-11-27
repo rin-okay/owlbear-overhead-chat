@@ -140,7 +140,7 @@ select { font: inherit; background: #181321; color: inherit; border: 1px solid #
 #gm-panel, #avatar-panel, #skills-panel { flex: 1; min-height: 0; overflow-y: auto; }
 #avatar-panel p { margin: 0 0 8px; color: #ab9dbb; }
 #avatar-panel p:empty { display: none; }
-.avatar-modes { margin-bottom: 8px; }
+.avatar-modes { flex-wrap: wrap; margin-bottom: 8px; }
 .avatar-modes button, .avatar-art-slot button { min-height: 28px; background: #312940; color: #e2d4f6; padding-inline: 8px; }
 .avatar-modes button[aria-pressed="true"] { background: #c7b6f8; color: #271c3a; }
 #avatar-scene-art { margin-bottom: 10px; }
@@ -244,3 +244,19 @@ select { font: inherit; background: #181321; color: inherit; border: 1px solid #
   text-align: center;
   text-transform: none;
 }
+
+#avatar-crop-controls { display: grid; gap: 9px; }
+.avatar-crop-stage {
+  display: grid; place-items: center; padding: 8px;
+  border-radius: 8px; background: #181321;
+}
+#avatar-crop-preview {
+  display: block; width: min(100%, 212px); height: auto;
+  cursor: grab; touch-action: none;
+}
+#avatar-crop-preview:active { cursor: grabbing; }
+.avatar-crop-settings { display: grid; grid-template-columns: minmax(0, 1fr) 58px; gap: 12px; align-items: end; }
+#avatar-crop-zoom { padding: 0; accent-color: #c7b6f8; }
+#avatar-character-preview { display: flex; align-items: center; gap: 8px; }
+#avatar-character-preview img { width: 44px; height: 44px; object-fit: contain; }
+#avatar-panel #avatar-creator-status { margin-top: 8px; }

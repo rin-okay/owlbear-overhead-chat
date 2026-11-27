@@ -4,8 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>overhead chat</title>
-  <link rel="stylesheet" href="./chat.css?v=2.11.11">
-  <script type="module" src="./chat.js?v=3.0.1"></script>
+  <link rel="stylesheet" href="./chat.css?v=3.0.2">
+  <script type="module" src="./chat.js?v=3.0.2"></script>
 </head>
 <body>
   <main>
@@ -124,6 +124,7 @@
     <section id="avatar-panel" aria-label="avatar slots" hidden>
       <nav class="avatar-modes" aria-label="avatar views">
         <button id="avatar-talk" type="button" aria-pressed="false" aria-controls="avatar-talk-panel" hidden>talk as</button>
+        <button id="avatar-creator" type="button" aria-pressed="false" aria-controls="avatar-creator-panel">avatar</button>
         <button id="avatar-change" type="button" aria-pressed="true" aria-controls="avatar-change-panel">quickbar</button>
         <button id="avatar-bindings" type="button" aria-pressed="false" aria-controls="avatar-bindings-panel">bindings</button>
       </nav>
@@ -143,6 +144,33 @@
         <p role="status"></p>
         <div id="avatar-art-slots"></div>
       </div>
+      <section id="avatar-creator-panel" aria-label="create or choose an avatar" hidden>
+        <section class="settings-group" aria-labelledby="avatar-create-heading">
+          <h2 id="avatar-create-heading">create a token</h2>
+          <div class="settings-actions"><button id="avatar-pick-attachment" type="button">choose attachment</button></div>
+          <div id="avatar-crop-controls" hidden>
+            <label>token name <input id="avatar-token-name" maxlength="80"></label>
+            <div class="avatar-crop-stage">
+              <canvas id="avatar-crop-preview" width="256" height="256" tabindex="0" aria-label="token crop preview" aria-describedby="avatar-crop-help"></canvas>
+            </div>
+            <p id="avatar-crop-help">Drag the image or use the arrow keys to position it.</p>
+            <div class="avatar-crop-settings">
+              <label>zoom <input id="avatar-crop-zoom" type="range" min="1" max="6" step="0.02" value="1"></label>
+              <label>border <input id="avatar-border-color" type="color" value="#a56cf6"></label>
+            </div>
+            <div class="settings-actions"><button id="avatar-create-token" type="button" disabled>save to characters</button></div>
+          </div>
+        </section>
+        <section class="settings-group" aria-labelledby="avatar-select-heading">
+          <h2 id="avatar-select-heading">choose your avatar</h2>
+          <div class="settings-actions">
+            <button id="avatar-pick-character" type="button">choose character</button>
+            <button id="avatar-use-character" type="button" disabled>make this my avatar</button>
+          </div>
+          <div id="avatar-character-preview" hidden><img alt=""><span></span></div>
+        </section>
+        <p id="avatar-creator-status" role="status"></p>
+      </section>
       <section id="avatar-bindings-panel" aria-label="bindings" hidden>
         <button id="open-keyboard" type="button" aria-haspopup="dialog" aria-keyshortcuts="F10">keyboard settings</button>
         <section class="settings-group" aria-labelledby="hotbar-settings-heading">

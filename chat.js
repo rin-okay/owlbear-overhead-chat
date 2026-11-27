@@ -10,11 +10,11 @@ import {
 } from "./session.js?v=2.9.16";
 
 import { drawBubble, normalizeAppearance, prepareBubbleFont } from "./appearance.js?v=2.7.9";
-import { setupDiscordPanel } from "./discord-panel.js?v=3.0.1";
-import { damageNotation, openCombatLog, saveNotation, toggleCombatLog } from "./combat-log.js?v=3.0.1";
+import { setupDiscordPanel } from "./discord-panel.js?v=3.0.2";
+import { damageNotation, openCombatLog, saveNotation, toggleCombatLog } from "./combat-log.js?v=3.0.2";
 import { aimsAtLocation, artworkFacingAngle, MAX_CAST_LEVEL, SKILLS, turnToHeading } from "./skills.js?v=2.11.12";
 import { ABILITIES, readTokenStats } from "./stats.js?v=2.8.5";
-import { setupAvatarPanel } from "./avatar-panel.js?v=2.11.12";
+import { setupAvatarPanel } from "./avatar-panel.js?v=3.0.2";
 import { setupSkillGrants, setupSkillPanel } from "./skill-panel.js?v=2.11.16";
 import { setupStatsEditor } from "./stats-panel.js?v=2.8.5";
 import { EMOTE } from "./emotes.js?v=2.7.21";
