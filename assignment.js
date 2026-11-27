@@ -1,0 +1,474 @@
+import OBR from "./obr.js";
+import { ASSIGNMENT_MODAL } from "./assignment-window.js?v=3.1.0";
+import { CUSTOM_ID, DAMAGE_MODIFIERS, DAMAGE_TYPES, customSkill, isAbility, isWeapon, parseDamageDice } from "./combat-catalog.js?v=3.1.0";
+import { weaponDefinition } from "./melee-damage.js?v=3.1.0";
+import { motifSoundEffects } from "./motif-cues.js?v=3.1.0";
+import {
+  DEFAULT_WEAPON, FRIENDLY_FIRE_MODES, RANGED_WEAPONS, SKILLS, SKILL_CHANGED, SPELLS, TEAMS, WEAPONS,
+  availableCustomSkills, availableRangedWeapons, availableSpells, availableWeapons, friendlyFireMode,
+  readSkills, skillConnections, spellParameter, tokenTeams, validSpellParameter, weaponNames, writeSkills,
+} from "./skills.js?v=3.1.0";
+import { ABILITIES } from "./stats.js?v=3.1.0";
+import { setupStatsEditor } from "./stats-panel.js?v=3.1.0";
+
+const labels = { spell: "Spell", weapon: "Weapon", "ranged-weapon": "Ranged weapon", skill: "Skill", ability: "Special ability" };
+const parameterFields = ["parameter", "targetLimit"];
+const catalogFields = { spell: "spellsByToken", weapon: "weaponsByToken", "ranged-weapon": "rangedWeaponsByToken",
+  skill: "customSkillsByToken", ability: "customSkillsByToken" };
+const isCharacter = (item) => item?.type === "IMAGE" && item.layer === "CHARACTER";
+const byId = (id) => document.getElementById(id);
+const make = (tag, text, className) => {
+  const element = document.createElement(tag);
+  if (text !== undefined) element.textContent = text;
+  if (className) element.className = className;
+  return element;
+};
+const button = (text, handler, className) => {
+  const element = make("button", text, className);
+  element.type = "button";
+  element.addEventListener("click", handler);
+  return element;
+};
+const choices = (select, options) => select.replaceChildren(...options.map(([id, name]) => new Option(name, id)));
+
+export function catalogEntries(config) {
+  return [
+    ...SPELLS.map((id) => ({
+      id, kind: "spell", category: id === "heart" || id === "sleep" ? "skill" : "spell",
+      name: SKILLS[id].name, fields: parameterFields.filter((field) => SKILLS[id][field]),
+      always: id === "sleep",
+    })),
+    ...["weapon", "ranged-weapon"].flatMap((kind) => Object.entries(weaponNames(config, kind))
+      .map(([id, name]) => ({ id, kind, name }))),
+    ...Object.entries(config.catalog ?? {}).flatMap(([id, definition]) => CUSTOM_ID.test(id) && customSkill(definition)
+      ? [{ id, kind: definition.kind, name: definition.name }] : []),
+  ];
+}
+
+function grantedIds(config, kind, token) {
+  if (kind === "spell") return availableSpells(config, token);
+  if (kind === "weapon") return availableWeapons(config.weaponsByToken?.[token], config);
+  if (kind === "ranged-weapon") return availableRangedWeapons(config.rangedWeaponsByToken?.[token], config);
+  return availableCustomSkills(config, token);
+}
+
+export function updateGrant(config, token, entry, grant, parameters) {
+  const ids = new Set(grantedIds(config, entry.kind, token));
+  const added = grant && !ids.has(entry.id);
+  if (grant) ids.add(entry.id);
+  else ids.delete(entry.id);
+  const field = catalogFields[entry.kind];
+  config[field] = { ...config[field], [token]: [...ids].filter((id) => id !== DEFAULT_WEAPON) };
+  if (entry.fields?.length && (parameters || !grant)) {
+    const tokenParameters = { ...config.spellParametersByToken?.[token] };
+    delete tokenParameters[entry.id];
+    if (parameters && Object.keys(parameters).length) tokenParameters[entry.id] = parameters;
+    config.spellParametersByToken = { ...config.spellParametersByToken, [token]: tokenParameters };
+  }
+  return added ? { kind: entry.kind, variant: entry.id, name: entry.name, tokenId: token, id: crypto.randomUUID() } : {};
+}
+
+function initialize(obr) {
+  const token = byId("token");
+  const tokenInput = new URLSearchParams(location.search).get("token");
+  const results = byId("results");
+  const customize = byId("customize");
+  const editor = byId("definition");
+  const fields = editor.elements;
+  const feedback = byId("feedback");
+  const menu = byId("entry-menu");
+  const menuEdit = menu.querySelector("button");
+  const views = [...document.querySelectorAll("nav button")];
+  const enable = byId("enable-skills");
+  const friendly = byId("friendly-fire");
+  const teams = byId("teams");
+  let config = {};
+  let tokens = new Map();
+  let allowed = false;
+  let saving = false;
+  let editing;
+  let customEntry;
+  let menuEntry;
+  let revision = 0;
+  let scene = 0;
+  let firstLoad = true;
+  let roster;
+
+  const showStats = setupStatsEditor(obr, byId("stats").querySelector("form"), { gm: true });
+  const close = () => void obr.modal.close(ASSIGNMENT_MODAL).catch(console.error);
+  byId("close").addEventListener("click", close);
+  const closeMenu = () => { menu.hidden = true; menuEntry = undefined; };
+  document.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape") return;
+    if (!menu.hidden) {
+      const origin = menuEntry?.trigger;
+      closeMenu();
+      origin?.focus();
+    } else close();
+  });
+  document.addEventListener("pointerdown", (event) => { if (!menu.contains(event.target)) closeMenu(); });
+
+  const showView = (name) => {
+    for (const tab of views) {
+      const active = tab.getAttribute("aria-controls") === name;
+      tab.setAttribute("aria-pressed", String(active));
+      byId(tab.getAttribute("aria-controls")).hidden = !active;
+    }
+    closeMenu();
+  };
+  for (const tab of views) tab.addEventListener("click", () => showView(tab.getAttribute("aria-controls")));
+
+  choices(friendly, FRIENDLY_FIRE_MODES.map((mode) => [mode, mode === "aoe" ? "Area effects only" : mode === "enabled" ? "Enabled" : "Disabled"]));
+  choices(fields.damageType, DAMAGE_TYPES.map((type) => [type, type]));
+  choices(fields.modifier, Object.entries(DAMAGE_MODIFIERS));
+  choices(fields.saveAbility, [["", "None"], ...Object.entries(ABILITIES)]);
+  const teamControls = new Map(TEAMS.map((name) => {
+    const label = make("label", undefined, "check");
+    const input = make("input");
+    input.type = "checkbox";
+    label.append(input, name);
+    teams.append(label);
+    input.addEventListener("change", () => {
+      const checked = input.checked;
+      void save((next, id) => {
+        const assigned = new Set(tokenTeams(next, id));
+        if (checked) assigned.add(name);
+        else assigned.delete(name);
+        next.teamsByToken = { ...next.teamsByToken, [id]: [...assigned] };
+      }, { tokenRequired: true });
+    });
+    return [name, input];
+  }));
+  function render() {
+    enable.disabled = friendly.disabled = token.disabled = !allowed || saving;
+    enable.checked = config.enabled === true;
+    friendly.value = friendlyFireMode(config);
+    for (const [name, input] of teamControls) {
+      input.disabled = !allowed || !token.value || saving;
+      input.checked = tokenTeams(config, token.value).includes(name);
+    }
+    byId("save-definition").disabled = saving || !allowed;
+    showStats(tokens.get(token.value), allowed);
+    for (const input of customize.elements) input.disabled = saving || !allowed;
+    renderResults();
+  }
+
+  function renderResults() {
+    const filter = document.querySelector('input[name="filter"]:checked').value;
+    const search = byId("search").value.trim().toLowerCase().split(/\s+/);
+    const entries = catalogEntries(config)
+      .filter(({ id, kind, category = kind, name }) => (!filter || filter === category || filter === "skill" && kind === "ability") &&
+        search.every((word) => [name, labels[category], id].join(" ").toLowerCase().includes(word)))
+      .sort((left, right) => left.name.localeCompare(right.name) || left.kind.localeCompare(right.kind));
+    byId("empty").hidden = entries.length > 0;
+    const focused = document.activeElement?.closest?.("li[data-entry]");
+    const target = focused && { id: focused.dataset.entry, control: document.activeElement.dataset.control };
+    const rows = entries.map((entry) => {
+      const { id, kind, name, category = kind } = entry;
+      const row = make("li");
+      row.dataset.entry = kind + ":" + id;
+      const assigned = entry.always || grantedIds(config, kind, token.value).includes(id);
+      const fixed = entry.always || id === DEFAULT_WEAPON;
+      const saved = config.spellParametersByToken?.[token.value]?.[id];
+      const styled = Boolean(entry.fields?.length && assigned &&
+        (typeof saved === "number" ? saved !== SKILLS[id].parameter?.defaultValue :
+          entry.fields.some((field) => saved?.[field] !== undefined && saved[field] !== SKILLS[id][field].defaultValue)));
+      const check = make("input");
+      check.type = "checkbox";
+      check.dataset.control = "grant";
+      check.checked = Boolean(token.value && assigned);
+      check.disabled = saving || !allowed || !token.value || fixed;
+      check.setAttribute("aria-label", (fixed ? "Always available: " : "Grant ") + name);
+      check.addEventListener("change", () => {
+        const checked = check.checked;
+        void save((next, targetId) => updateGrant(next, targetId, entry, checked), { tokenRequired: true });
+      });
+      const label = entry.fields?.length
+        ? button(name, () => openCustomization(entry), "entry-name")
+        : make("div", name, "entry-text");
+      label.append(make("small", labels[category]));
+      if (entry.fields?.length) {
+        label.dataset.control = "options";
+        label.disabled = check.disabled;
+        label.setAttribute("aria-pressed", String(id === customEntry?.id));
+        label.setAttribute("aria-label", "Configure " + name);
+        check.title = "Quick grant with default settings";
+      }
+      row.append(check, label);
+      if (styled) {
+        const mark = make("span", "✓✧", "configured");
+        mark.title = "Granted with custom settings";
+        mark.setAttribute("aria-label", mark.title);
+        row.append(mark);
+      } else if (isWeapon(kind) || isAbility(kind)) {
+        const edit = button("Edit", () => editDefinition(entry), "edit");
+        edit.dataset.control = "edit";
+        edit.setAttribute("aria-label", "Edit " + name);
+        row.append(edit);
+        row.addEventListener("contextmenu", (event) => {
+          event.preventDefault();
+          menuEntry = { entry, trigger: edit };
+          menu.style.left = Math.max(0, Math.min(event.clientX || edit.getBoundingClientRect().left, innerWidth - 100)) + "px";
+          menu.style.top = Math.max(0, Math.min(event.clientY || edit.getBoundingClientRect().bottom, innerHeight - 55)) + "px";
+          menu.hidden = false;
+          menuEdit.focus();
+        });
+      }
+      return row;
+    });
+    results.replaceChildren(...rows);
+    if (target?.control) rows.find((row) => row.dataset.entry === target.id)
+      ?.querySelector('[data-control="' + target.control + '"]')?.focus({ preventScroll: true });
+  }
+
+  function hideCustomization() {
+    customEntry = undefined;
+    customize.replaceChildren();
+    customize.hidden = true;
+    byId("rules").hidden = false;
+  }
+
+  function openCustomization(entry) {
+    customEntry = entry;
+    customize.replaceChildren(make("h2", entry.name));
+    for (const field of entry.fields) {
+      const parameter = SKILLS[entry.id][field];
+      const label = make("label", parameter.label);
+      const input = make("input");
+      input.name = field;
+      input.type = "number";
+      input.step = parameter.integer ? "1" : "any";
+      input.min = parameter.min;
+      input.placeholder = String(parameter.defaultValue);
+      input.value = spellParameter(config, token.value, entry.id, field);
+      label.append(input);
+      customize.append(label);
+    }
+    const actions = make("div", undefined, "form-actions");
+    const submit = make("button", "Grant");
+    submit.type = "submit";
+    actions.append(submit, button("Cancel", () => { hideCustomization(); renderResults(); }));
+    customize.append(actions);
+    customize.hidden = false;
+    byId("rules").hidden = true;
+    renderResults();
+    customize.querySelector("input")?.focus({ preventScroll: true });
+  }
+
+  customize.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const entry = customEntry;
+    if (!entry) return;
+    const parameters = {};
+    for (const field of entry.fields) {
+      const input = customize.elements.namedItem(field);
+      if (!input.value) continue;
+      if (!validSpellParameter(entry.id, input.valueAsNumber, field)) {
+        feedback.textContent = "Check the numbers for " + entry.name + ".";
+        return;
+      }
+      if (input.valueAsNumber !== SKILLS[entry.id][field].defaultValue) parameters[field] = input.valueAsNumber;
+    }
+    void save((next, id) => updateGrant(next, id, entry, true, parameters), {
+      tokenRequired: true, after: () => { if (customEntry === entry) hideCustomization(); },
+    });
+  });
+
+  function editorType(animation, sound) {
+    const kind = fields.kind.value;
+    const weapon = isWeapon(kind);
+    const usesWeapon = !weapon && fields.uses.value !== "none";
+    byId("weapon-fields").hidden = byId("weapon-fields").disabled = !weapon;
+    byId("skill-fields").hidden = byId("skill-fields").disabled = weapon;
+    byId("cast-range").hidden = usesWeapon;
+    fields.range.disabled = usesWeapon;
+    byId("damage-type").hidden = usesWeapon;
+    byId("additional-damage").hidden = !usesWeapon;
+    fields.dice.required = weapon;
+    if (!weapon) return;
+    const options = Object.entries(kind === "weapon" ? WEAPONS : RANGED_WEAPONS);
+    choices(fields.animation, options);
+    fields.animation.value = options.some(([id]) => id === animation) ? animation : options[0][0];
+    const cues = motifSoundEffects();
+    if (sound && !cues.has(sound)) cues.set(sound, sound + " (unavailable)");
+    choices(fields.sound, [["", "None"], ...cues]);
+    fields.sound.value = sound ?? "";
+  }
+
+  function startDefinition(entry) {
+    editing = entry;
+    editor.reset();
+    const definition = entry && (isWeapon(entry.kind) ? weaponDefinition(config, entry.kind, entry.id) : config.catalog?.[entry.id]);
+    fields.kind.disabled = Boolean(definition);
+    fields.kind.value = definition?.kind ?? "weapon";
+    byId("editor-title").textContent = definition ? "Edit " + definition.name : "Create a definition";
+    fields.name.value = definition?.name ?? "";
+    fields.dice.value = definition?.dice ? definition.dice.count + "d" + definition.dice.sides : "";
+    fields.damageType.value = definition?.damageType ?? "slashing";
+    fields.modifier.value = definition?.modifier ?? "str";
+    fields.damageBonus.value = definition?.damageBonus ?? 0;
+    fields.hitBonus.value = definition?.hitBonus ?? 0;
+    fields.uses.value = definition?.uses ?? "none";
+    fields.saveAbility.value = definition?.saveAbility ?? "";
+    fields.range.value = definition?.range ?? 6;
+    editorType(definition?.animation, definition?.sound);
+  }
+  function editDefinition(entry) {
+    startDefinition(entry);
+    showView("create");
+    fields.name.focus();
+  }
+  menuEdit.addEventListener("click", () => { if (menuEntry) editDefinition(menuEntry.entry); });
+  byId("new-definition").addEventListener("click", () => { startDefinition(); fields.name.focus(); });
+  fields.kind.addEventListener("change", () => {
+    if (fields.kind.value === "ranged-weapon") {
+      fields.modifier.value = "dex";
+      fields.damageType.value = "piercing";
+    } else if (fields.kind.value === "weapon") {
+      fields.modifier.value = "str";
+      fields.damageType.value = "slashing";
+    }
+    editorType(undefined, fields.sound.value);
+  });
+  fields.uses.addEventListener("change", () => editorType());
+  editor.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const entry = editing;
+    const kind = fields.kind.value;
+    const name = fields.name.value.trim();
+    let definition;
+    try {
+      if (!name || !Object.hasOwn(labels, kind) || kind === "spell") throw Error("Enter a name and choose a definition type.");
+      const weapon = isWeapon(kind);
+      const dice = parseDamageDice(fields.dice.value, !weapon);
+      definition = { name, kind, dice, damageType: fields.damageType.value };
+      if (weapon) {
+        const modifier = fields.modifier.value;
+        const damageBonus = fields.damageBonus.valueAsNumber;
+        const hitBonus = fields.hitBonus.valueAsNumber;
+        const animation = fields.animation.value;
+        if (![damageBonus, hitBonus].every((value) => Number.isInteger(value) && Math.abs(value) <= 99) ||
+            !Object.hasOwn(DAMAGE_MODIFIERS, modifier) || !Object.hasOwn(kind === "weapon" ? WEAPONS : RANGED_WEAPONS, animation)) {
+          throw Error("Choose an animation and enter whole-number bonuses from −99 to 99.");
+        }
+        Object.assign(definition, { modifier, damageBonus, hitBonus, animation, sound: fields.sound.value });
+      } else {
+        Object.assign(definition, {
+          uses: fields.uses.value, saveAbility: fields.saveAbility.value || undefined,
+          ...(fields.uses.value === "none" ? { range: fields.range.valueAsNumber } : {}),
+        });
+        if (!customSkill(definition)) throw Error("Set a valid range and add damage or a saving throw for a standalone skill.");
+      }
+    } catch (error) {
+      feedback.textContent = error.message;
+      return;
+    }
+    const id = entry?.id ?? "custom-" + crypto.randomUUID();
+    void save((next) => {
+      next.catalog = { ...next.catalog, [id]: definition };
+    }, { after: () => { if (editing === entry) startDefinition({ id, kind, name }); }, message: name + " saved." });
+  });
+
+  async function save(change, { tokenRequired = false, after, message = "Saved." } = {}) {
+    if (saving || !allowed) return;
+    const id = token.value;
+    const version = scene;
+    saving = true;
+    feedback.textContent = "";
+    render();
+    try {
+      const { self, gm } = await skillConnections(obr);
+      if (self.role !== "GM" || gm?.connectionId !== self.connectionId) throw Error("The active skills GM must save changes.");
+      if (tokenRequired && (!id || !(await obr.scene.items.getItems([id])).some(isCharacter))) {
+        throw Error("Choose a character in the open scene.");
+      }
+      if (scene !== version || !allowed) throw Error("The scene or your GM access changed.");
+      const next = readSkills(obr, "gm");
+      const grant = change(next, id);
+      writeSkills(obr, "gm", next);
+      config = next;
+      after?.();
+      await obr.broadcast.sendMessage(SKILL_CHANGED, grant?.id ? { grant } : {}, { destination: "ALL" });
+      feedback.textContent = message;
+    } catch (error) {
+      feedback.textContent = error.message || "Couldn’t save changes.";
+    } finally {
+      saving = false;
+      render();
+    }
+  }
+
+  async function refresh() {
+    const requested = ++revision;
+    try {
+      const [{ self, gm }, ready] = await Promise.all([skillConnections(obr), obr.scene.isReady()]);
+      if (requested !== revision) return;
+      allowed = self.role === "GM" && gm?.connectionId === self.connectionId && ready;
+      byId("access").hidden = allowed;
+      byId("workspace").hidden = !allowed;
+      if (!allowed) {
+        tokens.clear();
+        roster = undefined;
+        token.replaceChildren();
+        showStats(undefined, false);
+        byId("access").textContent = self.role !== "GM" ? "GM access required."
+          : !ready ? "Open a scene to assign skills and equipment." : "Another connected GM is handling skills.";
+        return;
+      }
+      const [items, selection] = await Promise.all([
+        obr.scene.items.getItems(isCharacter), firstLoad && !tokenInput ? obr.player.getSelection() : [],
+      ]);
+      if (requested !== revision) return;
+      const selected = firstLoad ? tokenInput || (selection?.length === 1 ? selection[0] : "") : token.value;
+      firstLoad = false;
+      config = readSkills(obr, "gm");
+      tokens = new Map(items.sort((a, b) => (a.name || "").localeCompare(b.name || "")).map((item) => [item.id, item]));
+      const options = [...tokens.values()].map(({ id, name }) => [id, name || "Unnamed character"]);
+      const nextRoster = JSON.stringify(options);
+      if (roster !== nextRoster) {
+        choices(token, [["", "Choose a character"], ...options]);
+        roster = nextRoster;
+      }
+      token.value = tokens.has(selected) ? selected : "";
+      if (!token.value) hideCustomization();
+      render();
+    } catch (error) {
+      if (requested !== revision) return;
+      allowed = false;
+      byId("access").hidden = false;
+      byId("access").textContent = "Couldn’t load the assignment window.";
+      byId("workspace").hidden = true;
+      console.error(error);
+    }
+  }
+  const reload = () => void refresh();
+  enable.addEventListener("change", () => {
+    const checked = enable.checked;
+    void save((next) => { next.enabled = checked; });
+  });
+  friendly.addEventListener("change", () => {
+    const mode = friendly.value;
+    if (FRIENDLY_FIRE_MODES.includes(mode)) void save((next) => { next.friendlyFire = mode; });
+  });
+  token.addEventListener("change", () => { hideCustomization(); feedback.textContent = ""; render(); });
+  byId("search").addEventListener("input", renderResults);
+  document.querySelector(".filters").addEventListener("change", renderResults);
+  obr.player.onChange(({ role }) => { if (role !== "GM" || !allowed) reload(); });
+  obr.party.onChange(reload);
+  obr.scene.onReadyChange(() => { scene++; hideCustomization(); reload(); });
+  obr.scene.items.onChange((items) => {
+    if (!allowed) return;
+    const characters = items.filter(isCharacter);
+    const rosterChanged = characters.length !== tokens.size ||
+      characters.some(({ id, name }) => !tokens.has(id) || tokens.get(id).name !== name);
+    if (rosterChanged) reload();
+    else {
+      tokens = new Map(characters.map((item) => [item.id, item]));
+      showStats(tokens.get(token.value), allowed);
+    }
+  });
+  startDefinition();
+  reload();
+}
+
+OBR.onReady(() => initialize(OBR));

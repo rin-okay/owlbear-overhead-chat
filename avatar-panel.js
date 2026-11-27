@@ -1,7 +1,7 @@
 import OBR from "./obr.js";
 import { setupAvatarCreator } from "./avatar-creator.js?v=3.0.2";
 import { BUILTIN_EMOTES } from "./emotes.js?v=2.7.21";
-import { SKILLS, SPELLS } from "./skills.js?v=2.11.12";
+import { SKILLS } from "./skills.js?v=3.1.0";
 import { isPublicToken } from "./rules.js";
 import {
   savedAvatarSlots, saveAvatarSlot, savedAvatarMode, saveAvatarMode,
@@ -260,7 +260,7 @@ function setupQuickbar(panel, openDialog) {
     return updateSpells;
   });
   return (available) => {
-    const next = SPELLS.filter((id) => available.includes(id));
+    const next = available.filter((id) => id !== "spear" && id !== "ranged" && Object.hasOwn(SKILLS, id));
     if (next.join() === spells.join()) return;
     spells = next;
     renderSpells.forEach((update) => update());

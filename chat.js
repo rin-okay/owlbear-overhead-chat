@@ -1,3 +1,4 @@
+import { openAssignment } from "./assignment-window.js?v=3.1.0";
 import OBR from "./obr.js";
 import {
   ABOVE_FOG, AVATAR, GENERAL_CHAT_ROOM, HABBO_MODE, HABBO_SCALE, MELEE_HIT_TIMING, ROLL_DAMAGE_FROM_COMBAT_LOG, RUMBLE_DICE, SPEECH,
@@ -11,12 +12,12 @@ import {
 
 import { drawBubble, normalizeAppearance, prepareBubbleFont } from "./appearance.js?v=2.7.9";
 import { setupDiscordPanel } from "./discord-panel.js?v=3.0.2";
-import { damageNotation, openCombatLog, saveNotation, toggleCombatLog } from "./combat-log.js?v=3.0.2";
-import { aimsAtLocation, artworkFacingAngle, MAX_CAST_LEVEL, SKILLS, turnToHeading } from "./skills.js?v=2.11.12";
-import { ABILITIES, readTokenStats } from "./stats.js?v=2.8.5";
-import { setupAvatarPanel } from "./avatar-panel.js?v=3.0.2";
-import { setupSkillGrants, setupSkillPanel } from "./skill-panel.js?v=2.11.16";
-import { setupStatsEditor } from "./stats-panel.js?v=2.8.5";
+import { damageNotation, openCombatLog, saveNotation, toggleCombatLog } from "./combat-log.js?v=3.1.0";
+import { aimsAtLocation, artworkFacingAngle, MAX_CAST_LEVEL, SKILLS, turnToHeading } from "./skills.js?v=3.1.0";
+import { ABILITIES, readTokenStats } from "./stats.js?v=3.1.0";
+import { setupAvatarPanel } from "./avatar-panel.js?v=3.1.0";
+import { setupSkillPanel } from "./skill-panel.js?v=3.1.0";
+import { setupStatsEditor } from "./stats-panel.js?v=3.1.0";
 import { EMOTE } from "./emotes.js?v=2.7.21";
 import { setupTargeting } from "./targeting.js?v=2.11.15";
 import { listenForChatShortcut, requestChatShortcut } from "./chat-shortcut.js?v=2.11.0";
@@ -24,11 +25,11 @@ import { cameraFollowPreference, centerAvatar, panCameraStep, prepareKeyboardPan
 
 import { readMovementGrid, stepAvatar, turnAvatar } from "./movement.js?v=2.7.5";
 import { rollSpans, validateRollSpans } from "./dice.js";
-import { rollWithRumble } from "./rumble.js?v=2.9.4";
+import { rollWithRumble } from "./rumble.js?v=3.1.0";
 import { rollWithNativeDice } from "./native-dice.js";
-import { hotbarOrientation, hotbarShowsLabels, sendHotbarCommand, setHotbarLabels, setHotbarOrientation } from "./hotbar.js?v=2.11.16";
-import { actionForChord, actionForEvent, bindingLabel, editableTarget, eventChord, keyIdentity, keyboardProfile, modifierMask } from "./key-bindings.js?v=2.11.16";
-import { handleRoomKey, openKeyboard } from "./keyboard-shortcuts.js?v=2.11.16";
+import { hotbarOrientation, hotbarShowsLabels, sendHotbarCommand, setHotbarLabels, setHotbarOrientation } from "./hotbar.js?v=3.1.0";
+import { actionForChord, actionForEvent, bindingLabel, editableTarget, eventChord, keyIdentity, keyboardProfile, modifierMask } from "./key-bindings.js?v=3.1.0";
+import { handleRoomKey, openKeyboard } from "./keyboard-shortcuts.js?v=3.1.0";
 
 const combatView = new URLSearchParams(location.search).has("combat-log");
 const combatWindow = combatView ? document.querySelector("#combat-window") : null;
@@ -55,7 +56,7 @@ if (combatWindow) {
   stylesheet.rel = "stylesheet";
   stylesheet.href = new URL("./combat-log.css?v=2.9.16", import.meta.url).href;
   document.head.append(stylesheet);
-  void import("./combat-log-panel.js?v=2.11.19")
+  void import("./combat-log-panel.js?v=3.1.0")
     .then(({ setCombatRollers }) => setCombatRollers(rollCombatSave, rollCombatDamage)).catch(console.error);
 }
 
@@ -739,7 +740,7 @@ function handleAimKey(event, action) {
   const mode = tokenControl;
   if (!action?.aim || !mode || mode.switching || !targeting) return false;
   const skill = boundSkill(action);
-  if (!Number.isInteger(SKILLS[skill]?.spellLevel) || !aimsAtLocation(skill) ||
+  if ((!Number.isInteger(SKILLS[skill]?.spellLevel) && !SKILLS[skill]?.custom) || !aimsAtLocation(skill) ||
       !skillPanel?.hasSkill(skill) || (action.upcast && !SKILLS[skill].upcast)) return false;
   if (!event.repeat) useSkillKey(mode, skill, action.upcast, true, modifierMask(event));
   return true;
@@ -1054,7 +1055,8 @@ async function rollFromCombatLog(entryId, tokenId, kind, prepare) {
 async function finishRoll(message, spans) {
   let resolution;
   try {
-    const useRumble = (await OBR.room.getMetadata())[RUMBLE_DICE] === true;
+    const useRumble = (await OBR.room.getMetadata())[RUMBLE_DICE] === true &&
+      (message.combatRoll?.kind !== "damage" || spans.every(({ notation }) => !/d(?!4\b|6\b|8\b|10\b|12\b|20\b)\d/i.test(notation)));
     if (useRumble) {
       const rolls = [];
       for (const { notation } of spans) rolls.push(await rollWithRumble(notation, message.combatRoll?.kind === "damage"));
@@ -1282,18 +1284,15 @@ function setupSettings() {
   const { refresh: updateAvatarPanel, showSpells } = setupAvatarPanel(avatarPanel, openPanelDialog);
   refreshAvatarPanel = (items) => updateAvatarPanel(items, playerRole);
   skillPanel = setupSkillPanel(OBR, () => avatar, showSpells, (text) => sendChatNotice?.(text), updateMoveModeLabel);
-  const refreshSkillGrants = setupSkillGrants(OBR);
   const loadoutTab = document.querySelector("#skill-loadout-tab");
   const statsTab = document.querySelector("#skill-stats-tab");
   const grantsTab = document.querySelector("#skill-grants-tab");
   const loadout = document.querySelector("#player-skills");
   const stats = document.querySelector("#player-stats");
-  const grants = document.querySelector("#gm-skills");
   showPlayerStats = setupStatsEditor(OBR, stats.querySelector("form"));
   const skillViews = [
     { tab: loadoutTab, panel: loadout },
     { tab: statsTab, panel: stats },
-    { tab: grantsTab, panel: grants },
   ];
   let skillView = 0;
   function selectSkillView(index) {
@@ -1303,14 +1302,18 @@ function setupSettings() {
       tab.setAttribute("aria-pressed", String(!panel.hidden));
     });
     if (skillsPanel.hidden) return;
-    if (skillView === 2) void refreshSkillGrants();
-    else if (skillView === 0) skillPanel.refresh(avatar, true);
+    if (skillView === 0) skillPanel.refresh(avatar, true);
   }
   showSkillsForRole = (role) => {
     grantsTab.hidden = role !== "GM";
-    if (grantsTab.hidden && skillView === 2) selectSkillView(0);
   };
   skillViews.forEach(({ tab }, index) => tab.addEventListener("click", () => selectSkillView(index)));
+  grantsTab.addEventListener("click", () => {
+    void openPanelDialog(() => openAssignment(OBR)).catch((error) => {
+      console.error("Overhead Chat assignment", error);
+      status.textContent = "Couldn’t open GM assignment.";
+    });
+  });
   const fields = settingsPanel.querySelector("form");
   const preview = settingsPanel.querySelector("#bubble-preview");
   const fontPicker = fields.elements.namedItem("font");

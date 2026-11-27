@@ -1,4 +1,4 @@
-import { readTokenStats } from "./stats.js?v=2.7.21";
+import { readTokenStats } from "./stats.js?v=3.1.0";
 
 export const MAGIC_MISSILE_INTERVAL = 200;
 export const MAGIC_MISSILE_MAX_LEVEL = 9;

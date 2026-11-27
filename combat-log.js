@@ -1,4 +1,5 @@
-import { SKILLS, skillConnections } from "./skills.js?v=2.11.12";
+import { CUSTOM_ID, diceGroups } from "./combat-catalog.js?v=3.1.0";
+import { SKILLS, skillConnections } from "./skills.js?v=3.1.0";
 
 export const COMBAT_POPOVER = "chat.overhead.combat-log.v1";
 const COMBAT_EVENT = "chat.overhead.combat-event.v1";
@@ -54,7 +55,7 @@ export async function openCombatLog(obr) {
   const [width, height] = await Promise.all([obr.viewport.getWidth(), obr.viewport.getHeight()]);
   await obr.popover.open({
     id: COMBAT_POPOVER,
-    url: new URL("./index.html?v=3.0.2&combat-log=1", import.meta.url).href,
+    url: new URL("./index.html?v=3.1.0&combat-log=1", import.meta.url).href,
     width: Math.max(1, Math.min(380, width - 24)), height: Math.max(1, Math.min(340, height - 64)),
     anchorReference: "POSITION",
     anchorOrigin: { horizontal: "LEFT", vertical: "TOP" },
@@ -74,6 +75,7 @@ export function combatDamage(rolls) {
     type: first.type,
     dice: rolls.flatMap((roll) => roll.dice ?? []),
     sides: first.sides,
+    groups: first.groups,
     modifier: rolls.reduce((sum, roll) => sum + (roll.modifier ?? 0), 0),
   };
 }
@@ -86,13 +88,16 @@ export function formatCombatDamage(damage) {
   const total = damage.amount + " " + damage.type + " damage";
   const rolled = damage.dice.reduce((sum, die) => sum + die, damage.modifier);
   const result = rolled < 0 ? " → " : " = ";
-  return damage.dice.length ? damage.dice.length + "d" + damage.sides + signed + " = " + terms + result + total : total;
+  return damage.dice.length
+    ? damageNotation({ ...damage, count: damage.dice.length }) + " = " + terms + result + total : total;
 }
 
-export function damageNotation({ count, sides, modifier }, spaced = false) {
-  const operator = modifier < 0 ? "-" : "+";
-  return count + "d" + sides + (modifier
-    ? (spaced ? " " + operator + " " : operator) + Math.abs(modifier) : "");
+export function damageNotation(formula, spaced = false) {
+  const plus = spaced ? " + " : "+";
+  const minus = spaced ? " - " : "-";
+  const { modifier } = formula;
+  return diceGroups(formula).map(({ count, sides }) => count + "d" + sides).join(plus) +
+    (modifier ? (modifier < 0 ? minus : plus) + Math.abs(modifier) : "");
 }
 
 export function saveNotation(modifier, mode) {
@@ -102,13 +107,19 @@ export function saveNotation(modifier, mode) {
 
 function damageFromRoll(formula, roll) {
   if (roll?.notation !== damageNotation(formula) || !Array.isArray(roll.breakdown)) return;
-  const { count, sides, type, modifier } = formula;
+  const { sides, type, groups, modifier = 0 } = formula;
+  let count = 0;
+  for (const group of diceGroups(formula)) {
+    for (let i = 0; i < group.count; i++) {
+      const die = roll.breakdown[count++];
+      if (!Number.isInteger(die) || die < 1 || die > group.sides) return;
+    }
+  }
   const dice = roll.breakdown.slice(0, count);
   if (roll.breakdown.length !== count + Number(modifier !== 0) ||
       (modifier !== 0 && roll.breakdown[count] !== modifier) ||
-      !dice.every((die) => Number.isInteger(die) && die >= 1 && die <= sides) ||
       dice.reduce((sum, die) => sum + die, modifier) !== roll.total) return;
-  return { amount: Math.max(0, roll.total), type, dice, sides, modifier };
+  return { amount: Math.max(0, roll.total), type, dice, sides, groups, modifier };
 }
 
 export function setupCombatLog(obr) {
@@ -169,7 +180,7 @@ export function setupCombatLog(obr) {
     const version = sceneVersion;
     const update = data?.type === "roll";
     const entry = typeof data?.id === "string" && /^[0-9a-f-]{36}(?:\.\d+)?$/i.test(data.id) &&
-      Object.hasOwn(SKILLS, data.skill) && Array.isArray(data.hits) && data.hits.length <= 20;
+      (Object.hasOwn(SKILLS, data.skill) || typeof data.skill === "string" && CUSTOM_ID.test(data.skill)) && Array.isArray(data.hits) && data.hits.length <= 20;
     if (update ? !combatId(data.id) : !entry) return;
     incoming = incoming.then(async () => {
       const [{ gm }, ready] = await Promise.all([skillConnections(obr), obr.scene.isReady()]);
@@ -180,7 +191,7 @@ export function setupCombatLog(obr) {
     return incoming;
   });
 
-  async function record({ requestId, caster, skill, level, selected, hits = [], damage, damageFormula, action, attack = false }) {
+  async function record({ requestId, caster, skill, level, selected, hits = [], damage, damageFormula, action, attack = false, definition = SKILLS[skill] }) {
     const version = sceneVersion;
     const targets = [...new Map(hits.map((token) => [token.id, { id: token.id, name: name(token.name) }])).values()];
     const groups = [];
@@ -191,10 +202,10 @@ export function setupCombatLog(obr) {
         if (version !== sceneVersion) break;
         const entry = {
           id: index ? requestId + "." + index : requestId,
-          actor: name(caster.name), casterId: caster.id, skill, action: action || SKILLS[skill].name, level, attack,
+          actor: name(caster.name), casterId: caster.id, skill, action: action || definition.name, level, attack,
           selected: selected ? { id: selected.id, name: name(selected.name) } : undefined,
           hits: group,
-          saveAbility: SKILLS[skill].saveAbility,
+          saveAbility: definition.saveAbility,
           damage, damageFormula,
         };
         receive(entry);

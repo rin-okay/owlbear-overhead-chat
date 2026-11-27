@@ -1,23 +1,25 @@
-import { reachableTargets, targetGeometry } from "./target-cycle.js?v=2.11.15";
+import { reachableTargets, targetGeometry } from "./target-cycle.js?v=3.1.0";
 import { addHeartEffects } from "./heart-spells.js?v=2.11.12";
 import { setupBless } from "./bless.js?v=2.9.14";
-import { combatDamage } from "./combat-log.js?v=2.11.12";
+import { combatDamage } from "./combat-log.js?v=3.1.0";
 import { isShieldGraphic, readShieldGraphics, setupShield } from "./shield.js?v=2.9.15";
 import { setupSleep } from "./sleep.js?v=2.9.15";
 import { canSpeak, MELEE_HIT_TIMING, normalizeMeleeHitTiming, ROLL_DAMAGE_FROM_COMBAT_LOG } from "./rules.js?v=2.9.4";
 import {
   areaHits, clearSpellPath, coneHits, isProjectileToken, isProjectileWall, openMeleeDoor, projectileImpact, projectileTokenContainsPoint, teleportLandingClear,
 } from "./projectile-collision.js?v=2.10.2";
-import { HIT_MARKERS, MELEE_HIT_CUE } from "./hit-markers.js?v=2.9.4";
-import { meleeDamageFormula, rangedDamageFormula, rollMeleeDamage, rollRangedDamage } from "./melee-damage.js?v=2.9.11";
-import { readTokenStats } from "./stats.js?v=2.8.5";
+import { HIT_MARKERS, MELEE_HIT_CUE } from "./hit-markers.js?v=3.1.0";
+import { attackDamageFormula, weaponDefinition } from "./melee-damage.js?v=3.1.0";
+import { CUSTOM_ID, rollAttackDamage } from "./combat-catalog.js?v=3.1.0";
+import { playWeaponSound } from "./motif-cues.js?v=3.1.0";
+import { readTokenStats } from "./stats.js?v=3.1.0";
 import {
   BLOCKED_MAGIC_MISSILE, MAGIC_MISSILE_INTERVAL, rollMagicMissileDart, rollSpellDamage, spellDamageFormula,
 } from "./spell-damage.js?v=2.9.13";
 import {
-  DEFAULT_WEAPON, EMBERS_EFFECTS, MAX_CAST_LEVEL, MELEE_DURATION_MS, RANGED_WEAPONS, SKILLS, SKILL_REQUEST, SKILL_RESULT, WEAPONS,
-  aimsAtLocation, availableRangedWeapons, availableSkills, availableWeapons, friendlyFireMode, readSkills, skillConnections, skillEffect, spellParameter, tokenTeams, turnToHeading,
-} from "./skills.js?v=2.11.12";
+  DEFAULT_WEAPON, EMBERS_EFFECTS, MAX_CAST_LEVEL, MELEE_DURATION_MS, SKILLS, SKILL_REQUEST, SKILL_RESULT,
+  availableRangedWeapons, availableSkills, availableWeapons, configuredSkill, friendlyFireMode, readSkills, skillConnections, skillEffect, spellParameter, tokenTeams, turnToHeading,
+} from "./skills.js?v=3.1.0";
 
 function aimAtTarget(source, target, range = 0, passThrough = false, maxRange = Infinity) {
   if (![target?.center?.x, target?.center?.y].every(Number.isFinite)) return;
@@ -76,7 +78,7 @@ export function setupSkillHost(obr, buildImage, recordCombat) {
   obr.broadcast.onMessage(SKILL_REQUEST, async ({ connectionId, data }) => {
     if (typeof data?.requestId !== "string" || !/^[a-f0-9-]{36}$/i.test(data.requestId) ||
         typeof data.tokenId !== "string" || !data.tokenId || data.tokenId.length > 128 ||
-        (data.type !== "list" && (!["cast", "targets"].includes(data.type) || !Object.hasOwn(SKILLS, data.skill)))) return;
+        (data.type !== "list" && (!["cast", "targets"].includes(data.type) || typeof data.skill !== "string" || (!Object.hasOwn(SKILLS, data.skill) && !CUSTOM_ID.test(data.skill))))) return;
     const version = sceneVersion;
     const answer = (result) => obr.broadcast.sendMessage(SKILL_RESULT, {
       ...result, connectionId, requestId: data.requestId, tokenId: data.tokenId,
@@ -96,10 +98,16 @@ export function setupSkillHost(obr, buildImage, recordCombat) {
       }
       const getLoadout = (config) => {
         const enabled = config.enabled === true;
+        const skills = availableSkills(config, token.id);
+        const weapons = enabled ? availableWeapons(config.weaponsByToken?.[token.id], config) : [];
+        const rangedWeapons = enabled ? availableRangedWeapons(config.rangedWeaponsByToken?.[token.id], config) : [];
+        const weaponLabels = Object.fromEntries([
+          ...weapons.map((id) => [id, weaponDefinition(config, "weapon", id).name]),
+          ...rangedWeapons.map((id) => [id, weaponDefinition(config, "ranged-weapon", id).name]),
+        ]);
         return {
-          enabled, skills: availableSkills(config, token.id),
-          weapons: enabled ? availableWeapons(config.weaponsByToken?.[token.id]) : [],
-          rangedWeapons: enabled ? availableRangedWeapons(config.rangedWeaponsByToken?.[token.id]) : [],
+          enabled, skills, weapons, rangedWeapons, weaponLabels,
+          customSkills: Object.fromEntries(skills.filter((id) => CUSTOM_ID.test(id)).map((id) => [id, config.catalog[id]])),
         };
       };
       const config = readSkills(obr, "gm");
@@ -108,18 +116,23 @@ export function setupSkillHost(obr, buildImage, recordCombat) {
         await answer(result);
         return;
       }
-      const skill = SKILLS[data.skill];
+      const skill = configuredSkill(config, data.skill);
+      if (!skill) {
+        await answer({ ...result, error: "That skill is unavailable." });
+        return;
+      }
+      const checksHit = Boolean(skill.range || skill.meleeReach || skill.cone);
       const granted = result.skills.includes(data.skill);
       if (data.type === "targets") {
         const level = skill.upcast ? data.spellLevel ?? skill.spellLevel : skill.spellLevel;
-        if (!granted || !aimsAtLocation(data.skill) || (!Number.isInteger(level) && level !== undefined) ||
+        if (!granted || !checksHit || (!Number.isInteger(level) && level !== undefined) ||
             level < skill.spellLevel || level > Math.min(skill.maxCastLevel ?? MAX_CAST_LEVEL, readTokenStats(token).details.spellLevel)) {
           await answer({ reachableIds: [] });
           return;
         }
         const geometry = await targetGeometry(obr, token.id);
         if (version === sceneVersion) {
-          await answer({ reachableIds: reachableTargets(geometry, token.id, data.skill, config).map(({ id }) => id) });
+          await answer({ reachableIds: reachableTargets(geometry, token.id, data.skill, config, skill).map(({ id }) => id) });
         }
         return;
       }
@@ -133,10 +146,10 @@ export function setupSkillHost(obr, buildImage, recordCombat) {
         await answer({ ...result, error: config.enabled ? "This avatar hasn’t been granted that skill." : "The GM hasn’t enabled skill hotkeys." });
         return;
       }
-      const ranged = data.skill === "ranged";
-      const weapon = data.weapon ?? (ranged ? undefined : DEFAULT_WEAPON);
+      const ranged = data.skill === "ranged" || skill.uses === "ranged-weapon";
+      const weapon = typeof data.weapon === "string" ? data.weapon : ranged ? undefined : DEFAULT_WEAPON;
       const weaponGranted = (loadout) => ranged ? loadout.rangedWeapons.includes(weapon)
-        : data.skill !== "spear" || loadout.weapons.includes(weapon);
+        : !skill.meleeReach || loadout.weapons.includes(weapon);
       if (!weaponGranted(result)) {
         await answer({ ...result, error: "This avatar hasn’t been granted that weapon." });
         return;
@@ -157,7 +170,8 @@ export function setupSkillHost(obr, buildImage, recordCombat) {
         return;
       }
       const logCast = (details) => version === sceneVersion && recordCombat?.({
-        requestId: data.requestId, caster: token, skill: data.skill, level: spellLevel, ...details,
+        requestId: data.requestId, caster: token, skill: data.skill, level: spellLevel,
+        definition: skill, ...details,
       });
       const now = Date.now();
       if (now - (lastCast.get(sender.id) ?? -Infinity) < 650) {
@@ -202,7 +216,6 @@ export function setupSkillHost(obr, buildImage, recordCombat) {
         return;
       }
       const projectile = Boolean(skill.range);
-      const checksHit = aimsAtLocation(data.skill);
       const geometry = checksHit ? Promise.all([
         obr.scene.items.getItems((item) => isProjectileWall(item) ||
           (skill.location !== "teleport" && isProjectileToken(item)) ||
@@ -224,8 +237,13 @@ export function setupSkillHost(obr, buildImage, recordCombat) {
         await answer({ ...latestLoadout, error: "This avatar no longer has that weapon." });
         return;
       }
+      if (skill.custom && JSON.stringify(config.catalog[data.skill]) !== JSON.stringify(latest.catalog?.[data.skill])) {
+        await answer({ ...latestLoadout, error: "This skill changed. Try again." });
+        return;
+      }
+      const equipped = ranged || skill.meleeReach ? weaponDefinition(latest, ranged ? "ranged-weapon" : "weapon", weapon) : undefined;
       const parameter = spellParameter(latest, token.id, data.skill);
-      const instruction = skillEffect(data.skill, token, bounds?.center, dpi, data.facing, weapon, parameter);
+      const instruction = skillEffect(data.skill, token, bounds?.center, dpi, data.facing, equipped?.animation, parameter, skill);
       if (!instruction) {
         await answer({ ...result, error: "Couldn’t determine avatar facing. Check the scene grid and facing setting." });
         return;
@@ -385,8 +403,8 @@ export function setupSkillHost(obr, buildImage, recordCombat) {
             });
           }
         } else {
-          const maxRange = eldritch || ranged || skill.heartMarker ? skill.range * dpi : Infinity;
-          const projectileSpell = projectile && Number.isInteger(skill.spellLevel);
+          const maxRange = eldritch || ranged || skill.heartMarker || skill.custom ? skill.range * dpi : Infinity;
+          const projectileSpell = projectile && (Number.isInteger(skill.spellLevel) || skill.custom && !ranged);
           const targetId = selectedBeams[0]?.id ?? data.targetId;
           const pointAim = aimAtTarget(source, { center: data.targetLocation }, 0, false, maxRange);
           let aimed = pointAim;
@@ -472,7 +490,7 @@ export function setupSkillHost(obr, buildImage, recordCombat) {
       }, { destination: "ALL" }).catch((error) => console.error("Overhead Chat hit markers", error));
       if (meleeHit) {
         const timing = normalizeMeleeHitTiming(metadata[MELEE_HIT_TIMING]);
-        const cueDelay = Math.round(MELEE_DURATION_MS[weapon] * timing / 100);
+        const cueDelay = Math.round(MELEE_DURATION_MS[equipped.animation] * timing / 100);
         const cue = { type: "action", id: "message", arguments: [MELEE_HIT_CUE, data.requestId, "LOCAL"] };
         if (timing === 100) {
           // Embers runs nested actions after it removes the finished effect.
@@ -480,14 +498,20 @@ export function setupSkillHost(obr, buildImage, recordCombat) {
         } else {
           instructions.push({ ...cue, delay: cueDelay });
         }
-        if (manual) damageFormula = meleeDamageFormula(weapon, token);
-        else damageRolls = [rollMeleeDamage(weapon, token)];
+        const formula = attackDamageFormula(equipped, skill, token);
+        if (manual) damageFormula = formula;
+        else damageRolls = [rollAttackDamage(formula)];
         await sendMarkers(cueDelay + 750, damageRolls?.[0], { useAnimationCue: true });
         if (version !== sceneVersion) return;
       }
-      await obr.broadcast.sendMessage(EMBERS_EFFECTS, {
-        instructions, spellData: { name: skill.name, caster: sender.id },
-      }, { destination: "ALL" });
+      if (equipped?.sound) {
+        void playWeaponSound(obr, equipped.sound, equipped.name, sender.id).catch(console.warn);
+      }
+      if (instruction.id) {
+        await obr.broadcast.sendMessage(EMBERS_EFFECTS, {
+          instructions, spellData: { name: skill.name, caster: sender.id },
+        }, { destination: "ALL" });
+      }
       if (doorId && version === sceneVersion) {
         await openMeleeDoor(obr, doorId, sender.role, () => version === sceneVersion)
           .catch((error) => console.error("Overhead Chat could not open the door", error));
@@ -531,13 +555,14 @@ export function setupSkillHost(obr, buildImage, recordCombat) {
           await sendMarkers(skill.hitDelay, damage, { missileFollowUps });
         }
       } else if (version === sceneVersion && hitTokenIds.length && !meleeHit && !skill.heartMarker) {
-        const formula = ranged ? rangedDamageFormula(token) : spellDamageFormula(skill, token, spellLevel);
+        const attack = ranged || skill.custom;
+        const formula = attack ? attackDamageFormula(equipped, skill, token) : spellDamageFormula(skill, token, spellLevel);
         if (manual) damageFormula = formula;
-        else if (formula) damageRolls = [ranged ? rollRangedDamage(token) : rollSpellDamage(formula)];
-        await sendMarkers(skill.impact?.delay ?? skill.hitDelay, damageRolls?.[0]);
+        else if (formula) damageRolls = [attack ? rollAttackDamage(formula) : rollSpellDamage(formula)];
+        if (formula || !skill.custom) await sendMarkers(skill.impact?.delay ?? skill.hitDelay, damageRolls?.[0]);
       }
       await logCast({
-        action: ranged ? RANGED_WEAPONS[weapon] : skill.meleeReach && weapon !== DEFAULT_WEAPON ? WEAPONS[weapon] : skill.name,
+        action: !skill.custom && equipped && (ranged || weapon !== DEFAULT_WEAPON || latest.catalog?.[weapon]) ? equipped.name : skill.name,
         attack: checksHit && skill.location !== "teleport",
         selected: logSelected, hits: hitTokens, damage: combatDamage(damageRolls), damageFormula,
       });

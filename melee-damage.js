@@ -1,4 +1,6 @@
-import { readTokenStats } from "./stats.js?v=2.7.18";
+import { DAMAGE_TYPES, combineDamage, rollAttackDamage } from "./combat-catalog.js?v=3.1.0";
+import { RANGED_WEAPONS, WEAPONS } from "./skills.js?v=3.1.0";
+import { readTokenStats } from "./stats.js?v=3.1.0";
 
 const bludgeoning = "bludgeoning";
 const piercing = "piercing";
@@ -34,7 +36,27 @@ export const MELEE_WEAPON_DAMAGE = {
   warhammer: { count: 1, sides: 8, type: bludgeoning },
   wrench: improvisedBlunt,
 };
-const types = new Set(Object.values(MELEE_WEAPON_DAMAGE).map(({ type }) => type));
+export function weaponDefinition(config, kind, id) {
+  const stock = kind === "weapon" ? WEAPONS : RANGED_WEAPONS;
+  const edited = config.catalog?.[id];
+  if (edited?.kind === kind) return edited;
+  if (!Object.hasOwn(stock, id)) return;
+  const damage = kind === "weapon" ? MELEE_WEAPON_DAMAGE[id] : { count: 1, sides: 8, type: piercing };
+  return {
+    kind, name: stock[id], animation: id, dice: { count: damage.count, sides: damage.sides },
+    damageType: damage.type, damageBonus: 0, hitBonus: 0,
+    modifier: kind === "ranged-weapon" ? "dex" : damage.finesse ? "finesse" : "str",
+    sound: "",
+  };
+}
+
+export function attackDamageFormula(weapon, skill, token) {
+  if (!weapon) return skill.dice ? { ...skill.dice, type: skill.damageType, modifier: 0 } : undefined;
+  const { str, dex } = readTokenStats(token).modifiers;
+  const stat = { str, dex, finesse: Math.max(str, dex), none: 0 }[weapon.modifier];
+  const formula = { ...weapon.dice, type: weapon.damageType, modifier: stat + weapon.damageBonus };
+  return combineDamage(formula, skill.dice);
+}
 
 export function meleeDamageFormula(weapon, token) {
   const { count, sides, type, finesse } = MELEE_WEAPON_DAMAGE[weapon];
@@ -48,20 +70,14 @@ export function rangedDamageFormula(token) {
 }
 
 export function rollMeleeDamage(weapon, token, random = Math.random) {
-  return rollWeaponDamage(meleeDamageFormula(weapon, token), random);
+  return rollAttackDamage(meleeDamageFormula(weapon, token), random);
 }
 
 export function rollRangedDamage(token, random = Math.random) {
-  return rollWeaponDamage(rangedDamageFormula(token), random);
-}
-
-function rollWeaponDamage({ count, sides, type, modifier }, random) {
-  const dice = Array.from({ length: count }, () => 1 + Math.floor(random() * sides));
-  const sum = dice.reduce((total, value) => total + value, 0);
-  return { amount: Math.max(0, sum + modifier), type, maxRoll: sum === count * sides, dice, sides, modifier };
+  return rollAttackDamage(rangedDamageFormula(token), random);
 }
 
 export function validMeleeDamage(damage) {
   return Number.isSafeInteger(damage?.amount) && damage.amount >= 0 &&
-    types.has(damage.type) && typeof damage.maxRoll === "boolean";
+    damage.amount <= 5000 && DAMAGE_TYPES.includes(damage.type) && typeof damage.maxRoll === "boolean";
 }

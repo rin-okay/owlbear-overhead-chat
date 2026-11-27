@@ -1,3 +1,5 @@
+import { CUSTOM_ID, customSkill } from "./combat-catalog.js?v=3.1.0";
+
 export const SKILL_REQUEST = "chat.overhead.skills/request.v1";
 export const SKILL_RESULT = "chat.overhead.skills/result.v1";
 export const SKILL_CHANGED = "chat.overhead.skills/changed.v1";
@@ -129,6 +131,55 @@ export const SKILLS = {
   },
 };
 export const SPELLS = Object.keys(SKILLS).filter((id) => id !== "spear" && id !== "ranged");
+export function configuredSkill(config, id) {
+  if (CUSTOM_ID.test(id)) return customSkill(config.catalog?.[id]);
+  return Object.hasOwn(SKILLS, id) ? SKILLS[id] : undefined;
+}
+
+export const skillCacheKey = (obr) => storageKey(obr, "known-custom-skills");
+let clientCacheRoom;
+let clientCacheRaw;
+let clientSkillGeneration = 0;
+const clientSkillIds = new Set();
+
+export function syncClientSkills(obr) {
+  const key = skillCacheKey(obr);
+  let raw;
+  try { raw = localStorage.getItem(key); } catch {}
+  if (key === clientCacheRoom && raw === clientCacheRaw) return clientSkillGeneration;
+  clientCacheRoom = key;
+  clientCacheRaw = raw;
+  for (const id of clientSkillIds) delete SKILLS[id];
+  clientSkillIds.clear();
+  for (const [id, definition] of Object.entries(readSkills(obr, "known-custom-skills"))) {
+    const skill = CUSTOM_ID.test(id) && customSkill(definition);
+    if (!skill) continue;
+    SKILLS[id] = skill;
+    clientSkillIds.add(id);
+  }
+  return ++clientSkillGeneration;
+}
+
+export function rememberCustomSkills(obr, definitions) {
+  syncClientSkills(obr);
+  let changed = false;
+  const known = readSkills(obr, "known-custom-skills");
+  for (const [id, definition] of Object.entries(definitions ?? {})) {
+    const skill = CUSTOM_ID.test(id) && customSkill(definition);
+    if (!skill || JSON.stringify(known[id]) === JSON.stringify(definition)) continue;
+    known[id] = definition;
+    SKILLS[id] = skill;
+    clientSkillIds.add(id);
+    changed = true;
+  }
+  if (!changed) return;
+  clientSkillGeneration++;
+  try {
+    writeSkills(obr, "known-custom-skills", known);
+    clientCacheRaw = localStorage.getItem(skillCacheKey(obr));
+  } catch { /* The current loadout still works when local storage is unavailable. */ }
+}
+
 export const FACINGS = [
   [0, "right"], [45, "down-right"], [90, "down"], [135, "down-left"],
   [180, "left"], [225, "up-left"], [270, "up"], [315, "up-right"],
@@ -152,8 +203,8 @@ export function writeSkills(obr, type, settings) {
 
 export function availableSkills(config, tokenId) {
   if (config.enabled !== true) return ["sleep"];
-  const ranged = availableRangedWeapons(config.rangedWeaponsByToken?.[tokenId]);
-  return ["spear", "sleep", ...(ranged.length ? ["ranged"] : []), ...availableSpells(config, tokenId)];
+  const ranged = availableRangedWeapons(config.rangedWeaponsByToken?.[tokenId], config);
+  return ["spear", "sleep", ...(ranged.length ? ["ranged"] : []), ...availableSpells(config, tokenId), ...availableCustomSkills(config, tokenId)];
 }
 
 export function availableSpells(config, tokenId) {
@@ -185,16 +236,35 @@ export function spellParameter(config, tokenId, skillId, field = "parameter") {
   return validSpellParameter(skillId, value, field) ? value : SKILLS[skillId]?.[field]?.defaultValue;
 }
 
-export function availableWeapons(grants) {
-  return Object.keys(WEAPONS).filter((id) => id === DEFAULT_WEAPON || (Array.isArray(grants) && grants.includes(id)));
+export function availableCustomSkills(config, tokenId) {
+  const ids = config.customSkillsByToken?.[tokenId];
+  return Array.isArray(ids) ? ids.filter((id) => CUSTOM_ID.test(id) && configuredSkill(config, id)) : [];
 }
 
-export function availableRangedWeapons(grants) {
-  return Array.isArray(grants) ? Object.keys(RANGED_WEAPONS).filter((id) => grants.includes(id)) : [];
+export function weaponNames(config, kind) {
+  const stock = kind === "weapon" ? WEAPONS : RANGED_WEAPONS;
+  const names = { ...stock };
+  for (const [id, definition] of Object.entries(config.catalog ?? {})) {
+    if (definition?.kind === kind && typeof definition.name === "string" &&
+        (CUSTOM_ID.test(id) || Object.hasOwn(stock, id))) names[id] = definition.name;
+  }
+  return names;
 }
 
-export function skillGrantLabel(kind, variant) {
+export function availableWeapons(grants, config = {}) {
+  return Object.keys(weaponNames(config, "weapon")).filter((id) => id === DEFAULT_WEAPON || (Array.isArray(grants) && grants.includes(id)));
+}
+
+export function availableRangedWeapons(grants, config = {}) {
+  return Array.isArray(grants) ? Object.keys(weaponNames(config, "ranged-weapon")).filter((id) => grants.includes(id)) : [];
+}
+
+export function skillGrantLabel(kind, variant, label) {
   if (typeof variant !== "string") return;
+  if (typeof label === "string" && label.trim() && ["weapon", "ranged-weapon", "skill", "ability"].includes(kind)) {
+    return ({ weapon: "melee attack", "ranged-weapon": "ranged attack", skill: "skill", ability: "special ability" })[kind] +
+      ": " + label.slice(0, 80);
+  }
   if (kind === "ranged-weapon" && Object.hasOwn(RANGED_WEAPONS, variant)) {
     return "ranged attack: " + RANGED_WEAPONS[variant];
   }
@@ -240,14 +310,13 @@ export function turnToHeading(token, facing, heading) {
 }
 
 export function skillEffect(skillId, token, center, dpi, facing, weapon = DEFAULT_WEAPON,
-  parameter = SKILLS[skillId]?.parameter?.defaultValue) {
-  if (!Object.hasOwn(SKILLS, skillId) || !FACINGS.some(([angle]) => angle === facing) ||
+  parameter = SKILLS[skillId]?.parameter?.defaultValue, skill = SKILLS[skillId]) {
+  if (!skill || !FACINGS.some(([angle]) => angle === facing) ||
       ![center?.x, center?.y, token.rotation, dpi].every(Number.isFinite) || dpi <= 0) return;
-  const skill = SKILLS[skillId];
   let effect = skill.effect;
-  if (skillId === "spear" && Object.hasOwn(WEAPONS, weapon)) effect = "generic.weapon_attacks.melee.single." + weapon;
-  if (skillId === "ranged" && Object.hasOwn(RANGED_WEAPONS, weapon)) effect = "generic.weapon_attacks.ranged." + weapon;
-  if (!effect) return;
+  if (skill.meleeReach && Object.hasOwn(WEAPONS, weapon)) effect = "generic.weapon_attacks.melee.single." + weapon;
+  if ((skillId === "ranged" || skill.uses === "ranged-weapon") && Object.hasOwn(RANGED_WEAPONS, weapon)) effect = "generic.weapon_attacks.ranged." + weapon;
+  if (!effect && !skill.custom) return;
   if (skillId === "heart") {
     // The heart travels vertically around the center of the clip over one loop.
     return {

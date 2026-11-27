@@ -1,5 +1,5 @@
 import { buildPath, Command } from "./obr.js";
-import { fetchSpellTargets, nextTarget, reachableTargets, targetGeometry } from "./target-cycle.js?v=2.11.15";
+import { fetchSpellTargets, nextTarget, reachableTargets, targetGeometry } from "./target-cycle.js?v=3.1.0";
 
 const report = (error) => console.warn("Overhead Chat target selection", error);
 const validPoint = (point) => Number.isFinite(point?.x) && Number.isFinite(point?.y);

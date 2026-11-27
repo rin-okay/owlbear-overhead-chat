@@ -1,9 +1,10 @@
+import { skillCacheKey } from "./skills.js?v=3.1.0";
 import OBR from "./obr.js";
 import {
   KEY_ACTIONS, KEYBOARD_KEYS, INTERNATIONAL_KEYS, FIXED_KEYS, MODIFIERS, actionForEvent, assignBinding, bindingLabel, browserLayout, editableTarget, eventChord,
   keyLabel, readKeyboard, resolveBindings, writeKeyboard,
-} from "./key-bindings.js?v=2.11.16";
-import { connectKeyboardEditor, isFixedKeyboardShortcut, KEYBOARD_MODAL } from "./keyboard-shortcuts.js?v=2.11.16";
+} from "./key-bindings.js?v=3.1.0";
+import { connectKeyboardEditor, isFixedKeyboardShortcut, KEYBOARD_MODAL } from "./keyboard-shortcuts.js?v=3.1.0";
 
 OBR.onReady(() => {
   const board = document.querySelector("#board");
@@ -273,6 +274,16 @@ OBR.onReady(() => {
     assign(selected, next);
   }, true);
   render();
+  window.addEventListener("storage", (event) => {
+    if (event.key !== skillCacheKey(OBR)) return;
+    ({ overrides, layout } = readKeyboard(OBR));
+    bindings = resolveBindings(overrides);
+    if (selected && !Object.hasOwn(KEY_ACTIONS, selected)) {
+      selected = undefined;
+      capturing = false;
+    }
+    render();
+  });
   void browserLayout().then((map) => {
     const detected = { ...map, ...layout };
     if (Object.keys(map).every((code) => layout[code] === detected[code])) return;

@@ -48,7 +48,7 @@ export async function writeTokenStats(obr, tokenId, scores, { gm, editable, expe
   if (!ready || !current()) throw Error("The selected token changed.");
   let applied = false;
   await obr.scene.items.updateItems([tokenId], ([item]) => {
-    if (!current() || !isPublicToken(item)) throw Error("The selected token changed.");
+    if (!current() || !(gm ? item?.type === "IMAGE" && item.layer === "CHARACTER" : isPublicToken(item))) throw Error("The selected token changed.");
     const previous = readTokenStats(item);
     const allowed = gm ? role === "GM" : previous.editable && canSpeak({ role, id: obr.player.id }, item, permissions);
     if (!allowed) throw Error("You can’t edit stats for this token.");

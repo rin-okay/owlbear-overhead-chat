@@ -1,4 +1,5 @@
-import { SKILLS, aimsAtLocation, readSkills } from "./skills.js?v=2.11.12";
+import { CUSTOM_ID } from "./combat-catalog.js?v=3.1.0";
+import { SKILLS, aimsAtLocation, readSkills, syncClientSkills } from "./skills.js?v=3.1.0";
 
 const SHIFT = 1;
 const CTRL = 2;
@@ -138,6 +139,22 @@ for (const [id, skill] of Object.entries(SKILLS)) {
 }
 
 export const KEY_ACTIONS = Object.fromEntries(commands.map((action) => [action.id, action]));
+const builtInCommands = [...commands];
+let customGeneration;
+function refreshCustomActions(obr) {
+  const generation = syncClientSkills(obr);
+  if (generation === customGeneration) return generation;
+  customGeneration = generation;
+  for (const action of commands.slice(builtInCommands.length)) delete KEY_ACTIONS[action.id];
+  const customActions = Object.entries(SKILLS).flatMap(([id, skill]) => skill.custom ? [
+    { id: "skill-" + id, label: skill.name, defaultKey: null, group: "Skills", skill: id },
+    { id: "aim-" + id, label: "Aim " + skill.name, base: "skill-" + id, modifiers: CTRL,
+      group: "Skills", skill: id, aim: true },
+  ] : []);
+  commands.splice(0, commands.length, ...builtInCommands, ...customActions);
+  for (const action of customActions) KEY_ACTIONS[action.id] = action;
+  return generation;
+}
 export const FIXED_KEYS = [
   ["F1", "Chat"], ["F2", "Move"], ["F3", "Center avatar"], ["F4", "Camera follow"], ["F10", "Keyboard settings"],
 ];
@@ -170,7 +187,8 @@ function isBaseBinding(binding) {
 
 function baseOverrides(overrides) {
   return Object.fromEntries(Object.entries(overrides ?? {}).filter(([id, binding]) =>
-    Object.hasOwn(KEY_ACTIONS, id) && !KEY_ACTIONS[id].base && isBaseBinding(binding)));
+    (Object.hasOwn(KEY_ACTIONS, id) && !KEY_ACTIONS[id].base ||
+      id.startsWith("skill-") && CUSTOM_ID.test(id.slice(6))) && isBaseBinding(binding)));
 }
 
 export function legacyOverrides(legacy) {
@@ -239,6 +257,7 @@ export function bindingStorageKey(obr) {
 }
 
 export function readKeyboard(obr) {
+  refreshCustomActions(obr);
   try {
     const saved = JSON.parse(localStorage.getItem(bindingStorageKey(obr)));
     if (saved?.overrides && saved.layout) return { overrides: baseOverrides(saved.overrides), layout: saved.layout };
@@ -262,12 +281,13 @@ export async function browserLayout(keyboard = globalThis.navigator?.keyboard) {
 const profiles = new Map();
 export function keyboardProfile(obr) {
   const key = bindingStorageKey(obr);
+  const skills = refreshCustomActions(obr);
   let raw;
   try { raw = localStorage.getItem(key); } catch {}
   let profile = profiles.get(key);
-  if (!profile || profile.raw !== raw) {
+  if (!profile || profile.raw !== raw || profile.skills !== skills) {
     const settings = readKeyboard(obr);
-    profile = { raw, ...settings, bindings: resolveBindings(settings.overrides) };
+    profile = { raw, skills, ...settings, bindings: resolveBindings(settings.overrides) };
     profiles.set(key, profile);
   }
   return profile;

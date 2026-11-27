@@ -43,16 +43,25 @@ async function showOwnDice(roll) {
 }
 
 function damageBreakdown(notation, roll, total) {
-  const [diceTerm, modifierTerm] = parseDice(notation);
-  const dice = (roll.sets ?? []).filter((set) => set.type === "d" + diceTerm.sides)
-    .flatMap((set) => (set.rolls ?? []).map((die) => die.value));
-  const modifier = modifierTerm?.constant ?? 0;
-  if (dice.length !== diceTerm.count ||
-      !dice.every((die) => Number.isInteger(die) && die >= 1 && die <= diceTerm.sides) ||
-      dice.reduce((sum, die) => sum + die, modifier) !== total) {
+  const terms = parseDice(notation);
+  const bySides = new Map();
+  for (const term of terms) {
+    if (!term.count || bySides.has(term.sides)) continue;
+    bySides.set(term.sides, (roll.sets ?? []).filter((set) => set.type === "d" + term.sides)
+      .flatMap((set) => (set.rolls ?? []).map((die) => die.value)));
+  }
+  const breakdown = terms.flatMap(({ count, sides, constant }) => {
+    if (constant !== undefined) return [constant];
+    const dice = bySides.get(sides).splice(0, count);
+    if (dice.length !== count || !dice.every((die) => Number.isInteger(die) && die >= 1 && die <= sides)) {
+      throw Error("Rumble! did not return the individual damage dice.");
+    }
+    return dice;
+  });
+  if ([...bySides.values()].some((dice) => dice.length) || breakdown.reduce((sum, value) => sum + value, 0) !== total) {
     throw Error("Rumble! did not return the individual damage dice.");
   }
-  return modifier ? [...dice, modifier] : dice;
+  return breakdown;
 }
 
 export async function rollWithRumble(notation, requireBreakdown = false) {

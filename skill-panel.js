@@ -1,16 +1,14 @@
 import {
   KEY_ACTIONS, actionForChord, assignBinding, bindingLabel, bindingStorageKey,
   eventChord, keyboardProfile, keyIdentity, writeKeyboard,
-} from "./key-bindings.js?v=2.11.16";
-import { setupStatsEditor } from "./stats-panel.js?v=2.8.5";
-import { isPublicToken } from "./rules.js";
+} from "./key-bindings.js?v=3.1.0";
 import { isProjectileToken } from "./projectile-collision.js?v=2.9.10";
 import { spellDamageFormula } from "./spell-damage.js?v=2.9.13";
-import { readTokenStats } from "./stats.js?v=2.8.5";
+import { readTokenStats } from "./stats.js?v=3.1.0";
 import {
-  DEFAULT_WEAPON, FACINGS, FRIENDLY_FIRE_MODES, RANGED_WEAPONS, SKILLS, SKILL_CHANGED, SKILL_REQUEST, SKILL_RESULT, SPELLS, TEAMS, WEAPONS,
-  aimsAtLocation, availableRangedWeapons, availableSpells, availableWeapons, friendlyFireMode, readSkills, skillConnections, spellParameter, tokenTeams, validSpellParameter, writeSkills,
-} from "./skills.js?v=2.11.12";
+  DEFAULT_WEAPON, FACINGS, RANGED_WEAPONS, SKILLS, SKILL_CHANGED, SKILL_REQUEST, SKILL_RESULT, WEAPONS,
+  aimsAtLocation, readSkills, rememberCustomSkills, skillConnections, syncClientSkills, writeSkills,
+} from "./skills.js?v=3.1.0";
 
 function characterLabel(token) {
   return token.name || "unnamed character";
@@ -41,6 +39,7 @@ export function setupSkillPanel(obr, getAvatar, showSpells, showChatNotice, onBi
   let available = [];
   let weapons = [];
   let rangedWeapons = [];
+  let weaponLabels = {};
   let enabled = false;
   let castStatusTimer;
   let listRevision = 0;
@@ -68,10 +67,10 @@ export function setupSkillPanel(obr, getAvatar, showSpells, showChatNotice, onBi
     facing.value = String(facingFor(preferences, avatar));
     arrow.style.transform = `rotate(${facing.value}deg)`;
     const options = weapons.length ? weapons : [DEFAULT_WEAPON];
-    weapon.replaceChildren(...options.map((id) => new Option(WEAPONS[id], id)));
+    weapon.replaceChildren(...options.map((id) => new Option(weaponLabels[id] ?? WEAPONS[id], id)));
     weapon.value = selectedWeapon(avatar?.id);
     weapon.disabled = !enabled;
-    rangedWeapon.replaceChildren(...rangedWeapons.map((id) => new Option(RANGED_WEAPONS[id], id)));
+    rangedWeapon.replaceChildren(...rangedWeapons.map((id) => new Option(weaponLabels[id] ?? RANGED_WEAPONS[id], id)));
     rangedWeapon.value = selectedRangedWeapon(avatar?.id) ?? "";
     rangedWeapon.closest("label").hidden = !available.includes("ranged");
     rangedWeapon.disabled = !enabled || !rangedWeapons.length;
@@ -249,6 +248,9 @@ export function setupSkillPanel(obr, getAvatar, showSpells, showChatNotice, onBi
       showStatus("The GM needs to be connected to use skills.");
       return;
     }
+    const skill = SKILLS[id];
+    const melee = id === "spear" || skill?.uses === "weapon";
+    const ranged = id === "ranged" || skill?.uses === "ranged-weapon";
     const requestId = crypto.randomUUID();
     const facing = type === "cast" ? facingFor(preferences, token) : undefined;
     const expected = {
@@ -265,8 +267,8 @@ export function setupSkillPanel(obr, getAvatar, showSpells, showChatNotice, onBi
       await obr.broadcast.sendMessage(SKILL_REQUEST, {
         requestId, tokenId: token.id, type,
         ...(type === "cast" ? { skill: id, facing } : {}),
-        ...(id === "spear" ? { weapon: selectedWeapon(token.id) } : {}),
-        ...(id === "ranged" ? { weapon: selectedRangedWeapon(token.id) } : {}),
+        ...(melee ? { weapon: selectedWeapon(token.id) } : {}),
+        ...(ranged ? { weapon: selectedRangedWeapon(token.id) } : {}),
         ...(SKILLS[id]?.upcast && spellLevel !== undefined ? { spellLevel } : {}),
         ...(targetIds ? { targetIds } : targetId ? { targetId } : {}),
         ...(projectileCounts ? { projectileCounts } : {}),
@@ -281,6 +283,7 @@ export function setupSkillPanel(obr, getAvatar, showSpells, showChatNotice, onBi
   function refresh(token = getAvatar(), force = false) {
     const changed = token?.id !== avatar?.id || token?.image?.url !== avatar?.image?.url;
     if (!changed && !force) return;
+    syncClientSkills(obr);
     avatar = token;
     const revision = ++listRevision;
     clearPending("list");
@@ -288,6 +291,7 @@ export function setupSkillPanel(obr, getAvatar, showSpells, showChatNotice, onBi
       available = [];
       weapons = [];
       rangedWeapons = [];
+      weaponLabels = {};
       enabled = false;
     }
     const url = avatar?.image?.url;
@@ -323,10 +327,13 @@ export function setupSkillPanel(obr, getAvatar, showSpells, showChatNotice, onBi
         }
       }
       if (data.tokenId !== avatar?.id || !Array.isArray(data.skills)) return;
+      rememberCustomSkills(obr, data.customSkills);
       available = data.skills.filter((id) => Object.hasOwn(SKILLS, id));
       enabled = data.enabled === true;
-      weapons = availableWeapons(data.weapons);
-      rangedWeapons = availableRangedWeapons(data.rangedWeapons);
+      weaponLabels = data.weaponLabels ?? {};
+      const isKnown = (catalog, id) => Object.hasOwn(catalog, id) || typeof weaponLabels[id] === "string";
+      weapons = (data.weapons ?? []).filter((id) => isKnown(WEAPONS, id));
+      rangedWeapons = (data.rangedWeapons ?? []).filter((id) => isKnown(RANGED_WEAPONS, id));
       playerStatus.textContent = (!targetingRequested && data.error) || (enabled ? "" : "The GM hasn’t enabled skill hotkeys.");
       render();
     }
@@ -355,285 +362,4 @@ export function setupSkillPanel(obr, getAvatar, showSpells, showChatNotice, onBi
     refresh, cast, hasSkill: (id) => available.includes(id),
     facingFor: (token) => facingFor(preferences, token),
   };
-}
-
-export function setupSkillGrants(obr) {
-  const enabled = document.querySelector("#skill-enabled");
-  const friendlyFire = document.querySelector("#skill-friendly-fire");
-  const team = document.querySelector("#grant-team-type");
-  const teamGrant = document.querySelector("#skill-grant-team");
-  const tokens = document.querySelector("#skill-token");
-  const useSelectedToken = document.querySelector("#skill-use-selected-token");
-  const spell = document.querySelector("#grant-spell-type");
-  const spellGrant = document.querySelector("#skill-grant-spell");
-  const parameterControls = [
-    { field: "parameter", id: "skill-spell-parameter" },
-    { field: "targetLimit", id: "skill-spell-target-limit" },
-  ].map(({ field, id }) => ({
-    field,
-    row: document.querySelector("#" + id + "-row"),
-    label: document.querySelector("#" + id + "-label"),
-    input: document.querySelector("#" + id),
-  }));
-  const weaponGrants = [
-    { id: "weapon", field: "weaponsByToken", catalog: WEAPONS, available: availableWeapons, defaultId: DEFAULT_WEAPON },
-    { id: "ranged-weapon", field: "rangedWeaponsByToken", catalog: RANGED_WEAPONS, available: availableRangedWeapons },
-  ].map((definition) => ({
-    ...definition,
-    select: document.querySelector("#grant-" + definition.id + "-type"),
-    checkbox: document.querySelector("#skill-grant-" + definition.id),
-  }));
-  const status = document.querySelector("#skill-gm-status");
-  const assignTab = document.querySelector("#skill-assign-tab");
-  const statsTab = document.querySelector("#skill-grant-stats-tab");
-  const assignPanel = document.querySelector("#skill-assign");
-  const statsPanel = document.querySelector("#skill-grant-stats");
-  const showStats = setupStatsEditor(obr, statsPanel.querySelector("form"), { gm: true });
-  let sceneTokens = new Map();
-
-  const showSelectedStats = () => showStats(allowed ? sceneTokens.get(tokens.value) : undefined);
-  function selectGrantView(stats) {
-    assignPanel.hidden = stats;
-    statsPanel.hidden = !stats;
-    assignTab.setAttribute("aria-pressed", String(!stats));
-    statsTab.setAttribute("aria-pressed", String(stats));
-    showSelectedStats();
-  }
-  assignTab.addEventListener("click", () => selectGrantView(false));
-  statsTab.addEventListener("click", () => selectGrantView(true));
-  let revision = 0;
-  let allowed = false;
-  let saving = false;
-  let roster;
-
-  for (const { select, catalog, defaultId } of weaponGrants) {
-    for (const [id, name] of Object.entries(catalog)) {
-      if (id !== defaultId) select.add(new Option(name, id));
-    }
-  }
-  for (const id of SPELLS) {
-    if (id !== "sleep") spell.add(new Option(SKILLS[id].name, id));
-  }
-  for (const name of TEAMS) team.add(new Option(name, name));
-  for (const mode of FRIENDLY_FIRE_MODES) friendlyFire.add(new Option(mode, mode));
-
-  function render(config) {
-    enabled.disabled = !allowed || saving;
-    enabled.checked = config.enabled === true;
-    friendlyFire.disabled = !allowed || saving;
-    friendlyFire.value = friendlyFireMode(config);
-    tokens.disabled = !allowed || saving || tokens.options.length <= 1;
-    useSelectedToken.disabled = tokens.disabled;
-    showSelectedStats();
-    const disableGrants = !allowed || saving || !tokens.value;
-    spell.disabled = team.disabled = disableGrants;
-    teamGrant.disabled = disableGrants || !team.value;
-    const assignedTeams = tokenTeams(config, tokens.value);
-    teamGrant.checked = assignedTeams.includes(team.value);
-    for (const option of team.options) {
-      option.text = option.value + (assignedTeams.includes(option.value) ? " (assigned)" : "");
-    }
-    spellGrant.disabled = disableGrants || !spell.value;
-    const grantedSpells = availableSpells(config, tokens.value);
-    spellGrant.checked = grantedSpells.includes(spell.value);
-    for (const { field, row, label, input } of parameterControls) {
-      const parameter = SKILLS[spell.value]?.[field];
-      row.hidden = !tokens.value || !parameter;
-      input.disabled = disableGrants || !parameter || !spellGrant.checked;
-      if (!parameter || !tokens.value) continue;
-      label.textContent = parameter.label;
-      input.min = parameter.min;
-      input.placeholder = String(parameter.defaultValue);
-      input.valueAsNumber = spellParameter(config, tokens.value, spell.value, field);
-    }
-    for (const option of spell.options) {
-      option.text = SKILLS[option.value].name + (grantedSpells.includes(option.value) ? " (granted)" : "");
-    }
-    for (const { select, checkbox, catalog, field, available } of weaponGrants) {
-      select.disabled = disableGrants;
-      checkbox.disabled = disableGrants || !select.value;
-      const grantedWeapons = available(config[field]?.[tokens.value]);
-      checkbox.checked = grantedWeapons.includes(select.value);
-      for (const option of select.options) {
-        option.text = catalog[option.value] + (grantedWeapons.includes(option.value) ? " (granted)" : "");
-      }
-    }
-  }
-
-  async function refresh(sceneItems) {
-    const requested = ++revision;
-    try {
-      const { self, gm } = await skillConnections(obr);
-      if (requested !== revision) return;
-      allowed = self.role === "GM" && self.connectionId === gm?.connectionId;
-      if (!allowed || !await obr.scene.isReady()) {
-        if (requested !== revision) return;
-        sceneTokens.clear();
-        tokens.replaceChildren(new Option("choose a token", ""));
-        status.textContent = allowed ? "Open a scene to grant skills."
-          : self.role === "GM" ? "Another connected GM is handling skills." : "";
-      } else {
-        const [items, selection] = await Promise.all([
-          sceneItems ?? obr.scene.items.getItems(isPublicToken), obr.player.getSelection(),
-        ]);
-        if (requested !== revision) return;
-        sceneTokens = new Map(items.map((token) => [token.id, token]));
-        roster = rosterKey(items);
-        const choice = tokens.value || selection?.[0];
-        items.sort((a, b) => characterLabel(a).localeCompare(characterLabel(b)));
-        tokens.replaceChildren(new Option("choose a token", ""),
-          ...items.map((token) => new Option(characterLabel(token), token.id)));
-        tokens.value = items.some((token) => token.id === choice) ? choice : "";
-        status.textContent = "";
-      }
-      render(readSkills(obr, "gm"));
-    } catch {
-      if (requested === revision) status.textContent = "Couldn’t load skill grants.";
-    }
-  }
-
-  async function save(change) {
-    if (saving) return;
-    saving = true;
-    enabled.disabled = tokens.disabled = useSelectedToken.disabled = spell.disabled = spellGrant.disabled =
-      friendlyFire.disabled = team.disabled = teamGrant.disabled = true;
-    for (const { select, checkbox } of weaponGrants) select.disabled = checkbox.disabled = true;
-    for (const { input } of parameterControls) input.disabled = true;
-    try {
-      const { self, gm } = await skillConnections(obr);
-      if (self.role !== "GM" || gm?.connectionId !== self.connectionId) throw Error("The connected skills GM must save grants.");
-      const config = readSkills(obr, "gm");
-      let grant;
-      if (change.tokenId) {
-        const [token] = await obr.scene.items.getItems([change.tokenId]);
-        if (!isPublicToken(token) || change.tokenId !== tokens.value) throw Error("Choose a token in the open scene.");
-        if (change.team) {
-          if (!TEAMS.includes(change.team)) return;
-          const assigned = new Set(tokenTeams(config, token.id));
-          if (change.grant) assigned.add(change.team);
-          else assigned.delete(change.team);
-          config.teamsByToken = { ...config.teamsByToken, [token.id]: [...assigned] };
-        } else if (change.weapon) {
-          const { id, field, catalog, available, defaultId } = change.weaponGrant;
-          if (!Object.hasOwn(catalog, change.weapon) || change.weapon === defaultId) return;
-          const granted = new Set(available(config[field]?.[token.id]).filter((id) => id !== defaultId));
-          if (change.grant) {
-            if (!granted.has(change.weapon)) grant = { kind: id, variant: change.weapon };
-            granted.add(change.weapon);
-          } else granted.delete(change.weapon);
-          config[field] = { ...config[field], [token.id]: [...granted] };
-        } else {
-          if (change.spell === "sleep" || !SPELLS.includes(change.spell)) return;
-          const ids = new Set(availableSpells(config, token.id));
-          if (Object.hasOwn(change, "parameter")) {
-            const definition = SKILLS[change.spell][change.field];
-            if (!ids.has(change.spell) || !definition) return;
-            const tokenParameters = { ...config.spellParametersByToken?.[token.id] };
-            const saved = tokenParameters[change.spell];
-            const values = typeof saved === "number" ? { parameter: saved } : { ...saved };
-            if (change.parameter === null) delete values[change.field];
-            else {
-              if (!validSpellParameter(change.spell, change.parameter, change.field)) {
-                throw Error(definition.integer ? "Enter a whole number of at least 1." : "Enter a number of cells of at least 1.");
-              }
-              values[change.field] = change.parameter;
-            }
-            tokenParameters[change.spell] = values;
-            config.spellParametersByToken = { ...config.spellParametersByToken, [token.id]: tokenParameters };
-          } else {
-            if (change.grant) {
-              if (!ids.has(change.spell)) grant = { kind: "spell", variant: change.spell };
-              ids.add(change.spell);
-            } else ids.delete(change.spell);
-            config.spellsByToken = { ...config.spellsByToken, [token.id]: [...ids] };
-          }
-        }
-      } else if (Object.hasOwn(change, "friendlyFire")) {
-        if (!FRIENDLY_FIRE_MODES.includes(change.friendlyFire)) return;
-        config.friendlyFire = change.friendlyFire;
-      } else config.enabled = change.enabled;
-      writeSkills(obr, "gm", config);
-      status.textContent = "";
-      const data = grant ? { grant: { ...grant, id: crypto.randomUUID(), tokenId: change.tokenId } } : {};
-      await obr.broadcast.sendMessage(SKILL_CHANGED, data, { destination: "ALL" });
-    } catch (error) {
-      status.textContent = error.message || "Couldn’t save skill settings.";
-    } finally {
-      saving = false;
-      render(readSkills(obr, "gm"));
-    }
-  }
-  enabled.addEventListener("change", () => { void save({ enabled: enabled.checked }); });
-  friendlyFire.addEventListener("change", () => { void save({ friendlyFire: friendlyFire.value }); });
-  tokens.addEventListener("change", () => {
-    status.textContent = "";
-    render(readSkills(obr, "gm"));
-  });
-  useSelectedToken.addEventListener("click", async () => {
-    const requested = revision;
-    try {
-      const selection = new Set(await obr.player.getSelection());
-      if (requested !== revision || useSelectedToken.disabled || !isOpen()) return;
-      const matches = Array.from(tokens.options).filter(({ value }) => value && selection.has(value));
-      if (matches.length !== 1) {
-        status.textContent = "Select one character token on the map.";
-        return;
-      }
-      tokens.value = matches[0].value;
-      status.textContent = "";
-      render(readSkills(obr, "gm"));
-    } catch {
-      if (requested === revision && !useSelectedToken.disabled && isOpen()) {
-        status.textContent = "Couldn’t read the map selection.";
-      }
-    }
-  });
-  team.addEventListener("change", () => render(readSkills(obr, "gm")));
-  teamGrant.addEventListener("change", () => {
-    if (tokens.value && team.value) void save({ tokenId: tokens.value, team: team.value, grant: teamGrant.checked });
-  });
-  spell.addEventListener("change", () => render(readSkills(obr, "gm")));
-  spellGrant.addEventListener("change", () => {
-    if (tokens.value && spell.value) void save({ tokenId: tokens.value, spell: spell.value, grant: spellGrant.checked });
-  });
-  for (const { field, input } of parameterControls) {
-    input.addEventListener("keydown", (event) => {
-      if (event.key === "Enter") input.blur();
-    });
-    input.addEventListener("change", () => {
-      if (input.disabled) return;
-      const parameter = !input.value && !input.validity.badInput ? null : input.valueAsNumber;
-      void save({ tokenId: tokens.value, spell: spell.value, field, parameter });
-    });
-  }
-  for (const weaponGrant of weaponGrants) {
-    const { select, checkbox } = weaponGrant;
-    select.addEventListener("change", () => render(readSkills(obr, "gm")));
-    checkbox.addEventListener("change", () => {
-      if (tokens.value && select.value) {
-        void save({ tokenId: tokens.value, weapon: select.value, weaponGrant, grant: checkbox.checked });
-      }
-    });
-  }
-  const isOpen = () => !tokens.closest("[hidden]");
-  const rosterKey = (items) => JSON.stringify(items.map((item) => [item.id, item.name]).sort());
-  obr.scene.onReadyChange((ready) => {
-    if (!ready) {
-      sceneTokens.clear();
-      showSelectedStats();
-    }
-    if (isOpen()) void refresh();
-  });
-  obr.scene.items.onChange((items) => {
-    if (!allowed || !isOpen()) return;
-    const characters = items.filter(isPublicToken);
-    sceneTokens = new Map(characters.map((token) => [token.id, token]));
-    showSelectedStats();
-    if (roster !== rosterKey(characters)) {
-      roster = rosterKey(characters);
-      void refresh(characters);
-    }
-  });
-  obr.party.onChange(() => { if (isOpen()) void refresh(); });
-  return refresh;
 }

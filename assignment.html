@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>GM assignment · Overhead Chat</title>
+  <link rel="stylesheet" href="./assignment.css?v=3.1.0">
+  <script type="module" src="./assignment.js?v=3.1.0"></script>
+</head>
+<body>
+<main>
+  <header>
+    <div><h1>GM assignment</h1><label class="token-picker">Character <select id="token"></select></label></div>
+    <button type="button" id="close" aria-label="Close assignment">✕</button>
+  </header>
+  <div id="access" role="status">Connecting to Owlbear…</div>
+  <div id="workspace" hidden>
+    <nav aria-label="Assignment views">
+      <button type="button" aria-pressed="true" aria-controls="skills">Skills</button>
+      <button type="button" aria-pressed="false" aria-controls="stats">Stats</button>
+      <button type="button" aria-pressed="false" aria-controls="create">Create</button>
+    </nav>
+    <section id="skills" class="skills" aria-label="Skills">
+      <div class="library">
+        <div class="search-tools">
+          <input id="search" type="search" placeholder="Search skills, spells and weapons" aria-label="Search skills, spells and weapons">
+          <fieldset class="filters" aria-label="Filter by type">
+            <label title="All types"><input type="radio" name="filter" value="" checked aria-label="All types"><span aria-hidden="true">▦</span></label>
+            <label title="Spells"><input type="radio" name="filter" value="spell" aria-label="Spells"><span aria-hidden="true">✦</span></label>
+            <label title="Weapons"><input type="radio" name="filter" value="weapon" aria-label="Weapons"><span aria-hidden="true">⚔</span></label>
+            <label title="Ranged weapons"><input type="radio" name="filter" value="ranged-weapon" aria-label="Ranged weapons"><span aria-hidden="true">🏹</span></label>
+            <label title="Skills and special abilities"><input type="radio" name="filter" value="skill" aria-label="Skills and special abilities"><span aria-hidden="true">◇</span></label>
+          </fieldset>
+        </div>
+        <p id="empty" hidden>No matching entries.</p>
+        <ul id="results" aria-label="Available grants"></ul>
+      </div>
+      <aside aria-label="Grant options">
+        <form id="customize" hidden></form>
+        <details id="rules" open>
+          <summary>Combat settings</summary>
+          <label class="check"><input type="checkbox" id="enable-skills"> Enable skill hotkeys</label>
+          <label>Friendly fire <select id="friendly-fire"></select></label>
+          <fieldset id="teams"><legend>Token teams</legend></fieldset>
+        </details>
+      </aside>
+    </section>
+    <section id="stats" aria-label="Token stats" hidden>
+      <form class="stats-form">
+        <h2>Ability scores</h2>
+        <fieldset aria-label="Ability scores"></fieldset>
+        <h2>Combat stats</h2>
+        <fieldset class="stats-details" aria-label="Combat stats"></fieldset>
+        <label class="check"><input type="checkbox" name="editable"> Players can edit this token’s stats</label>
+        <div class="form-actions"><button type="submit">Save stats</button></div>
+        <p role="status"></p>
+      </form>
+    </section>
+    <section id="create" aria-label="Create or edit attacks and abilities" hidden>
+      <form id="definition">
+        <div class="editor-heading"><h2 id="editor-title">Create a definition</h2><button type="button" id="new-definition">New definition</button></div>
+        <div class="editor">
+          <label>Type <select name="kind" id="definition-kind"><option value="weapon">Weapon</option><option value="ranged-weapon">Ranged weapon</option><option value="skill">Skill</option><option value="ability">Special ability</option></select></label>
+          <label>Name <input name="name" required maxlength="80"></label>
+          <label>Damage dice <input name="dice" placeholder="1d8" maxlength="8"></label>
+          <label id="damage-type">Damage type <select name="damageType"></select></label>
+        </div>
+        <fieldset id="weapon-fields" class="editor" aria-label="Weapon settings">
+          <label>Ability modifier <select name="modifier"></select></label>
+          <label>Bonus damage <input name="damageBonus" type="number" min="-99" max="99" value="0" required></label>
+          <label>Bonus to hit <input name="hitBonus" type="number" min="-99" max="99" value="0" required><small>Saved for future attack rolls.</small></label>
+          <label>Animation <select name="animation"></select></label>
+          <label>Motif sound effect <select name="sound"></select></label>
+        </fieldset>
+        <fieldset id="skill-fields" class="editor" aria-label="Skill settings" hidden>
+          <label>Attack used <select name="uses"><option value="none">Standalone</option><option value="weapon">Current melee weapon</option><option value="ranged-weapon">Current ranged weapon</option></select></label>
+          <label>Saving throw <select name="saveAbility"><option value="">None</option></select></label>
+          <label id="cast-range">Range (cells) <input name="range" type="number" min="1" max="120" value="6"></label>
+          <p id="additional-damage" hidden>Bonus dice use the equipped weapon’s damage type.</p>
+        </fieldset>
+        <div class="form-actions"><button id="save-definition" type="submit">Save</button></div>
+      </form>
+    </section>
+    <p id="feedback" role="status"></p>
+  </div>
+  <div id="entry-menu" hidden><button type="button">Edit</button></div>
+</main>
+</body>
+</html>

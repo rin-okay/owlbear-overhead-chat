@@ -1,3 +1,4 @@
+import { setupAssignmentMenu } from "./assignment-window.js?v=3.1.0";
 import OBR, { buildImage, buildLabel, buildPath, Command } from "./obr.js?v=2.5.1";
 import {
   ABOVE_FOG, AVATAR, HABBO_MODE, HABBO_SCALE, SPEECH, BUBBLE_MS, GENERAL_CHAT_ROOM,
@@ -7,19 +8,19 @@ import {
 import { BUBBLE_LINE_HEIGHT, drawBubble, drawFloatingBubble, fonts, normalizeAppearance, prepareBubbleFont } from "./appearance.js?v=2.7.9";
 import { canvasPaths } from "./bubble-paths.js?v=2.5.1";
 import { FLOAT_LINE, placeFloatingBubbles } from "./floating-layout.js?v=2.5.1";
-import { ABILITIES, readTokenStats } from "./stats.js?v=2.8.5";
+import { ABILITIES, readTokenStats } from "./stats.js?v=3.1.0";
 import { openSessionChannel, savedAvatar, saveAvatar } from "./session.js?v=2.11.17";
 import { chatParts, isRollCommand, rollSpans } from "./dice.js";
 import { queueDiscord } from "./discord.js?v=2.3.9";
 import { parseTray } from "./dice-replay.js";
 import { queueDicePopup, resetDicePopups } from "./dice-popup.js";
-import { setupSkillHost } from "./skill-host.js?v=2.11.15";
-import { setupHotbar } from "./hotbar.js?v=2.11.16";
-import { resetCombatLogPopover, setupCombatLog } from "./combat-log.js?v=2.11.19";
-import { SKILL_CHANGED, skillConnections, skillGrantLabel } from "./skills.js?v=2.11.12";
+import { setupSkillHost } from "./skill-host.js?v=3.1.0";
+import { setupHotbar } from "./hotbar.js?v=3.1.0";
+import { resetCombatLogPopover, setupCombatLog } from "./combat-log.js?v=3.1.0";
+import { SKILL_CHANGED, skillConnections, skillGrantLabel } from "./skills.js?v=3.1.0";
 import { EMOTE, floatEmote, parseEmote } from "./emotes.js?v=2.7.22";
 import { setupHeartProjectiles } from "./heart-spells.js?v=2.11.12";
-import { setupHitMarkers } from "./hit-markers.js?v=2.11.0";
+import { setupHitMarkers } from "./hit-markers.js?v=3.1.0";
 import { requestChatShortcut } from "./chat-shortcut.js?v=2.11.0";
 import { setupChatRecovery } from "./chat-recovery.js?v=2.6.6";
 import { setupCameraFollow } from "./avatar-viewport.js?v=2.11.16";
@@ -408,6 +409,7 @@ OBR.onReady(() => {
   }
   combatLog = setupCombatLog(OBR);
   setupSkillHost(OBR, buildImage, combatLog.record);
+  setupAssignmentMenu(OBR);
   setupChatRecovery(OBR, function* () {
     for (const entry of transcript.values()) {
       if (!entry.localNotice) yield entry;
@@ -491,7 +493,7 @@ OBR.onReady(() => {
     const grant = data?.grant;
     if (typeof grant?.id !== "string" || !/^[a-f0-9-]{36}$/i.test(grant.id) ||
         typeof grant.tokenId !== "string" || !grant.tokenId || grant.tokenId.length > 128) return;
-    const label = skillGrantLabel(grant.kind, grant.variant);
+    const label = skillGrantLabel(grant.kind, grant.variant, grant.name);
     if (!label) return;
     const id = "grant:" + grant.id;
     const version = sceneVersion;

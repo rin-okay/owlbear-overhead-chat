@@ -1,7 +1,7 @@
 import {
   clearSpellPath, coneHits, isProjectileToken, isProjectileWall, projectileImpact, projectileTokenContainsPoint, tokenCircle,
 } from "./projectile-collision.js?v=2.11.15";
-import { SKILLS, SKILL_REQUEST, SKILL_RESULT, friendlyFireMode, skillConnections, spellParameter, tokenTeams } from "./skills.js?v=2.11.12";
+import { SKILLS, SKILL_REQUEST, SKILL_RESULT, friendlyFireMode, skillConnections, spellParameter, tokenTeams } from "./skills.js?v=3.1.0";
 
 export async function targetGeometry(obr, tokenId) {
   const [bounds, dpi, shared, local] = await Promise.all([
@@ -13,8 +13,7 @@ export async function targetGeometry(obr, tokenId) {
   return { source: bounds?.center, dpi, items: [...shared, ...local] };
 }
 
-export function reachableTargets({ source, dpi, items }, tokenId, skillId, config = {}) {
-  const skill = SKILLS[skillId];
+export function reachableTargets({ source, dpi, items }, tokenId, skillId, config = {}, skill = SKILLS[skillId]) {
   if (![source?.x, source?.y, dpi].every(Number.isFinite) || dpi <= 0 || skill?.location === "teleport") return [];
 
   const mode = friendlyFireMode(config);
