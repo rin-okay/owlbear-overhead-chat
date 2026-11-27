@@ -12,18 +12,49 @@ export async function openCombatChannel(obr) {
   return new BroadcastChannel(JSON.stringify([COMBAT_POPOVER, obr.room.id, connectionId]));
 }
 
+function combatPopoverKey(obr) {
+  return JSON.stringify([COMBAT_POPOVER, obr.room.id, obr.player.id, "open"]);
+}
+
+let combatPopoverOpen = false;
+
+function isCombatLogOpen(obr) {
+  try { return sessionStorage.getItem(combatPopoverKey(obr)) === "1"; }
+  catch { return combatPopoverOpen; }
+}
+
+function setCombatLogOpen(obr, open) {
+  combatPopoverOpen = open;
+  try {
+    if (open) sessionStorage.setItem(combatPopoverKey(obr), "1");
+    else sessionStorage.removeItem(combatPopoverKey(obr));
+  } catch {}
+}
+
+export function resetCombatLogPopover(obr) {
+  setCombatLogOpen(obr, false);
+}
+
+export async function closeCombatLog(obr) {
+  setCombatLogOpen(obr, false);
+  try {
+    await obr.popover.close(COMBAT_POPOVER);
+  } catch (error) {
+    setCombatLogOpen(obr, true);
+    throw error;
+  }
+}
+
 export async function toggleCombatLog(obr, open = () => openCombatLog(obr)) {
-  // Owlbear exposes the dimensions of an existing popover through the host.
-  const width = await obr.popover.getWidth(COMBAT_POPOVER).catch(() => undefined);
-  if (Number.isFinite(width) && width > 0) return obr.popover.close(COMBAT_POPOVER);
+  if (isCombatLogOpen(obr)) return closeCombatLog(obr);
   return open();
 }
 
 export async function openCombatLog(obr) {
   const [width, height] = await Promise.all([obr.viewport.getWidth(), obr.viewport.getHeight()]);
-  return obr.popover.open({
+  await obr.popover.open({
     id: COMBAT_POPOVER,
-    url: new URL("./index.html?v=2.11.18&combat-log=1", import.meta.url).href,
+    url: new URL("./index.html?v=2.11.19&combat-log=1", import.meta.url).href,
     width: Math.max(1, Math.min(380, width - 24)), height: Math.max(1, Math.min(340, height - 64)),
     anchorReference: "POSITION",
     anchorOrigin: { horizontal: "LEFT", vertical: "TOP" },
@@ -31,6 +62,7 @@ export async function openCombatLog(obr) {
     transformOrigin: { horizontal: "RIGHT", vertical: "BOTTOM" },
     disableClickAway: true,
   });
+  setCombatLogOpen(obr, true);
 }
 
 export function combatDamage(rolls) {

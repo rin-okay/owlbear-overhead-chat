@@ -10,8 +10,8 @@ import {
 } from "./session.js?v=2.9.16";
 
 import { drawBubble, normalizeAppearance, prepareBubbleFont } from "./appearance.js?v=2.7.9";
-import { setupDiscordPanel } from "./discord-panel.js?v=2.11.18";
-import { damageNotation, openCombatLog, saveNotation, toggleCombatLog } from "./combat-log.js?v=2.11.18";
+import { setupDiscordPanel } from "./discord-panel.js?v=2.11.19";
+import { damageNotation, openCombatLog, saveNotation, toggleCombatLog } from "./combat-log.js?v=2.11.19";
 import { aimsAtLocation, artworkFacingAngle, MAX_CAST_LEVEL, SKILLS, turnToHeading } from "./skills.js?v=2.11.12";
 import { ABILITIES, readTokenStats } from "./stats.js?v=2.8.5";
 import { setupAvatarPanel } from "./avatar-panel.js?v=2.11.12";
@@ -55,7 +55,7 @@ if (combatWindow) {
   stylesheet.rel = "stylesheet";
   stylesheet.href = new URL("./combat-log.css?v=2.9.16", import.meta.url).href;
   document.head.append(stylesheet);
-  void import("./combat-log-panel.js?v=2.11.16")
+  void import("./combat-log-panel.js?v=2.11.19")
     .then(({ setCombatRollers }) => setCombatRollers(rollCombatSave, rollCombatDamage)).catch(console.error);
 }
 

@@ -15,7 +15,7 @@ import { parseTray } from "./dice-replay.js";
 import { queueDicePopup, resetDicePopups } from "./dice-popup.js";
 import { setupSkillHost } from "./skill-host.js?v=2.11.15";
 import { setupHotbar } from "./hotbar.js?v=2.11.16";
-import { setupCombatLog } from "./combat-log.js?v=2.11.16";
+import { resetCombatLogPopover, setupCombatLog } from "./combat-log.js?v=2.11.19";
 import { SKILL_CHANGED, skillConnections, skillGrantLabel } from "./skills.js?v=2.11.12";
 import { EMOTE, floatEmote, parseEmote } from "./emotes.js?v=2.7.22";
 import { setupHeartProjectiles } from "./heart-spells.js?v=2.11.12";
@@ -381,6 +381,7 @@ function queueSpeech(event) {
 }
 
 OBR.onReady(() => {
+  resetCombatLogPopover(OBR);
   setupHitMarkers(OBR, buildLabel, buildPath, Command);
   setupHeartProjectiles(OBR);
   setupCameraFollow(OBR);

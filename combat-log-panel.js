@@ -1,6 +1,6 @@
 import { actionForEvent, keyboardProfile } from "./key-bindings.js?v=2.11.16";
 import OBR from "./obr.js";
-import { COMBAT_POPOVER, damageNotation, formatCombatDamage, openCombatChannel } from "./combat-log.js?v=2.11.16";
+import { closeCombatLog, damageNotation, formatCombatDamage, openCombatChannel } from "./combat-log.js?v=2.11.19";
 import { appliedCombatDamage, applyForgeDamage, forgeHpKey, hasForgeHp, undoForgeDamage } from "./forge-hp.js?v=2.9.7";
 
 const combatWindow = document.querySelector("#combat-window");
@@ -313,7 +313,7 @@ function updateItems(items) {
 }
 
 OBR.onReady(() => {
-  document.querySelector("#combat-close").addEventListener("click", () => void OBR.popover.close(COMBAT_POPOVER));
+  document.querySelector("#combat-close").addEventListener("click", () => void closeCombatLog(OBR).catch(console.error));
   OBR.player.onChange((player) => { role = player.role; refreshControls(); });
   OBR.room.onMetadataChange((metadata) => { hpKey = forgeHpKey(metadata); refreshControls(); });
   let itemRevision = 0;
