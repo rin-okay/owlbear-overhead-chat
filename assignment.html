@@ -4,8 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>GM assignment · Overhead Chat</title>
-  <link rel="stylesheet" href="./assignment.css?v=3.2.4">
-  <script type="module" src="./assignment.js?v=3.2.4"></script>
+  <link rel="stylesheet" href="./assignment.css?v=3.2.6">
+  <script type="module" src="./assignment.js?v=3.2.6"></script>
 </head>
 <body>
 <main>
@@ -66,30 +66,48 @@
     <section id="create" aria-label="Create or edit attacks and abilities" hidden>
       <form id="definition">
         <div class="editor-heading"><h2 id="editor-title">Create a definition</h2><button type="button" id="new-definition">New definition</button></div>
-        <div class="editor">
-          <label>Type <select name="kind" id="definition-kind"><option value="weapon">Weapon</option><option value="ranged-weapon">Ranged weapon</option><option value="skill">Skill</option><option value="ability">Special ability</option></select></label>
-          <label>Name <input name="name" required maxlength="80"></label>
-          <label>Damage dice <input name="dice" placeholder="1d8" maxlength="8"></label>
-          <label id="damage-type">Damage type <select name="damageType"></select></label>
+        <div class="editor-tabs" role="group" aria-label="Definition editor">
+          <button type="button" aria-controls="definition-stats" aria-pressed="true">Stats</button>
+          <button type="button" aria-controls="definition-effects" aria-pressed="false">Animation + sound</button>
         </div>
-        <fieldset id="weapon-fields" class="editor" aria-label="Weapon settings">
-          <label>Ability modifier <select name="modifier"></select></label>
-          <label>Bonus damage <input name="damageBonus" type="number" min="-99" max="99" value="0" required></label>
-          <label>Bonus to hit <input name="hitBonus" type="number" min="-99" max="99" value="0" required><small>Saved for future attack rolls.</small></label>
-          <label>Animation <select name="animation"></select></label>
-          <label>Damage marker delay (%) <input name="hitDelay" type="number" min="0" max="100" step="1" value="45" required></label>
-          <label>Swing sound effect <select name="swingSound"></select></label>
-          <label>Swing sound delay (%) <input name="swingDelay" type="number" min="0" max="100" step="1" value="45" required></label>
-          <label>Hit sound effect <select name="hitSound"></select></label>
-          <label>Hit sound delay (%) <input name="hitSoundDelay" type="number" min="0" max="100" step="1" value="45" required></label>
-        </fieldset>
-        <fieldset id="skill-fields" class="editor" aria-label="Skill settings" hidden>
-          <label>Attack used <select name="uses"><option value="none">Standalone</option><option value="weapon">Current melee weapon</option><option value="ranged-weapon">Current ranged weapon</option></select></label>
-          <label>Saving throw <select name="saveAbility"><option value="">None</option></select></label>
-          <label id="cast-range">Range (cells) <input name="range" type="number" min="1" max="120" value="6"></label>
-          <p id="additional-damage" hidden>Bonus dice use the equipped weapon’s damage type.</p>
-        </fieldset>
-        <p id="weapon-timing-help">0% is the start of the animation. 100% is the end.</p>
+        <section id="definition-stats" aria-label="Stats">
+          <div class="editor">
+            <label>Type <select name="kind" id="definition-kind"><option value="weapon">Weapon</option><option value="ranged-weapon">Ranged weapon</option><option value="skill">Skill</option><option value="ability">Special ability</option></select></label>
+            <label>Name <input name="name" required maxlength="80"></label>
+            <label>Damage dice <input name="dice" placeholder="1d8" maxlength="8"></label>
+            <label id="damage-type">Damage type <select name="damageType"></select></label>
+          </div>
+          <fieldset id="weapon-fields" class="editor" aria-label="Weapon settings">
+            <label>Ability modifier <select name="modifier"></select></label>
+            <label>Bonus damage <input name="damageBonus" type="number" min="-99" max="99" value="0" required></label>
+            <label>Bonus to hit <input name="hitBonus" type="number" min="-99" max="99" value="0" required><small>Saved for future attack rolls.</small></label>
+          </fieldset>
+          <fieldset id="skill-fields" class="editor" aria-label="Skill settings" hidden>
+            <label>Attack used <select name="uses"><option value="none">Standalone</option><option value="weapon">Current melee weapon</option><option value="ranged-weapon">Current ranged weapon</option></select></label>
+            <label>Saving throw <select name="saveAbility"><option value="">None</option></select></label>
+            <label id="cast-range">Range (cells) <input name="range" type="number" min="1" max="120" value="6"></label>
+            <p id="additional-damage" hidden>Bonus dice use the equipped weapon’s damage type.</p>
+          </fieldset>
+        </section>
+        <section id="definition-effects" aria-label="Animation and sound" hidden>
+          <fieldset id="weapon-effects" class="editor" aria-label="Weapon animation and sounds">
+            <label>Animation <select name="animation"></select></label>
+            <label>Damage marker delay (%) <input name="hitDelay" type="number" min="0" max="100" step="1" value="45" required></label>
+            <label>Swing sound effect <select name="swingSound"></select></label>
+            <label>Swing sound delay (%) <input name="swingDelay" type="number" min="0" max="100" step="1" value="45" required></label>
+            <label>On hit <select name="hitSound"></select></label>
+            <label>On miss <select name="missSound"></select></label>
+            <label>On miss delay (%) <input name="missDelay" type="number" min="0" max="100" step="1" value="45" required></label>
+          </fieldset>
+          <fieldset id="skill-effects" class="editor" aria-label="Skill sounds" hidden>
+            <label>Cast sound effect <select name="castSound"></select></label>
+            <label>Cast sound delay (ms) <input name="castDelay" type="number" min="0" max="10000" value="0" required></label>
+            <label>On hit <select name="skillHitSound"></select></label>
+            <label>On miss <select name="skillMissSound"></select></label>
+            <label>On miss delay after impact (ms) <input name="skillMissDelay" type="number" min="0" max="10000" value="0" required></label>
+          </fieldset>
+          <p id="weapon-timing-help">0% is the start of the animation. 100% is the end.</p>
+        </section>
         <div class="form-actions"><button id="save-definition" type="submit">Save</button></div>
       </form>
       <form id="spell-sounds" hidden>
@@ -97,8 +115,9 @@
         <fieldset class="editor" aria-label="Motif sounds">
           <label>Cast sound effect <select name="castSound"></select></label>
           <label>Cast sound delay (ms) <input name="castDelay" type="number" min="0" max="10000" value="0" required></label>
-          <label>Hit sound effect <select name="hitSound"></select></label>
-          <label>Hit sound delay after impact (ms) <input name="hitDelay" type="number" min="0" max="10000" value="0" required></label>
+          <label>On hit <select name="hitSound"></select></label>
+          <label><span id="spell-miss-label">On miss</span><select name="missSound"></select></label>
+          <label><span id="spell-miss-delay-label">On miss delay after impact (ms)</span><input name="missDelay" type="number" min="0" max="10000" value="0" required></label>
           <label>Loop sound effect <select name="loopSound"></select></label>
         </fieldset>
         <div class="form-actions"><button id="save-spell-sounds" type="submit">Save</button></div>
@@ -115,7 +134,7 @@
     </footer>
     <p id="feedback" role="status"></p>
   </div>
-  <div id="entry-menu" hidden><button type="button">Edit</button></div>
+  <div id="entry-menu" hidden><button type="button">Edit</button><button type="button" id="create-template" hidden>Create from template</button></div>
 </main>
 </body>
 </html>

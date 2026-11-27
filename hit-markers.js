@@ -1,3 +1,4 @@
+import { hitSoundCues, playCombatSounds } from "./motif-cues.js?v=3.2.6";
 import { isProjectileToken } from "./projectile-collision.js?v=2.6.13";
 import { skillConnections } from "./skills.js?v=3.1.0";
 import { validMeleeDamage } from "./melee-damage.js?v=3.1.0";
@@ -56,7 +57,7 @@ export function setupHitMarkers(obr, buildLabel, buildPath, command) {
     });
   }
 
-  async function show(tokenIds, current, damage, { x = 0, y = 0, splat = false } = {}) {
+  async function show(tokenIds, current, damage, { x = 0, y = 0, splat = false, sound } = {}) {
     const [targets, scale] = await Promise.all([
       obr.scene.items.getItems(tokenIds), obr.viewport.getScale(),
     ]);
@@ -89,6 +90,7 @@ export function setupHitMarkers(obr, buildLabel, buildPath, command) {
     const ids = labels.map(({ id }) => id);
     try {
       await obr.scene.local.addItems(labels);
+      if (sound && current()) playCombatSounds(obr, hitSoundCues(sound, labels.length), "Hit", obr.player.id);
       for (let frame = 1; frame <= 6; frame++) {
         await wait(maxRoll && frame === 1 ? 65 : 130);
         if (!current()) return;
@@ -135,6 +137,8 @@ export function setupHitMarkers(obr, buildLabel, buildPath, command) {
       if (recent.has(data.requestId)) return;
       recent.set(data.requestId, now + 10000);
       const tokenIds = [...new Set(data.tokenIds)];
+      const sound = self.connectionId === gm.connectionId && typeof data.hitSound === "string" &&
+        /^(?:\$\.)?[\w-]{1,80}$/.test(data.hitSound) ? data.hitSound : undefined;
       if (followUps || dartCount) {
         // Separate splats that are still on screen when the next dart hits.
         const lanes = [0, -1, 1, -2, 2];
@@ -148,7 +152,7 @@ export function setupHitMarkers(obr, buildLabel, buildPath, command) {
           const offset = damage?.blocked
             ? { x: blockedJitter[row], y: row * 23 }
             : { x: lanes[index % lanes.length] * 22 };
-          await show(tokenIds, current, damage, { ...offset, splat });
+          await show(tokenIds, current, damage, { ...offset, splat, sound });
         }));
         return;
       }
@@ -157,7 +161,7 @@ export function setupHitMarkers(obr, buildLabel, buildPath, command) {
       } else {
         await wait(data.delay);
       }
-      if (current()) await show(tokenIds, current, data.damage, { splat });
+      if (current()) await show(tokenIds, current, data.damage, { splat, sound });
     } catch (error) {
       console.error("Overhead Chat could not draw a hit marker", error);
     }

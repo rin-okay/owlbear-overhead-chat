@@ -23,7 +23,9 @@ export async function addHeartEffects(obr, instructions, skill, level, hitTokens
       effectProperties: { source: center, size: 2, disableHit: true, attachedTo: target.id },
     };
   }));
-  instructions.push(...markers.filter(Boolean));
+  const visibleMarkers = markers.filter(Boolean);
+  instructions.push(...visibleMarkers);
+  return { duration, markerCount: visibleMarkers.length };
 }
 
 export function setupHeartProjectiles(obr) {

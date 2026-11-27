@@ -1,4 +1,4 @@
-import { openAssignment } from "./assignment-window.js?v=3.2.4";
+import { openAssignment } from "./assignment-window.js?v=3.2.6";
 import OBR from "./obr.js";
 import {
   ABOVE_FOG, AVATAR, GENERAL_CHAT_ROOM, HABBO_MODE, HABBO_SCALE, ROLL_DAMAGE_FROM_COMBAT_LOG, RUMBLE_DICE, SPEECH,
@@ -12,7 +12,7 @@ import {
 
 import { drawBubble, normalizeAppearance, prepareBubbleFont } from "./appearance.js?v=2.7.9";
 import { setupDiscordPanel } from "./discord-panel.js?v=3.2.3";
-import { damageNotation, openCombatLog, saveNotation, toggleCombatLog } from "./combat-log.js?v=3.2.5";
+import { damageNotation, openCombatLog, saveNotation, toggleCombatLog } from "./combat-log.js?v=3.2.6";
 import { aimsAtLocation, artworkFacingAngle, MAX_CAST_LEVEL, SKILLS, turnToHeading } from "./skills.js?v=3.1.0";
 import { ABILITIES, readTokenStats } from "./stats.js?v=3.1.0";
 import { setupAvatarPanel } from "./avatar-panel.js?v=3.1.0";
