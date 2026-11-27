@@ -4,8 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>GM assignment · Overhead Chat</title>
-  <link rel="stylesheet" href="./assignment.css?v=3.2.3">
-  <script type="module" src="./assignment.js?v=3.2.3"></script>
+  <link rel="stylesheet" href="./assignment.css?v=3.2.4">
+  <script type="module" src="./assignment.js?v=3.2.4"></script>
 </head>
 <body>
 <main>
@@ -15,6 +15,13 @@
   </header>
   <div id="access" role="status">Connecting to Owlbear…</div>
   <div id="workspace" hidden>
+    <details id="catalog-backup" class="backup-menu">
+      <summary>Catalog backup</summary>
+      <p>Import merges definitions and restores the backup’s combat settings.</p>
+      <button type="button" id="export-catalog">Export catalog</button>
+      <button type="button" id="import-catalog">Import catalog</button>
+      <input type="file" id="catalog-file" accept=".json,application/json" hidden>
+    </details>
     <nav aria-label="Assignment views">
       <button type="button" aria-pressed="true" aria-controls="skills">Skills</button>
       <button type="button" aria-pressed="false" aria-controls="stats">Stats</button>
@@ -97,6 +104,15 @@
         <div class="form-actions"><button id="save-spell-sounds" type="submit">Save</button></div>
       </form>
     </section>
+    <footer id="token-backup" class="backup-footer" hidden>
+      <details class="backup-menu">
+        <summary>Token backup</summary>
+        <p>Import replaces the selected token’s stats and assignments.</p>
+        <button type="button" id="export-token">Export selected token</button>
+        <button type="button" id="import-token">Import to selected token</button>
+        <input type="file" id="token-file" accept=".json,application/json" hidden>
+      </details>
+    </footer>
     <p id="feedback" role="status"></p>
   </div>
   <div id="entry-menu" hidden><button type="button">Edit</button></div>

@@ -78,3 +78,11 @@ aside summary { cursor: pointer; }
 }
 
 #results .entry-actions { display: flex; align-items: center; gap: 6px; }
+
+.backup-menu { margin-bottom: 12px; }
+.backup-menu summary { width: fit-content; cursor: pointer; border: 1px solid var(--line); border-radius: 7px; padding: 6px 10px; }
+.backup-menu p { margin: 7px 0; color: var(--muted); }
+.backup-menu button { margin: 0 5px 3px 0; }
+.backup-footer { position: sticky; bottom: 0; display: flex; justify-content: flex-end; margin-top: 12px; padding-block: 4px; text-align: right; background: #1c1723; }
+.backup-footer summary { margin-left: auto; }
+.backup-footer .backup-menu { margin-bottom: 0; }

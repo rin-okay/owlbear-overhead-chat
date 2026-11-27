@@ -1,6 +1,7 @@
 import OBR from "./obr.js";
+import { CATALOG_BACKUP, TOKEN_BACKUP, catalogSnapshot, importCatalog, importToken, readBackup, saveBackup, tokenSnapshot } from "./assignment-backup.js?v=3.2.4";
 import { DEFAULT_WEAPON_DELAY, validWeaponDelay } from "./weapon-timing.js?v=3.2.2";
-import { ASSIGNMENT_MODAL } from "./assignment-window.js?v=3.2.3";
+import { ASSIGNMENT_MODAL } from "./assignment-window.js?v=3.2.4";
 import { CUSTOM_ID, DAMAGE_MODIFIERS, DAMAGE_TYPES, customSkill, isAbility, isWeapon, parseDamageDice } from "./combat-catalog.js?v=3.1.0";
 import { weaponDefinition } from "./melee-damage.js?v=3.1.0";
 import { motifSoundEffects } from "./motif-cues.js?v=3.2.3";
@@ -9,7 +10,7 @@ import {
   availableCustomSkills, availableRangedWeapons, availableSpells, availableWeapons, friendlyFireMode,
   readSkills, skillConnections, spellParameter, tokenTeams, validSpellParameter, weaponNames, writeSkills,
 } from "./skills.js?v=3.1.0";
-import { ABILITIES } from "./stats.js?v=3.1.0";
+import { ABILITIES, TOKEN_STATS, readTokenStats, writeTokenStats } from "./stats.js?v=3.1.0";
 import { setupStatsEditor } from "./stats-panel.js?v=3.1.0";
 
 const labels = { spell: "Spell", weapon: "Weapon", "ranged-weapon": "Ranged weapon", skill: "Skill", ability: "Special ability" };
@@ -157,6 +158,8 @@ function initialize(obr) {
     byId("save-definition").disabled = byId("save-spell-sounds").disabled = saving || !allowed;
     showStats(tokens.get(token.value), allowed);
     for (const input of customize.elements) input.disabled = saving || !allowed;
+    byId("token-backup").hidden = !allowed || !token.value;
+    for (const id of ["export-catalog", "import-catalog", "export-token", "import-token"]) byId(id).disabled = !allowed || saving;
     renderResults();
   }
 
@@ -422,26 +425,33 @@ function initialize(obr) {
     }, { after: () => { if (editing === entry) startDefinition({ id, kind, name }); }, message: name + " saved." });
   });
 
-  async function save(change, { tokenRequired = false, after, message = "Saved." } = {}) {
+  async function save(change, { tokenRequired = false, beforeWrite, after, message = "Saved." } = {}) {
     if (saving || !allowed) return;
     const id = token.value;
     const version = scene;
+    const current = () => scene === version && allowed && token.value === id;
     saving = true;
     feedback.textContent = "";
     render();
     try {
       const { self, gm } = await skillConnections(obr);
       if (self.role !== "GM" || gm?.connectionId !== self.connectionId) throw Error("The active skills GM must save changes.");
-      if (tokenRequired && (!id || !(await obr.scene.items.getItems([id])).some(isCharacter))) {
-        throw Error("Choose a character in the open scene.");
-      }
-      if (scene !== version || !allowed) throw Error("The scene or your GM access changed.");
+      const [item] = tokenRequired && id ? await obr.scene.items.getItems([id]) : [];
+      if (tokenRequired && !isCharacter(item)) throw Error("Choose a character in the open scene.");
+      if (!current()) throw Error("The scene or your GM access changed.");
       const next = readSkills(obr, "gm");
       const grant = change(next, id);
-      writeSkills(obr, "gm", next);
+      const undo = beforeWrite ? await beforeWrite(item, current) : undefined;
+      try {
+        if (!current()) throw Error("The scene or your GM access changed.");
+        writeSkills(obr, "gm", next);
+      } catch (error) {
+        if (undo) await undo().catch(console.error);
+        throw error;
+      }
       config = next;
       after?.();
-      await obr.broadcast.sendMessage(SKILL_CHANGED, grant?.id ? { grant } : {}, { destination: "ALL" });
+      await obr.broadcast.sendMessage(SKILL_CHANGED, grant?.id ? { grant } : {}, { destination: "ALL" }).catch(console.error);
       feedback.textContent = message;
     } catch (error) {
       feedback.textContent = error.message || "Couldn’t save changes.";
@@ -450,6 +460,66 @@ function initialize(obr) {
       render();
     }
   }
+
+  function setupBackup(kind, type) {
+    const fileInput = byId(kind + "-file");
+    const isToken = type === TOKEN_BACKUP;
+    byId("export-" + kind).addEventListener("click", () => {
+      if (!allowed || saving) return;
+      try {
+        const source = readSkills(obr, "gm");
+        if (isToken) {
+          const item = tokens.get(token.value);
+          if (!item) throw Error("Choose a token to export.");
+          const slug = (item.name || "token").replace(/[^\p{L}\p{N}]+/gu, "-").slice(0, 50);
+          saveBackup(type, tokenSnapshot(source, item), "overhead-chat-" + slug);
+        } else saveBackup(type, catalogSnapshot(source), "overhead-chat-catalog");
+        feedback.textContent = "Backup exported.";
+      } catch (error) { feedback.textContent = error.message || "Couldn’t export the backup."; }
+    });
+    byId("import-" + kind).addEventListener("click", () => {
+      if (allowed && !saving) fileInput.click();
+    });
+    fileInput.addEventListener("change", async () => {
+      const [file] = fileInput.files;
+      fileInput.value = "";
+      if (!file) return;
+      const version = scene;
+      const selected = token.value;
+      try {
+        const data = await readBackup(file, type);
+        if (saving || !allowed || version !== scene || isToken && selected !== token.value) {
+          throw Error("The selection changed. Choose the backup again.");
+        }
+        if (isToken && !selected) throw Error("Choose a character to receive the backup.");
+        let stats;
+        await save((next, id) => {
+          if (isToken) stats = importToken(next, id, data);
+          else importCatalog(next, data);
+        }, {
+          tokenRequired: isToken,
+          beforeWrite: isToken ? async (item, current) => {
+            const previous = item.metadata[TOKEN_STATS];
+            await writeTokenStats(obr, item.id, stats.scores, {
+              gm: true, ...stats, expected: JSON.stringify(readTokenStats(item)), current,
+            });
+            const restored = JSON.stringify(stats);
+            return () => obr.scene.items.updateItems([item.id], ([latest]) => {
+              if (current() && JSON.stringify(latest?.metadata[TOKEN_STATS]) === restored) {
+                if (previous === undefined) delete latest.metadata[TOKEN_STATS];
+                else latest.metadata[TOKEN_STATS] = previous;
+              }
+            });
+          } : undefined,
+          after: () => { if (isToken) hideCustomization(); else startDefinition(); },
+          message: isToken ? "Token stats and assignments imported." : "Catalog imported.",
+        });
+      } catch (error) { feedback.textContent = error.message || "Couldn’t import the backup."; }
+    });
+  }
+
+  setupBackup("catalog", CATALOG_BACKUP);
+  setupBackup("token", TOKEN_BACKUP);
 
   async function refresh() {
     const requested = ++revision;
