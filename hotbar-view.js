@@ -2,7 +2,7 @@ import OBR from "./obr.js";
 import { AVATAR, canSpeak, isPublicToken } from "./rules.js";
 import { savedAvatar, savedAvatarMode, savedAvatarSlots, savedQuickbarSlots } from "./session.js?v=2.9.16";
 import { SKILLS, SKILL_CHANGED, SKILL_REQUEST, SKILL_RESULT, rememberCustomSkills, skillConnections } from "./skills.js?v=3.1.0";
-import { hotbarMode, MIN_HOTBAR_SLOTS, resizeHotbar, sendHotbarCommand } from "./hotbar.js?v=3.2.1";
+import { hotbarMode, MIN_HOTBAR_SLOTS, openHotbarPlacement, resizeHotbar, sendHotbarCommand } from "./hotbar.js?v=3.2.2";
 import { BUILTIN_EMOTES } from "./emotes.js?v=2.7.21";
 
 import { bindingLabel, keyboardProfile } from "./key-bindings.js?v=3.1.0";
@@ -127,28 +127,18 @@ OBR.onReady(() => {
       dx, dy, left, compact, keyboard, slots: list.children.length,
     }).catch(console.error);
   };
-  let drag;
-  const endDrag = () => {
-    drag = undefined;
-    grip.classList.remove("dragging");
-  };
+  let openingPlacement = false;
   grip.addEventListener("pointerdown", (event) => {
-    if (drag || !event.isPrimary || event.button !== 0) return;
+    if (openingPlacement || !event.isPrimary || event.button !== 0) return;
     event.preventDefault();
-    grip.setPointerCapture(event.pointerId);
-    drag = { id: event.pointerId, x: event.clientX, y: event.clientY };
-    grip.classList.add("dragging");
+    if (grip.hasPointerCapture(event.pointerId)) grip.releasePointerCapture(event.pointerId);
+    openingPlacement = true;
+    void openHotbarPlacement(OBR, {
+      left, compact, slots: list.children.length,
+      x: event.clientX, y: event.clientY, width: innerWidth, height: innerHeight,
+      screenX: event.screenX, screenY: event.screenY,
+    }).catch(console.error).finally(() => { openingPlacement = false; });
   });
-  grip.addEventListener("pointerup", (event) => {
-    if (drag?.id !== event.pointerId) return;
-    const dx = event.clientX - drag.x;
-    const dy = event.clientY - drag.y;
-    endDrag();
-    if (Math.hypot(dx, dy) >= 3) moveHotbar(dx, dy);
-  });
-  for (const eventName of ["pointercancel", "lostpointercapture"]) {
-    grip.addEventListener(eventName, (event) => { if (drag?.id === event.pointerId) endDrag(); });
-  }
   const arrows = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
   grip.addEventListener("keydown", (event) => {
     if (event.altKey || event.ctrlKey || event.metaKey || !Object.hasOwn(arrows, event.key)) return;

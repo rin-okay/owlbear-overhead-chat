@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>GM assignment · Overhead Chat</title>
   <link rel="stylesheet" href="./assignment.css?v=3.1.0">
-  <script type="module" src="./assignment.js?v=3.1.0"></script>
+  <script type="module" src="./assignment.js?v=3.2.2"></script>
 </head>
 <body>
 <main>
@@ -70,6 +70,8 @@
           <label>Bonus damage <input name="damageBonus" type="number" min="-99" max="99" value="0" required></label>
           <label>Bonus to hit <input name="hitBonus" type="number" min="-99" max="99" value="0" required><small>Saved for future attack rolls.</small></label>
           <label>Animation <select name="animation"></select></label>
+          <label>Hit delay (%) <input name="hitDelay" type="number" min="0" max="100" step="1" value="45" required></label>
+          <label>Sound delay (%) <input name="soundDelay" type="number" min="0" max="100" step="1" value="45" required></label>
           <label>Motif sound effect <select name="sound"></select></label>
         </fieldset>
         <fieldset id="skill-fields" class="editor" aria-label="Skill settings" hidden>
@@ -78,6 +80,7 @@
           <label id="cast-range">Range (cells) <input name="range" type="number" min="1" max="120" value="6"></label>
           <p id="additional-damage" hidden>Bonus dice use the equipped weapon’s damage type.</p>
         </fieldset>
+        <p id="weapon-timing-help">0% is the start of the animation. 100% is the end.</p>
         <div class="form-actions"><button id="save-definition" type="submit">Save</button></div>
       </form>
     </section>

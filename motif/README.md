@@ -1,4 +1,4 @@
-# Motif v0.3.3
+# Motif v0.3.4
 
 [Install in Owlbear Rodeo](https://rin-okay.github.io/owlbear-overhead-chat/motif/manifest.json).
 
@@ -13,6 +13,8 @@ The library is grouped into Sound effects and Music folders. Search matches trac
 Paste a Suno embed or full song URL into Custom to share a Suno track in Active. Select and play the cue to open Suno’s player. Other listeners can open it from Active and press play. Use Minimize to keep the Suno player in a small bar at the bottom left, then Expand to restore its controls. The embedded player has its own clock and controls. Use a publicly hosted audio file for synchronized playback, Motif volume, looping, and trimming.
 
 Use Active to pause, resume, hide and mute, change volume, set clip points or looping, or stop a sound. Settings has personal music and effect volumes, plus the GM switch for player casting in the active scene. v0.2 starts a fresh custom library.
+
+After a refresh, Motif resumes room audio at the shared playback position. If the browser blocks autoplay, open Motif and click **Resume audio**.
 
 ## Map triggers
 

@@ -1,4 +1,5 @@
 const HOTBAR_ID = "chat.overhead.hotbar.v1";
+export const HOTBAR_PLACEMENT = HOTBAR_ID + "/placement";
 const HOTBAR_COMMAND = HOTBAR_ID + "/command";
 export const MIN_HOTBAR_SLOTS = 10;
 export const MAX_HOTBAR_SLOTS = 15;
@@ -36,7 +37,7 @@ function dimensions(left, compact, slots, viewport) {
   };
 }
 
-function clampAnchor(left, point, viewport, size) {
+export function clampAnchor(left, point, viewport, size) {
   const leftInset = left ? 0 : size.width / 2;
   const topInset = left ? size.height / 2 : size.height;
   const clamp = (value, before, after, limit) => {
@@ -79,6 +80,14 @@ export function sendHotbarCommand(obr, command, movement) {
   return obr.broadcast.sendMessage(HOTBAR_COMMAND, { command, movement }, { destination: "LOCAL" });
 }
 
+export function openHotbarPlacement(obr, { left, compact, slots, x, y, width, height, screenX, screenY }) {
+  const url = new URL("./hotbar-placement.html?v=3.2.2", import.meta.url);
+  for (const [key, value] of Object.entries({ left, compact, slots, x, y, width, height, screenX, screenY })) {
+    url.searchParams.set(key, String(value));
+  }
+  return obr.modal.open({ id: HOTBAR_PLACEMENT, url: url.href, fullScreen: true, hideBackdrop: true, hidePaper: true });
+}
+
 export function setupHotbar(obr) {
   let visible = false;
   let pending = Promise.resolve();
@@ -95,12 +104,12 @@ export function setupHotbar(obr) {
     const preferred = saved ? { left: saved.x * viewport.width, top: saved.y * viewport.height }
       : left ? { left: 60, top: viewport.height / 2 } : { left: viewport.width / 2, top: viewport.height - 12 };
     const anchor = clampAnchor(left, preferred, viewport, size);
-    const destination = movement
-      ? clampAnchor(left, { left: anchor.left + movement.dx, top: anchor.top + movement.dy }, viewport, size)
-      : anchor;
+    const destination = movement ? clampAnchor(left, movement.absolute
+      ? { left: movement.x * viewport.width, top: movement.y * viewport.height }
+      : { left: anchor.left + movement.dx, top: anchor.top + movement.dy }, viewport, size) : anchor;
     if (movement && destination.left === anchor.left && destination.top === anchor.top) return;
 
-    const url = new URL("./hotbar.html?v=3.2.1", import.meta.url);
+    const url = new URL("./hotbar.html?v=3.2.2", import.meta.url);
     if (left) url.searchParams.set("position", "left");
     if (compact) url.searchParams.set("labels", "off");
     if (slots !== MIN_HOTBAR_SLOTS) url.searchParams.set("slots", String(slots));
@@ -149,7 +158,9 @@ export function setupHotbar(obr) {
         await open();
       } else if (command === "move" && visible &&
           typeof movement?.left === "boolean" && typeof movement.compact === "boolean" &&
-          [movement.dx, movement.dy].every(Number.isFinite) && (movement.dx || movement.dy) &&
+          (movement.absolute === true
+            ? [movement.x, movement.y].every(value => Number.isFinite(value) && value >= 0 && value <= 1)
+            : [movement.dx, movement.dy].every(Number.isFinite) && (movement.dx || movement.dy)) &&
           Number.isInteger(movement.slots) && movement.slots >= MIN_HOTBAR_SLOTS) {
         await open(movement);
       }

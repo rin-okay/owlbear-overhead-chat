@@ -18,10 +18,10 @@ export function motifSoundEffects(storage = globalThis.localStorage) {
   return cues;
 }
 
-export function playWeaponSound(obr, id, name, caster) {
+export function playWeaponSound(obr, id, name, caster, delay) {
   // No source means Motif plays the cue without a map ripple. One loop overrides cue defaults.
   return obr.broadcast.sendMessage(MOTIF_EFFECTS, {
-    instructions: [{ type: "effect", id, loops: 1, effectProperties: {} }],
+    instructions: [{ type: "effect", id, loops: 1, delay, effectProperties: {} }],
     spellData: { name, caster },
   }, { destination: "ALL" });
 }

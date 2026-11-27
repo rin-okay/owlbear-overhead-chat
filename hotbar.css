@@ -40,9 +40,8 @@ body {
   height: 18px;
   background: radial-gradient(circle closest-side, currentColor 75%, transparent) 0 0 / 5px 6px;
 }
-#hotbar-grip:hover, #hotbar-grip:focus-visible, #hotbar-grip.dragging { background: #533b49; color: #ffdbad; }
+#hotbar-grip:hover, #hotbar-grip:focus-visible { background: #533b49; color: #ffdbad; }
 #hotbar-grip:focus-visible { outline: 2px solid #ffdbad; outline-offset: -3px; }
-#hotbar-grip.dragging { cursor: grabbing; }
 html:not(.left) #hotbar { border-radius: 5px 0 0 5px; border-right: 0; }
 .left body { grid-template: minmax(0, 1fr) 24px / minmax(0, 1fr); }
 .left #hotbar { border-radius: 5px 5px 0 0; border-bottom: 0; }

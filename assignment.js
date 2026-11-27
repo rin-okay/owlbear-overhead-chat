@@ -1,5 +1,6 @@
 import OBR from "./obr.js";
-import { ASSIGNMENT_MODAL } from "./assignment-window.js?v=3.1.0";
+import { DEFAULT_WEAPON_DELAY, validWeaponDelay } from "./weapon-timing.js?v=3.2.2";
+import { ASSIGNMENT_MODAL } from "./assignment-window.js?v=3.2.2";
 import { CUSTOM_ID, DAMAGE_MODIFIERS, DAMAGE_TYPES, customSkill, isAbility, isWeapon, parseDamageDice } from "./combat-catalog.js?v=3.1.0";
 import { weaponDefinition } from "./melee-damage.js?v=3.1.0";
 import { motifSoundEffects } from "./motif-cues.js?v=3.1.0";
@@ -279,6 +280,7 @@ function initialize(obr) {
     const weapon = isWeapon(kind);
     const usesWeapon = !weapon && fields.uses.value !== "none";
     byId("weapon-fields").hidden = byId("weapon-fields").disabled = !weapon;
+    byId("weapon-timing-help").hidden = !weapon;
     byId("skill-fields").hidden = byId("skill-fields").disabled = weapon;
     byId("cast-range").hidden = usesWeapon;
     fields.range.disabled = usesWeapon;
@@ -308,6 +310,8 @@ function initialize(obr) {
     fields.modifier.value = definition?.modifier ?? "str";
     fields.damageBonus.value = definition?.damageBonus ?? 0;
     fields.hitBonus.value = definition?.hitBonus ?? 0;
+    fields.hitDelay.value = definition?.hitDelay ?? DEFAULT_WEAPON_DELAY;
+    fields.soundDelay.value = definition?.soundDelay ?? DEFAULT_WEAPON_DELAY;
     fields.uses.value = definition?.uses ?? "none";
     fields.saveAbility.value = definition?.saveAbility ?? "";
     fields.range.value = definition?.range ?? 6;
@@ -351,7 +355,10 @@ function initialize(obr) {
             !Object.hasOwn(DAMAGE_MODIFIERS, modifier) || !Object.hasOwn(kind === "weapon" ? WEAPONS : RANGED_WEAPONS, animation)) {
           throw Error("Choose an animation and enter whole-number bonuses from −99 to 99.");
         }
-        Object.assign(definition, { modifier, damageBonus, hitBonus, animation, sound: fields.sound.value });
+        const hitDelay = fields.hitDelay.valueAsNumber;
+        const soundDelay = fields.soundDelay.valueAsNumber;
+        if (![hitDelay, soundDelay].every(validWeaponDelay)) throw Error("Enter whole percentages from 0 to 100 for both delays.");
+        Object.assign(definition, { modifier, damageBonus, hitBonus, animation, hitDelay, soundDelay, sound: fields.sound.value });
       } else {
         Object.assign(definition, {
           uses: fields.uses.value, saveAbility: fields.saveAbility.value || undefined,

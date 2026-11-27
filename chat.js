@@ -1,8 +1,8 @@
-import { openAssignment } from "./assignment-window.js?v=3.1.0";
+import { openAssignment } from "./assignment-window.js?v=3.2.2";
 import OBR from "./obr.js";
 import {
-  ABOVE_FOG, AVATAR, GENERAL_CHAT_ROOM, HABBO_MODE, HABBO_SCALE, MELEE_HIT_TIMING, ROLL_DAMAGE_FROM_COMBAT_LOG, RUMBLE_DICE, SPEECH,
-  canSpeak, isPublicToken, normalizeHabboScale, normalizeMeleeHitTiming, parseSpeech,
+  ABOVE_FOG, AVATAR, GENERAL_CHAT_ROOM, HABBO_MODE, HABBO_SCALE, ROLL_DAMAGE_FROM_COMBAT_LOG, RUMBLE_DICE, SPEECH,
+  canSpeak, isPublicToken, normalizeHabboScale, parseSpeech,
 } from "./rules.js?v=2.9.4";
 
 import {
@@ -12,7 +12,7 @@ import {
 
 import { drawBubble, normalizeAppearance, prepareBubbleFont } from "./appearance.js?v=2.7.9";
 import { setupDiscordPanel } from "./discord-panel.js?v=3.0.2";
-import { damageNotation, openCombatLog, saveNotation, toggleCombatLog } from "./combat-log.js?v=3.2.1";
+import { damageNotation, openCombatLog, saveNotation, toggleCombatLog } from "./combat-log.js?v=3.2.2";
 import { aimsAtLocation, artworkFacingAngle, MAX_CAST_LEVEL, SKILLS, turnToHeading } from "./skills.js?v=3.1.0";
 import { ABILITIES, readTokenStats } from "./stats.js?v=3.1.0";
 import { setupAvatarPanel } from "./avatar-panel.js?v=3.1.0";
@@ -27,7 +27,7 @@ import { readMovementGrid, stepAvatar, turnAvatar } from "./movement.js?v=2.7.5"
 import { rollSpans, validateRollSpans } from "./dice.js";
 import { rollWithRumble } from "./rumble.js?v=3.1.0";
 import { rollWithNativeDice } from "./native-dice.js";
-import { hotbarOrientation, hotbarShowsLabels, sendHotbarCommand, setHotbarLabels, setHotbarOrientation } from "./hotbar.js?v=3.2.1";
+import { hotbarOrientation, hotbarShowsLabels, sendHotbarCommand, setHotbarLabels, setHotbarOrientation } from "./hotbar.js?v=3.2.2";
 import { actionForChord, actionForEvent, bindingLabel, editableTarget, eventChord, keyIdentity, keyboardProfile, modifierMask } from "./key-bindings.js?v=3.1.0";
 import { handleRoomKey, openKeyboard } from "./keyboard-shortcuts.js?v=3.1.0";
 
@@ -1171,54 +1171,6 @@ function setupHabboScale() {
   });
 }
 
-function setupMeleeHitTiming() {
-  const timing = document.querySelector("#melee-hit-timing");
-  const value = document.querySelector("#melee-hit-timing-value");
-  const status = document.querySelector("#melee-hit-timing-status");
-  let saved = normalizeMeleeHitTiming();
-  let receivedMetadata = false;
-
-  function render(percent) {
-    timing.valueAsNumber = percent;
-    value.textContent = percent + "%";
-  }
-
-  function sync(metadata) {
-    const previous = saved;
-    saved = normalizeMeleeHitTiming(metadata[MELEE_HIT_TIMING]);
-    if (!receivedMetadata || saved !== previous) render(saved);
-    receivedMetadata = true;
-  }
-  OBR.room.onMetadataChange(sync);
-  OBR.room.getMetadata().then((metadata) => {
-    if (!receivedMetadata) sync(metadata);
-    timing.disabled = false;
-  }).catch(() => {
-    if (!receivedMetadata) status.textContent = "couldn’t load melee hit timing.";
-    render(saved);
-    timing.disabled = false;
-  });
-
-  timing.addEventListener("input", () => {
-    value.textContent = timing.value + "%";
-  });
-  timing.addEventListener("change", async () => {
-    const requested = normalizeMeleeHitTiming(timing.valueAsNumber);
-    timing.disabled = true;
-    try {
-      if (await OBR.player.getRole() !== "GM") return;
-      await OBR.room.setMetadata({ [MELEE_HIT_TIMING]: requested });
-      saved = requested;
-      status.textContent = "";
-    } catch {
-      status.textContent = "couldn’t save melee hit timing.";
-    } finally {
-      render(saved);
-      timing.disabled = false;
-    }
-  });
-}
-
 function setupSettings() {
   const chatTab = document.querySelector("#chat-tab");
   const settingsTab = document.querySelector("#settings-tab");
@@ -1519,7 +1471,6 @@ OBR.onReady(() => {
       void OBR.notification.show("Couldn’t toggle the combat log.").catch(console.error);
     });
   });
-  setupMeleeHitTiming();
   setupRoomToggle("gm-fog-settings", ABOVE_FOG);
   setupRoomToggle("gm-rumble-settings", RUMBLE_DICE);
   setupRoomToggle("gm-combat-damage-settings", ROLL_DAMAGE_FROM_COMBAT_LOG);

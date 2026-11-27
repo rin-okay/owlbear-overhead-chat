@@ -1,0 +1,6 @@
+:root { color-scheme: dark; font: 14px/1.25 system-ui, sans-serif; color: #fff0d8; }
+body { margin: 0; height: 100dvh; cursor: grabbing; touch-action: none; user-select: none; }
+#preview { position: fixed; box-sizing: border-box; border: 2px dashed #f1cf99; border-radius: 6px; background: #332633b8; pointer-events: none; }
+aside { position: fixed; inset: 12px 0 auto; width: max-content; max-width: calc(100vw - 24px); margin: auto; display: flex;
+  gap: 10px; align-items: center; background: #231a24; padding: 6px 10px; border: 1px solid #957651; border-radius: 6px; }
+button { font: inherit; color: inherit; background: #493449; border: 1px solid #957651; border-radius: 4px; padding: 4px 8px; cursor: pointer; }

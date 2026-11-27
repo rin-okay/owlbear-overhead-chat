@@ -1,23 +1,24 @@
 import { reachableTargets, targetGeometry } from "./target-cycle.js?v=3.1.0";
 import { addHeartEffects } from "./heart-spells.js?v=2.11.12";
 import { setupBless } from "./bless.js?v=2.9.14";
-import { combatDamage } from "./combat-log.js?v=3.1.0";
+import { combatDamage } from "./combat-log.js?v=3.2.2";
 import { isShieldGraphic, readShieldGraphics, setupShield } from "./shield.js?v=2.9.15";
 import { setupSleep } from "./sleep.js?v=2.9.15";
-import { canSpeak, MELEE_HIT_TIMING, normalizeMeleeHitTiming, ROLL_DAMAGE_FROM_COMBAT_LOG } from "./rules.js?v=2.9.4";
+import { canSpeak, ROLL_DAMAGE_FROM_COMBAT_LOG } from "./rules.js?v=2.9.4";
 import {
   areaHits, clearSpellPath, coneHits, isProjectileToken, isProjectileWall, openMeleeDoor, projectileImpact, projectileTokenContainsPoint, teleportLandingClear,
 } from "./projectile-collision.js?v=2.10.2";
 import { HIT_MARKERS, MELEE_HIT_CUE } from "./hit-markers.js?v=3.1.0";
 import { attackDamageFormula, weaponDefinition } from "./melee-damage.js?v=3.1.0";
 import { CUSTOM_ID, rollAttackDamage } from "./combat-catalog.js?v=3.1.0";
-import { playWeaponSound } from "./motif-cues.js?v=3.1.0";
+import { playWeaponSound } from "./motif-cues.js?v=3.2.2";
+import { weaponAnimationDuration, weaponDelay } from "./weapon-timing.js?v=3.2.2";
 import { readTokenStats } from "./stats.js?v=3.1.0";
 import {
   BLOCKED_MAGIC_MISSILE, MAGIC_MISSILE_INTERVAL, rollMagicMissileDart, rollSpellDamage, spellDamageFormula,
 } from "./spell-damage.js?v=2.9.13";
 import {
-  DEFAULT_WEAPON, EMBERS_EFFECTS, MAX_CAST_LEVEL, MELEE_DURATION_MS, SKILLS, SKILL_REQUEST, SKILL_RESULT,
+  DEFAULT_WEAPON, EMBERS_EFFECTS, MAX_CAST_LEVEL, SKILLS, SKILL_REQUEST, SKILL_RESULT,
   availableRangedWeapons, availableSkills, availableWeapons, configuredSkill, friendlyFireMode, readSkills, skillConnections, skillEffect, spellParameter, tokenTeams, turnToHeading,
 } from "./skills.js?v=3.1.0";
 
@@ -475,7 +476,8 @@ export function setupSkillHost(obr, buildImage, recordCombat) {
       }
       let damageRolls;
       let damageFormula;
-      const meleeHit = Boolean(skill.meleeReach && hitTokenIds.length);
+      const weaponHit = Boolean(equipped && hitTokenIds.length);
+      const animationDuration = equipped && weaponAnimationDuration(equipped, instruction.effectProperties, dpi);
       const metadata = hitTokenIds.length ? await obr.room.getMetadata().catch(() => ({})) : {};
       if (version !== sceneVersion) return;
       const manual = metadata[ROLL_DAMAGE_FROM_COMBAT_LOG] === true;
@@ -488,11 +490,10 @@ export function setupSkillHost(obr, buildImage, recordCombat) {
         ...(missileFollowUps ? { missileFollowUps } : {}),
         ...(dartCount ? { dartCount } : {}),
       }, { destination: "ALL" }).catch((error) => console.error("Overhead Chat hit markers", error));
-      if (meleeHit) {
-        const timing = normalizeMeleeHitTiming(metadata[MELEE_HIT_TIMING]);
-        const cueDelay = Math.round(MELEE_DURATION_MS[equipped.animation] * timing / 100);
+      if (weaponHit) {
+        const cueDelay = weaponDelay(animationDuration, equipped.hitDelay);
         const cue = { type: "action", id: "message", arguments: [MELEE_HIT_CUE, data.requestId, "LOCAL"] };
-        if (timing === 100) {
+        if (cueDelay === animationDuration) {
           // Embers runs nested actions after it removes the finished effect.
           instruction.instructions = [cue];
         } else {
@@ -505,7 +506,8 @@ export function setupSkillHost(obr, buildImage, recordCombat) {
         if (version !== sceneVersion) return;
       }
       if (equipped?.sound) {
-        void playWeaponSound(obr, equipped.sound, equipped.name, sender.id).catch(console.warn);
+        void playWeaponSound(obr, equipped.sound, equipped.name, sender.id,
+          weaponDelay(animationDuration, equipped.soundDelay)).catch(console.warn);
       }
       if (instruction.id) {
         await obr.broadcast.sendMessage(EMBERS_EFFECTS, {
@@ -554,11 +556,10 @@ export function setupSkillHost(obr, buildImage, recordCombat) {
           const [damage, ...missileFollowUps] = damageRolls;
           await sendMarkers(skill.hitDelay, damage, { missileFollowUps });
         }
-      } else if (version === sceneVersion && hitTokenIds.length && !meleeHit && !skill.heartMarker) {
-        const attack = ranged || skill.custom;
-        const formula = attack ? attackDamageFormula(equipped, skill, token) : spellDamageFormula(skill, token, spellLevel);
+      } else if (version === sceneVersion && hitTokenIds.length && !weaponHit && !skill.heartMarker) {
+        const formula = skill.custom ? attackDamageFormula(undefined, skill, token) : spellDamageFormula(skill, token, spellLevel);
         if (manual) damageFormula = formula;
-        else if (formula) damageRolls = [attack ? rollAttackDamage(formula) : rollSpellDamage(formula)];
+        else if (formula) damageRolls = [skill.custom ? rollAttackDamage(formula) : rollSpellDamage(formula)];
         if (formula || !skill.custom) await sendMarkers(skill.impact?.delay ?? skill.hitDelay, damageRolls?.[0]);
       }
       await logCast({
