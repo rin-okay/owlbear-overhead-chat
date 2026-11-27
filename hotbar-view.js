@@ -2,7 +2,7 @@ import OBR from "./obr.js";
 import { AVATAR, canSpeak, isPublicToken } from "./rules.js";
 import { savedAvatar, savedAvatarMode, savedAvatarSlots, savedQuickbarSlots } from "./session.js?v=2.9.16";
 import { SKILLS, SKILL_CHANGED, SKILL_REQUEST, SKILL_RESULT, rememberCustomSkills, skillConnections } from "./skills.js?v=3.1.0";
-import { hotbarMode, MIN_HOTBAR_SLOTS, resizeHotbar, sendHotbarCommand } from "./hotbar.js?v=3.1.0";
+import { hotbarMode, MIN_HOTBAR_SLOTS, resizeHotbar, sendHotbarCommand } from "./hotbar.js?v=3.2.1";
 import { BUILTIN_EMOTES } from "./emotes.js?v=2.7.21";
 
 import { bindingLabel, keyboardProfile } from "./key-bindings.js?v=3.1.0";
@@ -16,6 +16,7 @@ const ICONS = {
 };
 const SHORT_NAMES = { spear: "melee attack", ranged: "ranged attack" };
 const list = document.querySelector("#hotbar");
+const grip = document.querySelector("#hotbar-grip");
 const params = new URLSearchParams(location.search);
 const left = params.get("position") === "left";
 const compact = params.get("labels") === "off";
@@ -106,24 +107,66 @@ OBR.onReady(() => {
   let activeGM;
   let partyGms;
   let revision = 0;
-  let appliedLength = MIN_HOTBAR_SLOTS;
+  let appliedLength = Number(params.get("slots")) || MIN_HOTBAR_SLOTS;
+  let initialLoadout = params.has("slots");
   let resizing = Promise.resolve();
   let closed = false;
   const redraw = () => {
     const length = render(available, role, tokens);
     resizing = resizing.then(async () => {
-      if (closed || appliedLength === length) return;
+      if (closed || initialLoadout || appliedLength === length) return;
       await resizeHotbar(OBR, left, length, compact);
       appliedLength = length;
     }).catch(console.error);
   };
   window.addEventListener("pagehide", () => { closed = true; }, { once: true });
 
+  const moveHotbar = (dx, dy, keyboard = false) => {
+    if (closed || !dx && !dy) return;
+    void sendHotbarCommand(OBR, "move", {
+      dx, dy, left, compact, keyboard, slots: list.children.length,
+    }).catch(console.error);
+  };
+  let drag;
+  const endDrag = () => {
+    drag = undefined;
+    grip.classList.remove("dragging");
+  };
+  grip.addEventListener("pointerdown", (event) => {
+    if (drag || !event.isPrimary || event.button !== 0) return;
+    event.preventDefault();
+    grip.setPointerCapture(event.pointerId);
+    drag = { id: event.pointerId, x: event.clientX, y: event.clientY };
+    grip.classList.add("dragging");
+  });
+  grip.addEventListener("pointerup", (event) => {
+    if (drag?.id !== event.pointerId) return;
+    const dx = event.clientX - drag.x;
+    const dy = event.clientY - drag.y;
+    endDrag();
+    if (Math.hypot(dx, dy) >= 3) moveHotbar(dx, dy);
+  });
+  for (const eventName of ["pointercancel", "lostpointercapture"]) {
+    grip.addEventListener(eventName, (event) => { if (drag?.id === event.pointerId) endDrag(); });
+  }
+  const arrows = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
+  grip.addEventListener("keydown", (event) => {
+    if (event.altKey || event.ctrlKey || event.metaKey || !Object.hasOwn(arrows, event.key)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    if (event.repeat) return;
+    const [x, y] = arrows[event.key];
+    const step = event.shiftKey ? 4 : 16;
+    moveHotbar(x * step, y * step, true);
+  });
+  if (params.get("focus") === "grip") grip.focus({ preventScroll: true });
+
   async function refresh() {
     const current = ++revision;
     expected = undefined;
     if (!await OBR.scene.isReady()) {
       if (current !== revision) return;
+      initialLoadout = false;
       avatarId = undefined;
       activeGM = undefined;
       available = [];
@@ -143,6 +186,7 @@ OBR.onReady(() => {
     const avatar = canSpeak(self, candidate, permissions) && !candidate.locked ? candidate : undefined;
     if (avatarId !== avatar?.id || !gm) available = [];
     avatarId = avatar?.id;
+    if (!avatar || !gm) initialLoadout = false;
     redraw();
     if (!avatar || !gm) return;
     expected = { gm: gm.connectionId, requestId: crypto.randomUUID(), tokenId: avatar.id };
@@ -156,6 +200,7 @@ OBR.onReady(() => {
     if (!expected || connectionId !== expected.gm || data?.requestId !== expected.requestId ||
         data.tokenId !== expected.tokenId || !Array.isArray(data.skills)) return;
     expected = undefined;
+    initialLoadout = false;
     rememberCustomSkills(OBR, data.customSkills);
     available = data.skills.filter((id) => Object.hasOwn(SKILLS, id));
     redraw();

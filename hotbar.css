@@ -1,10 +1,16 @@
 :root { color-scheme: dark; font: 12px/1.2 system-ui, sans-serif; color: #f8e8c1; }
 * { box-sizing: border-box; }
-body { margin: 0; pointer-events: none; }
+body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 24px;
+  height: 100dvh;
+  margin: 0;
+  pointer-events: none;
+}
 #hotbar {
   display: grid;
   grid-template-columns: repeat(var(--slot-count, 10), minmax(0, 1fr));
-  height: 100dvh;
+  min-height: 0;
   gap: 3px;
   margin: 0;
   padding: 4px;
@@ -14,6 +20,34 @@ body { margin: 0; pointer-events: none; }
   border-radius: 5px;
   box-shadow: inset 0 0 0 1px #322634;
 }
+#hotbar-grip {
+  display: grid;
+  place-items: center;
+  min-width: 0;
+  padding: 0;
+  background: #30232d;
+  color: #d6b58a;
+  border: 1px solid #957651;
+  border-radius: 0 5px 5px 0;
+  cursor: grab;
+  pointer-events: auto;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+#hotbar-grip span {
+  width: 10px;
+  height: 18px;
+  background: radial-gradient(circle closest-side, currentColor 75%, transparent) 0 0 / 5px 6px;
+}
+#hotbar-grip:hover, #hotbar-grip:focus-visible, #hotbar-grip.dragging { background: #533b49; color: #ffdbad; }
+#hotbar-grip:focus-visible { outline: 2px solid #ffdbad; outline-offset: -3px; }
+#hotbar-grip.dragging { cursor: grabbing; }
+html:not(.left) #hotbar { border-radius: 5px 0 0 5px; border-right: 0; }
+.left body { grid-template: minmax(0, 1fr) 24px / minmax(0, 1fr); }
+.left #hotbar { border-radius: 5px 5px 0 0; border-bottom: 0; }
+.left #hotbar-grip { border-radius: 0 0 5px 5px; }
+.left #hotbar-grip span { transform: rotate(90deg); }
 .slot {
   position: relative;
   display: grid;
