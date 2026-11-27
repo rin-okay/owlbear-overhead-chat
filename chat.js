@@ -12,7 +12,7 @@ import {
 
 import { drawBubble, normalizeAppearance, prepareBubbleFont } from "./appearance.js?v=2.7.9";
 import { setupDiscordPanel } from "./discord-panel.js?v=3.2.3";
-import { damageNotation, openCombatLog, saveNotation, toggleCombatLog } from "./combat-log.js?v=3.2.4";
+import { damageNotation, openCombatLog, saveNotation, toggleCombatLog } from "./combat-log.js?v=3.2.5";
 import { aimsAtLocation, artworkFacingAngle, MAX_CAST_LEVEL, SKILLS, turnToHeading } from "./skills.js?v=3.1.0";
 import { ABILITIES, readTokenStats } from "./stats.js?v=3.1.0";
 import { setupAvatarPanel } from "./avatar-panel.js?v=3.1.0";
@@ -27,7 +27,8 @@ import { readMovementGrid, stepAvatar, turnAvatar } from "./movement.js?v=2.7.5"
 import { rollSpans, validateRollSpans } from "./dice.js";
 import { rollWithRumble } from "./rumble.js?v=3.1.0";
 import { rollWithNativeDice } from "./native-dice.js";
-import { hotbarOrientation, hotbarShowsLabels, hotbarVerticalPosition, hotbarVerticalRange, sendHotbarCommand, setHotbarLabels, setHotbarOrientation, setHotbarVerticalPosition } from "./hotbar.js?v=3.2.3";
+import { hotbarHorizontalPosition, hotbarOrientation, hotbarShowsLabels, hotbarVerticalPosition, hotbarVerticalRange, sendHotbarCommand,
+  setHotbarHorizontalPosition, setHotbarLabels, setHotbarOrientation, setHotbarVerticalPosition } from "./hotbar.js?v=3.2.5";
 import { actionForChord, actionForEvent, bindingLabel, editableTarget, eventChord, keyIdentity, keyboardProfile, modifierMask } from "./key-bindings.js?v=3.1.0";
 import { handleRoomKey, openKeyboard } from "./keyboard-shortcuts.js?v=3.1.0";
 
@@ -1214,6 +1215,23 @@ function setupSettings() {
   }
   const orientation = document.querySelector("#hotbar-orientation");
   const labels = document.querySelector("#hotbar-labels");
+  const horizontal = document.querySelector("#hotbar-horizontal-position");
+  const horizontalValue = document.querySelector("#hotbar-horizontal-value");
+  function updateHorizontal() {
+    horizontal.value = hotbarHorizontalPosition(OBR, hotbarOrientation(OBR) === "left");
+    showHorizontalValue();
+  }
+  function showHorizontalValue() {
+    horizontalValue.value = horizontal.value + "%";
+  }
+  if (horizontal && horizontalValue) {
+    updateHorizontal();
+    horizontal.addEventListener("input", showHorizontalValue);
+    horizontal.addEventListener("change", () => {
+      setHotbarHorizontalPosition(OBR, hotbarOrientation(OBR) === "left", horizontal.valueAsNumber);
+      void sendHotbarCommand(OBR, "layout").catch(console.error);
+    });
+  }
   const vertical = document.querySelector("#hotbar-vertical-position");
   const verticalValue = document.querySelector("#hotbar-vertical-value");
   function updateVertical() {
@@ -1245,6 +1263,7 @@ function setupSettings() {
     orientation.addEventListener("change", () => {
       setHotbarOrientation(OBR, orientation.value);
       if (vertical && verticalValue) updateVertical();
+      if (horizontal && horizontalValue) updateHorizontal();
       void sendHotbarCommand(OBR, "layout").catch(console.error);
     });
   }

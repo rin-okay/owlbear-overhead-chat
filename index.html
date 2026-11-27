@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>overhead chat</title>
   <link rel="stylesheet" href="./chat.css?v=3.2.2">
-  <script type="module" src="./chat.js?v=3.2.4"></script>
+  <script type="module" src="./chat.js?v=3.2.5"></script>
 </head>
 <body>
   <main>
@@ -181,6 +181,8 @@
               <option value="left">left (vertical)</option>
             </select>
           </label>
+          <label for="hotbar-horizontal-position">hotbar horizontal position <output id="hotbar-horizontal-value" for="hotbar-horizontal-position"></output></label>
+          <input id="hotbar-horizontal-position" type="range" min="0" max="100" step="1" value="50">
           <label for="hotbar-vertical-position">hotbar vertical position <output id="hotbar-vertical-value" for="hotbar-vertical-position"></output></label>
           <input id="hotbar-vertical-position" type="range" min="0" max="30" step="1" value="0">
           <label class="discord-enabled"><input id="hotbar-labels" type="checkbox" checked> show labels on hotbar</label>

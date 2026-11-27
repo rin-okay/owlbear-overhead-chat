@@ -28,6 +28,22 @@ export function setHotbarVerticalPosition(obr, left, value) {
   try { localStorage.setItem(verticalKey(obr, left), String(clampValue(left, value))); } catch {}
 }
 
+const horizontalKey = (obr, left) => key(obr, left ? "left-horizontal" : "bottom-horizontal");
+const clampHorizontal = (value) => Math.min(100, Math.max(0, Math.round(value)));
+
+export function hotbarHorizontalPosition(obr, left) {
+  try {
+    const saved = localStorage.getItem(horizontalKey(obr, left));
+    if (saved !== null && Number.isFinite(Number(saved))) return clampHorizontal(Number(saved));
+  } catch {}
+  return left ? 0 : 50;
+}
+
+export function setHotbarHorizontalPosition(obr, left, value) {
+  if (!Number.isFinite(value)) return;
+  try { localStorage.setItem(horizontalKey(obr, left), String(clampHorizontal(value))); } catch {}
+}
+
 function dimensions(left, compact, slots, viewport) {
   return {
     width: left ? Math.min(compact ? 62 : 146, viewport.width) : hotbarLength(false, viewport.width, slots, compact),
@@ -37,14 +53,15 @@ function dimensions(left, compact, slots, viewport) {
 
 function anchorPosition(obr, left, viewport, size) {
   const value = hotbarVerticalPosition(obr, left);
+  const horizontal = (viewport.width - size.width) * hotbarHorizontalPosition(obr, left) / 100;
   if (!left) {
     const margin = Math.min(12, Math.max(0, viewport.height - size.height));
-    return { left: viewport.width / 2, top: Math.max(size.height, viewport.height - margin - viewport.height * value / 100) };
+    return { left: horizontal + size.width / 2, top: Math.max(size.height, viewport.height - margin - viewport.height * value / 100) };
   }
   const available = Math.max(0, viewport.height - size.height);
   const margin = Math.min(VIEWPORT_MARGIN, available / 2);
   return {
-    left: Math.min(60, Math.max(0, viewport.width - size.width)),
+    left: horizontal,
     top: Math.round(size.height / 2 + margin + (available - margin * 2) * (100 - value) / 100),
   };
 }
@@ -91,7 +108,7 @@ export function setupHotbar(obr) {
     const left = hotbarOrientation(obr) === "left";
     const compact = !hotbarShowsLabels(obr);
     const size = dimensions(left, compact, slots, viewport);
-    const url = new URL("./hotbar.html?v=3.2.3", import.meta.url);
+    const url = new URL("./hotbar.html?v=3.2.5", import.meta.url);
     if (left) url.searchParams.set("position", "left");
     if (compact) url.searchParams.set("labels", "off");
     if (slots !== MIN_HOTBAR_SLOTS) url.searchParams.set("slots", String(slots));
@@ -125,7 +142,7 @@ export function setupHotbar(obr) {
       } else if (command === "resize" && visible && Number.isInteger(movement?.slots) &&
           movement.slots >= MIN_HOTBAR_SLOTS && movement.slots !== openedSlots &&
           movement.left === (hotbarOrientation(obr) === "left") && movement.compact === !hotbarShowsLabels(obr)) {
-        if (movement.left) {
+        if (movement.left || hotbarHorizontalPosition(obr, false) !== 50) {
           await close();
           await open(movement.slots);
         } else {
